@@ -56,6 +56,9 @@ function toDic(list) {
 }
 
 function strToList(str) {
+    if (!str || str === "") {
+        return [];
+    }
     return str.trim().split("\n");
 }
 
