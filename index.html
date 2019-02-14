@@ -1,20 +1,33 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+
+<html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <title>UL VanillaJS</title>
+  <meta charset="utf-8">
+  <title>List comparer</title>
+  <meta name="description" content="Compare lists">
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <form>
-        <input id="chars_num" type="number" value="" />
-        <input id="input_txt" type="text" />
-        <input id="submit_btn" type="submit" value="Submit" />
-        <input id="reset_btn" type="button" value="Start" />
-    </form>
-</body>
 
-<script src="app.js"></script>
+  <div>
+    <textarea id="a"></textarea>
+    <textarea id="b"></textarea>
+  </div>
+  <button id="compare-btn">Distinct sort compare</button>
+  <button hidden id="random-btn">Randomize</button>
+
+  <p>In both:</p>
+  <textarea id="a-and-b"></textarea>
+
+  <p>Only in left:</p>
+  <textarea id="a-not-b"></textarea>
+
+  <p>Only in right:</p>
+  <textarea id="b-not-a"></textarea>
+
+  <script src="app.js"></script>
+</body>
 
 </html>

@@ -1,72 +1,104 @@
-let peekTimeMs = 1000
-let arr = []
-let interval
+// --- MAIN ---
 
-$("#chars_num").value = localStorage.getItem("charsNum") || 4
+one("#compare-btn").addEventListener("click", function () {
+    var a = strToList(one("#a").value);
+    var b = strToList(one("#b").value);
 
-function start() {
-    if (interval != null) clearTimeout(interval)
-    let n = $("#chars_num").valueAsNumber
-    let input = $("#input_txt")
-    arr = generateRandomNumbers(n)
-    // console.log("arr", arr)
-    let i = 0
-    interval = setInterval(() => {
-        if (i >= arr.length) {
-            clearInterval(interval)
-            input.value = ""
-            input.focus()
-            return
+    var aDict = toDic(a);
+    var bDict = toDic(b);
+
+    // To distinct
+    a = dicToList(aDict);
+    b = dicToList(bDict);
+
+    // Populate with sorted distinct
+    one("#a").value = listToStr(a);
+    one("#b").value = listToStr(b);
+
+    // A and B
+    one("#a-and-b").value = listToStr(both(a, bDict));
+
+    // A not B
+    one("#a-not-b").value = listToStr(onlyFirst(a, bDict));
+
+    // B not A
+    one("#b-not-a").value = listToStr(onlyFirst(b, aDict));
+});
+
+one("#random-btn").addEventListener("click", function () {
+    one("#a").value = listToStr(randomList(100000, 999999, 10000));
+    one("#b").value = listToStr(randomList(100000, 999999, 10000));
+});
+
+// --- FUNCTIONS ---
+
+function one(tag) {
+    return document.querySelector(tag);
+}
+
+function many(tag) {
+    return document.querySelector(tag);
+}
+
+function toDic(list) {
+    var o = {};
+    for (var i = 0; i < list.length; i++) {
+        var key = list[i];
+        o[key] = key;
+    }
+    return o;
+}
+
+function strToList(str) {
+    return str.trim().split("\n");
+}
+
+function dicToList(dic) {
+    var xs = [];
+    for (let key in dic) {
+        if (dic.hasOwnProperty(key)) {
+            xs.push(key);
         }
-        input.value = arr[i++]
-    }, peekTimeMs)
+    }
+    return xs;
 }
 
-start()
-
-// Events
-$("#reset_btn").addEventListener("click", e => {
-    start();
-})
-
-$("#submit_btn").addEventListener("click", e => {
-    e.preventDefault()
-    const guess = $("#input_txt").value
-    const correct = arr.join("")
-    if (guess === correct) {
-        alert("Correct")
-    } else {
-        alert("Incorrect. Correct was: " + correct + " you entered: " + guess)
-    }
-    start()
-})
-
-$("#chars_num").addEventListener("change", e => {
-    localStorage.setItem("charsNum", e.target.value)
-})
-
-function $(selector, context) {
-    ctx = (context || document)
-    if (selector.startsWith("#")) {
-        return ctx.getElementById(selector.slice(1))
-    }
-    return ctx.querySelectorAll(selector)
+function listToStr(list) {
+    return list.join("\n");
 }
 
-function getRandomInt(min, max) {
-    min = Math.ceil(min)
-    max = Math.floor(max)
-    return Math.floor(Math.random() * (max - min)) + min
+function both(aList, bDict) {
+    var both = [];
+    for (var i = 0; i < aList.length; i++) {
+        var x = aList[i];
+        if (bDict[x]) {
+            both.push(x);
+        }
+    }
+    return both;
 }
 
-function generateRandomNumbers(n) {
-    let arr = [getRandomInt(0, 10)]
-    let r = -1
-    for (let i = 1; i < n; i++) {
-        do {
-            r = getRandomInt(0, 10)
-        } while(r === arr[i-1])
-        arr.push(r)
+function onlyFirst(aList, bDict) {
+    var onlyA = [];
+    for (var i = 0; i < aList.length; i++) {
+        var x = aList[i];
+        if (!bDict[x]) {
+            onlyA.push(x);
+        }
     }
-    return arr
+    return onlyA;
+}
+
+function randomInt(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min)) + min;
+}
+
+function randomList(min, max, size) {
+    var r = [];
+    for (var i = 0; i < size; i++) {
+        r.push(randomInt(min, max));
+    }
+    return r;
 }
