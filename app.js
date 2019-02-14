@@ -15,6 +15,9 @@ one("#compare-btn").addEventListener("click", function () {
     one("#a").value = listToStr(a);
     one("#b").value = listToStr(b);
 
+    one("#a-count").textContent = a.length;
+    one("#b-count").textContent = b.length;
+
     // A and B
     var bothList = both(a, bDict);
     one("#a-and-b").value = listToStr(bothList);
