@@ -59,7 +59,12 @@ function strToList(str) {
     if (!str || str === "") {
         return [];
     }
-    return str.trim().split("\n");
+    var a = str.trim().split("\n");
+    var trimmed = [];
+    for (var i = 0; i < a.length; i++) {
+        trimmed.push(a[i].trim());
+    }
+    return trimmed;
 }
 
 function dicToList(dic) {
