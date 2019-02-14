@@ -1,9 +1,30 @@
+html * {
+    font-family: monospace !important
+}
+
 textarea {
-    min-width: 40%;
+    min-width: 300px;
     min-height: 100px;
-    font-family: monospace;
+    resize: none;
 }
 
 button {
-    height: 32px;
+    height: 22px;
+    margin-top: 1em;
+    border-style: groove;
+    background: lightgoldenrodyellow;
+    font-size: medium;
+}
+
+body {
+    width: 800px;
+    margin: 0 auto;
+}
+
+.inline-block {
+    display: inline-block;
+}
+
+span {
+    color: darkgray;
 }

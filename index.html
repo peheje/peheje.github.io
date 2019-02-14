@@ -10,27 +10,39 @@
 </head>
 
 <body>
-  <div>
-    <textarea id="a"></textarea>
-    <span id="a-count"></span>
-    <textarea id="b"></textarea>
-    <span id="b-count"></span>
+  <div class="ab">
+    <div class="inline-block">
+      <p>Left: <span id="a-count">0</span></p>
+      <textarea id="a"></textarea>
+    </div>
+    <div class="inline-block">
+      <p>Right: <span id="b-count">0</span></p>
+      <textarea id="b"></textarea>
+    </div>
   </div>
 
-  <button id="compare-btn" title="Trim lines, remove duplicates, sort and compare">Compare</button>
-  <button hidden id="random-btn">Randomize</button>
+  <div>
+    <button id="compare-btn" title="Trim lines, remove duplicates, sort and compare">Compare</button>
+    <button hidden id="random-btn">Randomize</button>
+  </div>
 
-  <p>In both:</p>
-  <textarea id="a-and-b"></textarea>
-  <span id="a-and-b-count"></span>
+  <div class="inline-block">
+    <p>In both: <span id="a-and-b-count">0</span></p>
+    <textarea id="a-and-b"></textarea>
+    
+  </div>
 
-  <p>Only in left:</p>
-  <textarea id="a-not-b"></textarea>
-  <span id="a-not-b-count"></span>
-
-  <p>Only in right:</p>
-  <textarea id="b-not-a"></textarea>
-  <span id="b-not-a-count"></span>
+  <div class="ab">
+    <div class="inline-block">
+      <p>Only in left: <span id="a-not-b-count">0</span></p>
+      <textarea id="a-not-b"></textarea>
+      
+    </div>
+    <div class="inline-block">
+      <p>Only in right: <span id="b-not-a-count">0</span></p>
+      <textarea id="b-not-a"></textarea>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
