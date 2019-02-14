@@ -16,13 +16,19 @@ one("#compare-btn").addEventListener("click", function () {
     one("#b").value = listToStr(b);
 
     // A and B
-    one("#a-and-b").value = listToStr(both(a, bDict));
+    var bothList = both(a, bDict);
+    one("#a-and-b").value = listToStr(bothList);
+    one("#a-and-b-count").textContent = bothList.length;
 
     // A not B
-    one("#a-not-b").value = listToStr(onlyFirst(a, bDict));
+    var aOnlyList = onlyFirst(a, bDict);
+    one("#a-not-b").value = listToStr(aOnlyList);
+    one("#a-not-b-count").textContent = aOnlyList.length;
 
     // B not A
-    one("#b-not-a").value = listToStr(onlyFirst(b, aDict));
+    var bOnlyList = onlyFirst(b, aDict);
+    one("#b-not-a").value = listToStr(bOnlyList);
+    one("#b-not-a-count").textContent = bOnlyList.length;
 });
 
 one("#random-btn").addEventListener("click", function () {
