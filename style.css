@@ -1,6 +1,6 @@
 textarea {
-    width: 40%;
-    height: 100px;
+    min-width: 40%;
+    min-height: 100px;
     font-family: monospace;
 }
 
