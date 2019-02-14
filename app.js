@@ -1,52 +1,56 @@
 // --- MAIN ---
 
-one("#compare-btn").addEventListener("click", function () {
-    var a = strToList(one("#a").value);
-    var b = strToList(one("#b").value);
+q("#compare-btn").addEventListener("click", function () {
 
+    // Generate lists
+    var a = strToList(q("#a").value);
+    var b = strToList(q("#b").value);
+
+    // Generate dictionaries
     var aDict = toDic(a);
     var bDict = toDic(b);
 
-    // To distinct
+    // Make lists distinct
     a = dicToList(aDict);
     b = dicToList(bDict);
 
-    // Populate with sorted distinct
-    one("#a").value = listToStr(a);
-    one("#b").value = listToStr(b);
+    // Change to distinct lists on UI
+    q("#a").value = listToStr(a);
+    q("#b").value = listToStr(b);
 
-    one("#a-count").textContent = a.length;
-    one("#b-count").textContent = b.length;
+    // Calculate counts
+    q("#a-count").textContent = a.length;
+    q("#b-count").textContent = b.length;
 
     // A and B
     var bothList = both(a, bDict);
-    one("#a-and-b").value = listToStr(bothList);
-    one("#a-and-b-count").textContent = bothList.length;
+    q("#a-and-b").value = listToStr(bothList);
+    q("#a-and-b-count").textContent = bothList.length;
 
     // A not B
     var aOnlyList = onlyFirst(a, bDict);
-    one("#a-not-b").value = listToStr(aOnlyList);
-    one("#a-not-b-count").textContent = aOnlyList.length;
+    q("#a-not-b").value = listToStr(aOnlyList);
+    q("#a-not-b-count").textContent = aOnlyList.length;
 
     // B not A
     var bOnlyList = onlyFirst(b, aDict);
-    one("#b-not-a").value = listToStr(bOnlyList);
-    one("#b-not-a-count").textContent = bOnlyList.length;
+    q("#b-not-a").value = listToStr(bOnlyList);
+    q("#b-not-a-count").textContent = bOnlyList.length;
 });
 
-one("#random-btn").addEventListener("click", function () {
-    one("#a").value = listToStr(randomList(100000, 999999, 10000));
-    one("#b").value = listToStr(randomList(100000, 999999, 10000));
+q("#random-btn").addEventListener("click", function () {
+    q("#a").value = listToStr(randomList(100000, 999999, 10000));
+    q("#b").value = listToStr(randomList(100000, 999999, 10000));
 });
 
 // --- FUNCTIONS ---
 
-function one(tag) {
-    return document.querySelector(tag);
-}
-
-function many(tag) {
-    return document.querySelector(tag);
+function q(tag) {
+    if (tag[0] === "#") {
+        return document.querySelector(tag);
+    } else {
+        return document.querySelectorAll(tag);
+    }
 }
 
 function toDic(list) {
