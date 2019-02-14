@@ -3,9 +3,10 @@
 <html lang="en">
 
 <head>
+  <link rel="shortcut icon" type="image/png" href="/hamster.png" />
   <meta charset="utf-8">
-  <title>List comparer</title>
-  <meta name="description" content="Compare lists">
+  <title>List Comparer</title>
+  <meta name="description" content="List Comparer">
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -22,21 +23,21 @@
   </div>
 
   <div>
-    <button id="compare-btn" title="Trim lines, remove duplicates, sort and compare">Compare</button>
+    <button id="compare-btn" title="Trims lines, removes duplicates, sorts and compares.">Compare</button>
     <button hidden id="random-btn">Randomize</button>
   </div>
 
   <div class="inline-block">
     <p>In both: <span id="a-and-b-count">0</span></p>
     <textarea id="a-and-b"></textarea>
-    
+
   </div>
 
   <div class="ab">
     <div class="inline-block">
       <p>Only in left: <span id="a-not-b-count">0</span></p>
       <textarea id="a-not-b"></textarea>
-      
+
     </div>
     <div class="inline-block">
       <p>Only in right: <span id="b-not-a-count">0</span></p>
