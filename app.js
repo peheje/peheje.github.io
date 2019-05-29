@@ -7,8 +7,8 @@ q("#compare-btn").addEventListener("click", function () {
     var b = strToList(q("#b").value);
 
     // Generate dictionaries
-    var aDict = toDic(a);
-    var bDict = toDic(b);
+    var aDict = listToDic(a);
+    var bDict = listToDic(b);
 
     // Make lists distinct
     a = dicToList(aDict);
@@ -53,7 +53,7 @@ function q(tag) {
     }
 }
 
-function toDic(list) {
+function listToDic(list) {
     var o = {};
     for (var i = 0; i < list.length; i++) {
         var key = list[i];
