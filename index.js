@@ -1,0 +1,1 @@
+document.getElementById("goto-compare").submit()

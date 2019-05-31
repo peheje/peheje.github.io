@@ -1,0 +1,43 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <link rel="shortcut icon" type="image/png" href="/hamster.png" />
+    <meta charset="utf-8">
+    <title>List Comparer</title>
+    <meta name="description" content="List Comparer">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <nav>
+        <a href="compare.html">Compare</a> |
+        <a href="unique.html">Unique</a>
+    </nav>
+
+    <div class="inline-block">
+        <p>Original: <span id="original-count">0</span></p>
+        <textarea id="original"></textarea>
+    </div>
+
+    <div>
+        <button id="find-duplicates-btn" title="Finds duplicates">Find duplicates</button>
+        <button hidden id="random-btn">Randomize</button>
+    </div>
+
+    <div class="inline-block">
+        <p>Duplicates: <span id="duplicates-count">0</span></p>
+        <textarea id="duplicates"></textarea>
+    </div>
+
+    <div class="inline-block">
+        <p>Unique: <span id="unique-count">0</span></p>
+        <textarea id="unique"></textarea>
+    </div>
+
+    <script src="shared.js"></script>
+    <script src="unique.js"></script>
+</body>
+
+</html>
