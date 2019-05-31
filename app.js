@@ -3,29 +3,37 @@
 q("#compare-btn").addEventListener("click", function () {
 
     // Generate lists
-    var a = strToDic(q("#a").value);
-    var b = strToDic(q("#b").value);
+    var a = strToList(q("#a").value);
+    var b = strToList(q("#b").value);
+
+    // Generate dictionaries
+    var aDict = listToDic(a);
+    var bDict = listToDic(b);
+
+    // Make lists distinct
+    a = dicToList(aDict);
+    b = dicToList(bDict);
 
     // Change to distinct lists on UI
-    q("#a").value = listToStr(dicToList(a));
-    q("#b").value = listToStr(dicToList(b));
+    q("#a").value = listToStr(a);
+    q("#b").value = listToStr(b);
 
     // Calculate counts
     q("#a-count").textContent = a.length;
     q("#b-count").textContent = b.length;
 
     // A and B
-    var bothList = both(a, b);
+    var bothList = both(a, bDict);
     q("#a-and-b").value = listToStr(bothList);
     q("#a-and-b-count").textContent = bothList.length;
 
     // A not B
-    var aOnlyList = onlyFirst(a, b);
+    var aOnlyList = onlyFirst(a, bDict);
     q("#a-not-b").value = listToStr(aOnlyList);
     q("#a-not-b-count").textContent = aOnlyList.length;
 
     // B not A
-    var bOnlyList = onlyFirst(b, a);
+    var bOnlyList = onlyFirst(b, aDict);
     q("#b-not-a").value = listToStr(bOnlyList);
     q("#b-not-a-count").textContent = bOnlyList.length;
 });
@@ -82,17 +90,13 @@ function q(tag) {
     }
 }
 
-function strToDic(str) {
-    if (!str || str == "") {
-        return {};
-    }
-    var list = str.trim().split("\n");
-    var trimmed = {};
+function listToDic(list) {
+    var o = {};
     for (var i = 0; i < list.length; i++) {
-        var key = list[i].trim();
-        trimmed[key] = key;
+        var key = list[i];
+        o[key] = key;
     }
-    return trimmed;
+    return o;
 }
 
 function strToList(str) {
@@ -121,10 +125,10 @@ function listToStr(list) {
     return list.join("\n");
 }
 
-function both(aDict, bDict) {
+function both(aList, bDict) {
     var both = [];
-    for (var key in aDict) {
-        var x = aDict[key];
+    for (var i = 0; i < aList.length; i++) {
+        var x = aList[i];
         if (bDict[x]) {
             both.push(x);
         }
@@ -132,10 +136,10 @@ function both(aDict, bDict) {
     return both;
 }
 
-function onlyFirst(aDict, bDict) {
+function onlyFirst(aList, bDict) {
     var onlyA = [];
-    for (var key in aDict) {
-        var x = aDict[key];
+    for (var i = 0; i < aList.length; i++) {
+        var x = aList[i];
         if (!bDict[x]) {
             onlyA.push(x);
         }
