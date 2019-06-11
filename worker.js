@@ -1,6 +1,8 @@
 onmessage = function (evt) {
-    importScripts("shared.js");
-    var res = self[evt.data.action](...evt.data.arguments);
+    importScripts("shared.js"); // import the functions into "self"
+    var action = self[evt.data.action];
+    var params = evt.data.arguments;
+    var res = action(...params);
     self.postMessage(res);
 }
 
