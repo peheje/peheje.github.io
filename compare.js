@@ -23,24 +23,44 @@ q("#compare-btn").addEventListener("click", function () {
     q("#b-count").textContent = b.length;
 
     // A and B
-    var bothList = both(a, bDict);
-    q("#a-and-b").value = listToStr(bothList);
-    q("#a-and-b-count").textContent = bothList.length;
+    var bothWorker = new Worker("worker.js");
+    bothWorker.onmessage = function (evt) {
+        var bothList = evt.data;
+        q("#a-and-b").value = listToStr(bothList);
+        q("#a-and-b-count").textContent = bothList.length;
+        bothWorker.terminate();
+    };
+    bothWorker.postMessage({ action: "both", arguments: [a, bDict] });
 
     // A not B
-    var aOnlyList = onlyFirst(a, bDict);
-    q("#a-not-b").value = listToStr(aOnlyList);
-    q("#a-not-b-count").textContent = aOnlyList.length;
+    var aNotBWorker = new Worker("worker.js");
+    aNotBWorker.onmessage = function (evt) {
+        var aOnlyList = evt.data;
+        q("#a-not-b").value = listToStr(aOnlyList);
+        q("#a-not-b-count").textContent = aOnlyList.length;
+        aNotBWorker.terminate();
+    };
+    aNotBWorker.postMessage({ action: "onlyFirst", arguments: [a, bDict] });
 
     // B not A
-    var bOnlyList = onlyFirst(b, aDict);
-    q("#b-not-a").value = listToStr(bOnlyList);
-    q("#b-not-a-count").textContent = bOnlyList.length;
+    var bNotAWorker = new Worker("worker.js");
+    bNotAWorker.onmessage = function (evt) {
+        var bOnlyList = evt.data;
+        q("#b-not-a").value = listToStr(bOnlyList);
+        q("#b-not-a-count").textContent = bOnlyList.length;
+        bNotAWorker.terminate();
+    };
+    bNotAWorker.postMessage({ action: "onlyFirst", arguments: [b, aDict] });
 });
 
 q("#random-btn").addEventListener("click", function () {
-    q("#a").value = listToStr(randomList(100000, 999999, 10000));
-    q("#b").value = listToStr(randomList(100000, 999999, 10000));
+    var worker = new Worker("worker.js");
+    worker.onmessage = function (evt) {
+        q("#a").value = listToStr(evt.data.a);
+        q("#b").value = listToStr(evt.data.b);
+        worker.terminate();
+    }
+    worker.postMessage({ action: "twoLists", arguments: [] });
 });
 
 q("#download-btn").addEventListener("click", function (e) {
@@ -54,8 +74,7 @@ q("#download-btn").addEventListener("click", function (e) {
     var data = "Left,Right,In both,Only in left,Only in right\r\n";
     var max = a.length > b.length ? a.length : b.length;
 
-    for (var i = 0; i < max; i++)
-    {
+    for (var i = 0; i < max; i++) {
         data += takeOrEmpty(a, i);
         data += ",";
         data += takeOrEmpty(b, i);
@@ -70,28 +89,3 @@ q("#download-btn").addEventListener("click", function (e) {
 
     this.href = "data:text/plain;charset=UTF-8," + encodeURIComponent(data);
 });
-
-// --- FUNCTIONS ---
-
-function both(aList, bDict) {
-    var both = [];
-    for (var i = 0; i < aList.length; i++) {
-        var x = aList[i];
-        if (bDict[x]) {
-            both.push(x);
-        }
-    }
-    return both;
-}
-
-function onlyFirst(aList, bDict) {
-    var onlyA = [];
-    for (var i = 0; i < aList.length; i++) {
-        var x = aList[i];
-        if (!bDict[x]) {
-            onlyA.push(x);
-        }
-    }
-    return onlyA;
-}
-
