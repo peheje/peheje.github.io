@@ -6,6 +6,10 @@ q("#compare-btn").addEventListener("click", function () {
     var a = strToList(q("#a").value);
     var b = strToList(q("#b").value);
 
+    // Remove whitespace lines
+    a = a.filter(function(v) { return v.trim() !== ""; });
+    b = b.filter(function(v) { return v.trim() !== ""; });
+
     // Generate dictionaries
     var aDict = listToDic(a);
     var bDict = listToDic(b);

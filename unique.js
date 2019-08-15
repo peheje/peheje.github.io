@@ -2,10 +2,13 @@
 
 q("#find-duplicates-btn").addEventListener("click", function(){
     
-    var orig = strToList(q("#original").value);
-    q("#original-count").textContent = orig.length;
+    var a = strToList(q("#original").value);
+    a = a.filter(function(v) { return v.trim() !== ""; });
 
-    var unique = listToDic(orig);
+    q("#original").value = listToStr(a);
+    q("#original-count").textContent = a.length;
+
+    var unique = listToDic(a);
     if ("" in unique) {
         delete unique[""]
     }
@@ -13,7 +16,7 @@ q("#find-duplicates-btn").addEventListener("click", function(){
     var uniqueList = dicToList(unique);
     q("#unique").value = listToStr(uniqueList);
     q("#unique-count").textContent = uniqueList.length;
-    var duplicatesList = duplicates(orig);
+    var duplicatesList = duplicates(a);
     q("#duplicates").value = listToStr(duplicatesList);
     q("#duplicates-count").textContent = duplicatesList.length;
 });
