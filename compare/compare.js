@@ -1,5 +1,3 @@
-// --- MAIN ---
-
 q("#compare-btn").addEventListener("click", function () {
 
     // Generate lists
@@ -74,8 +72,6 @@ q("#download-btn").addEventListener("click", function (e) {
 
     this.href = "data:text/plain;charset=UTF-8," + encodeURIComponent(data);
 });
-
-// --- FUNCTIONS ---
 
 function both(aList, bDict) {
     var both = [];

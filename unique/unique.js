@@ -1,5 +1,3 @@
-// --- MAIN ---
-
 q("#find-duplicates-btn").addEventListener("click", function(){
     
     var a = strToList(q("#original").value);
@@ -20,8 +18,6 @@ q("#find-duplicates-btn").addEventListener("click", function(){
     q("#duplicates").value = listToStr(duplicatesList);
     q("#duplicates-count").textContent = duplicatesList.length;
 });
-
-// --- FUNCTIONS ---
 
 function duplicates(list) {
     var o = {};
