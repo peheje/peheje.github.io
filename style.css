@@ -28,3 +28,7 @@ body {
 span {
     color: darkgray;
 }
+
+nav span {
+    color: black;
+}
