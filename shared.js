@@ -17,8 +17,6 @@ function addMenuToPage() {
     contactAnchor.target = "_blank";
     nav.appendChild(contactAnchor);
 
-    console.log(nav)
-
     // prepend nav to body
     document.body.insertBefore(nav, document.body.firstChild);
 }
