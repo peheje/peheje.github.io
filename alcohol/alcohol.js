@@ -19,7 +19,7 @@ function calculateAndShowUnits() {
     var millilitresAlcohol = millilitres*percentage;
     var dkUnits = millilitresAlcohol / 15;
 
-    q("#dk-units").innerHTML = roundToDigits(1, dkUnits);
+    q("#dk-units").innerHTML = roundToDigits(2, dkUnits);
 }
 
 function roundToDigits(digits, value) {
