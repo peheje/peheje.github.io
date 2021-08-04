@@ -1,3 +1,41 @@
+addMenuToPage()
+
+function addMenuToPage() {
+    var nav = document.createElement("nav");
+
+    var compareAnchor = createAnchor("Compare", "/compare/compare.html");
+    nav.appendChild(compareAnchor);
+    
+    appendSeparator(nav);
+    
+    var uniqueAnchor = createAnchor("Unique", "/unique/unique.html");
+    nav.appendChild(uniqueAnchor);
+    
+    appendSeparator(nav);
+
+    var contactAnchor = createAnchor("Contact", "https://twitter.com/peheje");
+    contactAnchor.target = "_blank";
+    nav.appendChild(contactAnchor);
+
+    console.log(nav)
+
+    // prepend nav to body
+    document.body.insertBefore(nav, document.body.firstChild);
+}
+
+function appendSeparator(nav) {
+    var separator = document.createElement("span");
+    separator.innerHTML = " | ";
+    nav.appendChild(separator);
+}
+
+function createAnchor(text, href) {
+    var a = document.createElement("a");
+    a.href = href;
+    a.innerHTML = text;
+    return a;
+}
+
 function q(tag) {
     if (tag[0] === "#") {
         return document.querySelector(tag);
