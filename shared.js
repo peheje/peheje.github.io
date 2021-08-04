@@ -1,6 +1,30 @@
-addMenuToPage()
+addMenu();
 
-function addMenuToPage() {
+addHead();
+
+function addHead() {
+    var meta = document.createElement("meta");
+    meta.name = "description";
+    meta.content = "Peheje tools";
+    document.head.appendChild(meta);
+
+    var title = document.createElement("title");
+    title.innerHTML = "Peheje tools";
+    document.head.appendChild(title);
+
+    var link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "/style.css";
+    document.head.appendChild(link);
+
+    var shortcutIconLink = document.createElement("link");
+    shortcutIconLink.rel = "shortcut icon";
+    shortcutIconLink.href = "/hamster.png";
+    shortcutIconLink.type = "image/png";
+    document.head.appendChild(shortcutIconLink);
+}
+
+function addMenu() {
     var nav = document.createElement("nav");
 
     var compareAnchor = createAnchor("Compare", "/compare/compare.html");
@@ -10,7 +34,12 @@ function addMenuToPage() {
     
     var uniqueAnchor = createAnchor("Unique", "/unique/unique.html");
     nav.appendChild(uniqueAnchor);
-    
+
+    appendSeparator(nav);
+
+    var alcoholAnchor = createAnchor("Alcohol", "/alcohol/alcohol.html");
+    nav.appendChild(alcoholAnchor);
+
     appendSeparator(nav);
 
     var contactAnchor = createAnchor("Contact", "https://twitter.com/peheje");
