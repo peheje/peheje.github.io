@@ -1,11 +1,11 @@
-q("#millilitres").addEventListener("keyup", function() {
+q("#millilitres").addEventListener("input", function() {
     if (this.value < 0) {
         this.value = 0;
     }
     calculateAndShowUnits()
 });
 
-q("#percentage").addEventListener("keyup", function() {
+q("#percentage").addEventListener("input", function() {
     if (this.value > 100 || this.value < 0) {
         this.value = 0;
     }
