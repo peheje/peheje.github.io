@@ -29,6 +29,10 @@ span {
     color: darkgray;
 }
 
+nav {
+    margin-top: 12px;
+}
+
 nav span {
     color: black;
 }

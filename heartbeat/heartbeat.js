@@ -1,19 +1,28 @@
-var spacePressed = false;
+var beatKeyPressed = false;
 var beats = [];
 var beatElement = document.getElementById("beat");
 var heartbeatElement = document.getElementById("heartbeat");
 
-// test(2000);
+// test(100);
 
 document.addEventListener("keyup", function () {
-    spacePressed = false;
+    beatKeyPressed = false;
 });
 
 document.addEventListener("keydown", function (e) {
+    beat(e.key)
+});
 
-    if (spacePressed || e.key !== " ") { return; }
+document.getElementById("heartbeat-btn").addEventListener("click", function () {
+    beat(" ")
+    beatKeyPressed = false;
+});
 
-    spacePressed = true;
+function beat(key) {
+
+    if (beatKeyPressed || key !== " ") { return; }
+
+    beatKeyPressed = true;
 
     showBeatIndicator();
 
@@ -35,7 +44,7 @@ document.addEventListener("keydown", function (e) {
 
     var bpm = 60000 / averageTimeBetweenBeatMs;
     heartbeatElement.innerHTML = roundToDigits(0, bpm) + " bpm";
-});
+}
 
 function average(array) {
     var sum = 0;
