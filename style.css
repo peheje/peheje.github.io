@@ -10,6 +10,12 @@ textarea {
 
 button {
     background: lightgoldenrodyellow;
+    min-height: 32px;
+}
+
+.big-btn {
+    width: 128px;
+    height: 64px;
 }
 
 .margin-bottom-10 {
