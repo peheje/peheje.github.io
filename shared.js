@@ -62,8 +62,6 @@ function addMenu() {
 
 function highlightMenu() {
     var path = window.location.pathname;
-    console.log("path", path);
-
     var nav = document.querySelector("nav");
     var anchor = nav.querySelector("a[href='" + path + "']");
 
