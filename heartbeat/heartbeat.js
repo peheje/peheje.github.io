@@ -3,37 +3,38 @@ var beats = [];
 var beatElement = document.getElementById("beat");
 var heartbeatElement = document.getElementById("heartbeat");
 
-test(1000);
+// test(2000);
 
 document.addEventListener("keyup", function () {
     spacePressed = false;
 });
 
 document.addEventListener("keydown", function (e) {
-    if (e.key === " " && !spacePressed) {
-        spacePressed = true;
 
-        showBeatIndicator();
+    if (spacePressed || e.key !== " ") { return; }
 
-        keepOnlyNewestNBeats(10);
+    spacePressed = true;
 
-        beats.push(Date.now());
+    showBeatIndicator();
 
-        if (beats.length < 2) {
-            return;
-        }
+    keepOnlyNewestNBeats(10);
 
-        var timeBetweenBeatsMs = [];
-        for (var i = 0; i < beats.length - 1; i++) {
-            var delta = beats[i + 1] - beats[i];
-            timeBetweenBeatsMs.push(delta);
-        }
+    beats.push(Date.now());
 
-        var averageTimeBetweenBeatMs = average(timeBetweenBeatsMs);
-
-        var bpm = 60000 / averageTimeBetweenBeatMs;
-        heartbeatElement.innerHTML = roundToDigits(0, bpm) + " bpm";
+    if (beats.length < 2) {
+        return;
     }
+
+    var timeBetweenBeatsMs = [];
+    for (var i = 0; i < beats.length - 1; i++) {
+        var delta = beats[i + 1] - beats[i];
+        timeBetweenBeatsMs.push(delta);
+    }
+
+    var averageTimeBetweenBeatMs = average(timeBetweenBeatsMs);
+
+    var bpm = 60000 / averageTimeBetweenBeatMs;
+    heartbeatElement.innerHTML = roundToDigits(0, bpm) + " bpm";
 });
 
 function average(array) {
