@@ -42,6 +42,11 @@ function addMenu() {
 
     appendSeparator(nav);
 
+    var heartbeatAnchor = createAnchor("Heartbeat", "/heartbeat/heartbeat.html");
+    nav.appendChild(heartbeatAnchor);
+
+    appendSeparator(nav);
+
     var contactAnchor = createAnchor("Contact", "https://twitter.com/peheje");
     contactAnchor.target = "_blank";
     nav.appendChild(contactAnchor);
@@ -104,4 +109,9 @@ function dicToList(dic) {
 
 function listToStr(list) {
     return list.join("\n");
+}
+
+function roundToDigits(digits, value) {
+    var factor = Math.pow(10, digits);
+    return Math.round(value * factor) / factor;
 }

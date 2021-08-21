@@ -21,8 +21,3 @@ function calculateAndShowUnits() {
 
     q("#dk-units").innerHTML = roundToDigits(2, dkUnits);
 }
-
-function roundToDigits(digits, value) {
-    var factor = Math.pow(10, digits);
-    return Math.round(value * factor) / factor;
-}
