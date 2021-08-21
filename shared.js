@@ -1,5 +1,6 @@
 addMenu();
 addHead();
+highlightMenu();
 
 function addHead() {
     var meta = document.createElement("meta");
@@ -57,6 +58,16 @@ function addMenu() {
 
     // prepend nav to body
     document.body.insertBefore(nav, document.body.firstChild);
+}
+
+function highlightMenu() {
+    var path = window.location.pathname;
+    console.log("path", path);
+
+    var nav = document.querySelector("nav");
+    var anchor = nav.querySelector("a[href='" + path + "']");
+
+    anchor.classList.add("active");
 }
 
 function appendSeparator(nav) {
