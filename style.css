@@ -5,14 +5,24 @@ html * {
 textarea {
     resize: unset;
     min-height: 100px;
+    min-width: 200px;
 }
 
 button {
     background: lightgoldenrodyellow;
 }
 
+.margin-bottom-10 {
+    margin-bottom: 10px;
+}
+
 .inline-block {
-    display: inline-block;
+    display: inline-grid;
+    min-width: 300px;
+}
+
+.red {
+    color: red;
 }
 
 span {
