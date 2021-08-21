@@ -1,5 +1,4 @@
 addMenu();
-
 addHead();
 
 function addHead() {
@@ -7,6 +6,11 @@ function addHead() {
     meta.name = "description";
     meta.content = "Peheje tools";
     document.head.appendChild(meta);
+
+    var metaViewport = document.createElement("meta");
+    metaViewport.name = "viewport";
+    metaViewport.content = "width=device-width, initial-scale=1.0"
+    document.head.appendChild(metaViewport);
 
     var title = document.createElement("title");
     title.innerHTML = "Peheje tools";
@@ -70,7 +74,7 @@ function createAnchor(text, href) {
 
 function q(tag) {
     if (tag[0] === "#") {
-        return document.querySelector(tag);
+        return document.getElementById(tag.substring(1));
     } else {
         return document.querySelectorAll(tag);
     }

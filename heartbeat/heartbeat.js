@@ -1,11 +1,15 @@
 var beatKeyPressed = false;
 var beats = [];
-var beatElement = document.getElementById("beat");
-var heartbeatElement = document.getElementById("heartbeat");
+var beatElement = q("#beat");
+var heartbeatElement = q("#heartbeat");
 
-// test(100);
+// test(1000);
 
 document.addEventListener("keyup", function () {
+    beatKeyPressed = false;
+});
+
+document.addEventListener("mouseup", function () {
     beatKeyPressed = false;
 });
 
@@ -13,9 +17,8 @@ document.addEventListener("keydown", function (e) {
     beat(e.key)
 });
 
-document.getElementById("heartbeat-btn").addEventListener("click", function () {
+q("#heartbeat-btn").addEventListener("click", function () {
     beat(" ")
-    beatKeyPressed = false;
 });
 
 function beat(key) {

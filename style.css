@@ -3,22 +3,12 @@ html * {
 }
 
 textarea {
-    min-width: 300px;
+    resize: unset;
     min-height: 100px;
-    resize: none;
 }
 
 button {
-    height: 22px;
-    margin-top: 1em;
-    border-style: groove;
     background: lightgoldenrodyellow;
-    font-size: medium;
-}
-
-body {
-    width: 800px;
-    margin: 0 auto;
 }
 
 .inline-block {
@@ -29,8 +19,9 @@ span {
     color: darkgray;
 }
 
-nav {
-    margin-top: 12px;
+body {
+    margin-top: 32px;
+    margin-left: 32px;
 }
 
 nav span {
