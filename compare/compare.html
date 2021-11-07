@@ -15,8 +15,11 @@
     </div>
 
     <div>
-        <button id="compare-btn" title="Trims lines, remove whitespace lines, removes duplicates, sorts and compares.">Compare</button>
-        <button hidden id="random-btn">Randomize</button>
+        <button id="compare-btn" title="Trims, removes empty and duplicate lines then compares.">Compare</button>
+        <button id="random-btn" hidden>Randomize</button>
+
+        <label for="case-insensitive" class="not-selectable">Lowercase</label>
+        <input type="checkbox" id="case-insensitive">
     </div>
 
     <div class="inline-block">

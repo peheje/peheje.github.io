@@ -3,15 +3,15 @@ html * {
 }
 
 textarea {
-    resize: unset;
     min-height: 100px;
-    min-width: 200px;
+    min-width: 350px;
+    white-space: pre;
 }
 
 button {
     background: lightgoldenrodyellow;
-    min-height: 32px;
-    min-width: 100px;
+    min-height: 26px;
+    min-width: 90px;
 }
 
 .margin-bottom-10 {
@@ -50,4 +50,18 @@ nav a {
 .active {
     font-weight: bold;
     color: black;
+}
+
+input {
+    vertical-align: middle;
+}
+
+input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-left: 0;
+}
+
+.not-selectable {
+    user-select: none;
 }
