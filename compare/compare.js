@@ -4,9 +4,17 @@ q("#compare-btn").addEventListener("click", function () {
     var a = strToList(q("#a").value);
     var b = strToList(q("#b").value);
 
-    // Remove whitespace lines
-    a = a.filter(function(v) { return v.trim() !== ""; });
-    b = b.filter(function(v) { return v.trim() !== ""; });
+    // Remove whitespace lines and adhere to lowercase
+    function lowercase(v) {
+        return q("#case-insensitive").checked ? v.toLowerCase() : v;
+    }
+
+    function removeEmptyLines(v) {
+        return v.trim() !== "";
+    }
+
+    a = a.map(lowercase).filter(removeEmptyLines);
+    b = b.map(lowercase).filter(removeEmptyLines);
 
     // Generate dictionaries
     var aDict = listToDic(a);
@@ -56,8 +64,7 @@ q("#download-btn").addEventListener("click", function (e) {
     var data = "Left,Right,In both,Only in left,Only in right\r\n";
     var max = a.length > b.length ? a.length : b.length;
 
-    for (var i = 0; i < max; i++)
-    {
+    for (var i = 0; i < max; i++) {
         data += takeOrEmpty(a, i);
         data += ",";
         data += takeOrEmpty(b, i);
