@@ -5,16 +5,8 @@ q("#compare-btn").addEventListener("click", function () {
     var b = strToList(q("#b").value);
 
     // Remove whitespace lines and adhere to lowercase
-    function lowercase(v) {
-        return q("#case-insensitive").checked ? v.toLowerCase() : v;
-    }
-
-    function removeEmptyLines(v) {
-        return v.trim() !== "";
-    }
-
-    a = a.map(lowercase).filter(removeEmptyLines);
-    b = b.map(lowercase).filter(removeEmptyLines);
+    a = a.map(lowercaseIfCheckboxChecked).filter(removeEmptyLines);
+    b = b.map(lowercaseIfCheckboxChecked).filter(removeEmptyLines);
 
     // Generate dictionaries
     var aDict = listToDic(a);

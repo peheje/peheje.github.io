@@ -34,9 +34,9 @@ function addMenu() {
 
     var compareAnchor = createAnchor("Compare", "/compare/compare.html");
     nav.appendChild(compareAnchor);
-    
+
     appendSeparator(nav);
-    
+
     var uniqueAnchor = createAnchor("Unique", "/unique/unique.html");
     nav.appendChild(uniqueAnchor);
 
@@ -127,4 +127,12 @@ function listToStr(list) {
 function roundToDigits(digits, value) {
     var factor = Math.pow(10, digits);
     return Math.round(value * factor) / factor;
+}
+
+function removeEmptyLines(v) {
+    return v.trim() !== "";
+}
+
+function lowercaseIfCheckboxChecked(v) {
+    return q("#case-insensitive").checked ? v.toLowerCase() : v;
 }
