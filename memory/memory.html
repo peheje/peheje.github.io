@@ -1,0 +1,36 @@
+<!doctype html>
+
+<html lang="en">
+
+<body>
+
+    <p>Press start, a number will be shown for a configured interval, when it disappears enter it again and click submit.</p>
+
+    <div class="inline-block">
+        <label for="length">Length of number</label>
+        <input id="length" name="length" type="number" step="1" value="4" />
+    </div>
+    <div class="inline-block">
+        <label for="interval">Peek seconds</label>
+        <input id="interval" name="interval" type="number" step="1" value="4" />
+    </div>
+    <div class="inline-block">
+        <label for="io">Number</label>
+        <input id="io" name="io" type="text" />
+    </div>
+
+    <div>
+        <div class="inline-block">
+            <button id="submit">Start</button>
+        </div>
+        <div class="inline-block">
+            <button id="stop">Stop</button>
+        </div>
+    </div>
+
+</body>
+
+<script src="/shared.js"></script>
+<script src="./memory.js"></script>
+
+</html>
