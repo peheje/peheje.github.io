@@ -6,15 +6,12 @@ q("#submit").addEventListener("click", function () {
     if (state === "guess") {
 
         if (q("#io").value === number) {
-            alert("correct");
+            alert("Correct");
         } else {
-            alert("incorrect was " + number);
+            alert("Not correct, number was " + number);
         }
 
         state = "stopped";
-
-        q("#length").disabled = false;
-        q("#interval").disabled = false;
     }
 
     if (state === "stopped") {
@@ -34,17 +31,34 @@ q("#submit").addEventListener("click", function () {
     }
 });
 
-q("#stop").addEventListener("click", function() {
+q("#restart").addEventListener("click", function() {
     location.reload();
 });
 
+document.addEventListener("keypress", function(e) {
+    if (e.key === "Enter" && state === "guess" && q("#io").value) {
+        q("#submit").click();
+    }
+})
+
 function peek() {
     state = "peek";
+    show("#io-input");
+    hide("#length-input");
+    hide("#interval-input");
     q("#io").readOnly = true;
     q("#submit").disabled = true;
     q("#submit").innerText = "Peeking..";
-    q("#length").disabled = true;
-    q("#interval").disabled = true;
+}
+
+function hide(id) {
+    q(id).classList.remove("inline-block");
+    q(id).classList.add("display-none");
+}
+
+function show(id) {
+    q(id).classList.add("inline-block");
+    q(id).classList.remove("display-none");
 }
 
 function stopPeek() {
@@ -53,4 +67,3 @@ function stopPeek() {
     q("#submit").disabled = false;
     q("#submit").innerText = "Guess";
 }
-
