@@ -125,17 +125,3 @@ function takeOrEmpty(list, index) {
         return list[index];
     }
 }
-
-function randomInt(min, max) {
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min)) + min;
-}
-
-function randomList(min, max, size) {
-    var r = [];
-    for (var i = 0; i < size; i++) {
-        r.push(randomInt(min, max));
-    }
-    return r;
-}

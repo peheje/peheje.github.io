@@ -52,6 +52,11 @@ function addMenu() {
 
     appendSeparator(nav);
 
+    var memoryAnchor = createAnchor("Memory", "/memory/memory.html");
+    nav.appendChild(memoryAnchor);
+
+    appendSeparator(nav);
+
     var contactAnchor = createAnchor("Contact", "https://twitter.com/peheje");
     contactAnchor.target = "_blank";
     nav.appendChild(contactAnchor);
@@ -135,4 +140,18 @@ function removeEmptyLines(v) {
 
 function lowercaseIfCheckboxChecked(v) {
     return q("#case-insensitive").checked ? v.toLowerCase() : v;
+}
+
+function randomList(min, max, size) {
+    var r = [];
+    for (var i = 0; i < size; i++) {
+        r.push(randomInt(min, max));
+    }
+    return r;
+}
+
+function randomInt(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min)) + min;
 }
