@@ -17,8 +17,6 @@ q("#submit").addEventListener("click", function () {
     if (state === "stopped") {
         peek();
         var length = q("#length").value;
-        console.log(length);
-
         number = randomList(0, 10, length).join('');
         var io = q("#io");
         io.value = number;
@@ -51,6 +49,13 @@ function peek() {
     q("#submit").innerText = "Peeking..";
 }
 
+function stopPeek() {
+    state = "guess";
+    q("#io").readOnly = false;
+    q("#submit").disabled = false;
+    q("#submit").innerText = "Guess";
+}
+
 function hide(id) {
     q(id).classList.remove("inline-block");
     q(id).classList.add("display-none");
@@ -59,11 +64,4 @@ function hide(id) {
 function show(id) {
     q(id).classList.add("inline-block");
     q(id).classList.remove("display-none");
-}
-
-function stopPeek() {
-    state = "guess";
-    q("#io").readOnly = false;
-    q("#submit").disabled = false;
-    q("#submit").innerText = "Guess";
 }
