@@ -29,7 +29,7 @@ function beat(key) {
 
     showBeatIndicator();
 
-    keepOnlyNewestNBeats(10);
+    keepOnlyNewestNBeats(6);
 
     beats.push(Date.now());
 
