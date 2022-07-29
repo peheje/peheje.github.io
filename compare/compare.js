@@ -47,30 +47,53 @@ q("#random-btn").addEventListener("click", function () {
 
 q("#download-btn").addEventListener("click", function (e) {
 
-    var a = strToList(q("#a").value);
-    var b = strToList(q("#b").value);
+    var aString = q("#a").value;
+    var bString = q("#b").value;
+
+    var separator = getValidSeparator(aString + bString);
+    if (separator === null) {
+        e.preventDefault();
+        alert("Input already includes separator values | ; ,")
+        return;
+    }
+
+    var a = strToList(aString);
+    var b = strToList(bString);
     var aAndB = strToList(q("#a-and-b").value);
     var aNotB = strToList(q("#a-not-b").value);
     var bNotA = strToList(q("#b-not-a").value);
 
-    var data = "Left,Right,In both,Only in left,Only in right\r\n";
+    var data = "Left" + separator + "Right" + separator + "In both" + separator + "Only in left" + separator + "Only in right\n";
     var max = a.length > b.length ? a.length : b.length;
 
     for (var i = 0; i < max; i++) {
         data += takeOrEmpty(a, i);
-        data += ",";
+        data += separator;
         data += takeOrEmpty(b, i);
-        data += ",";
+        data += separator;
         data += takeOrEmpty(aAndB, i);
-        data += ",";
+        data += separator;
         data += takeOrEmpty(aNotB, i);
-        data += ",";
+        data += separator;
         data += takeOrEmpty(bNotA, i);
-        data += "\r\n";
+        data += "\n";
     }
 
     this.href = "data:text/plain;charset=UTF-8," + encodeURIComponent(data);
 });
+
+function getValidSeparator(str) {
+    const separators = ["|", ";", ","];
+
+    for (var i = 0; i < separators.length; i++) {
+        var separator = separators[i];
+        if (!str.includes(separator)) {
+            return separator;
+        }
+    }
+
+    return null;
+}
 
 function both(aList, bDict) {
     var both = [];
