@@ -1,6 +1,8 @@
-addMenu();
-addHead();
-highlightMenu();
+if (this.document) {
+    addMenu();
+    addHead();
+    highlightMenu();
+}
 
 function addHead() {
     var titleText = "peheje";

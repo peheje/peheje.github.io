@@ -1,48 +1,47 @@
 q("#compare-btn").addEventListener("click", function () {
 
+    var worker = new Worker("worker.js");
+
     // Generate lists
     var a = strToList(q("#a").value);
     var b = strToList(q("#b").value);
 
-    // Remove whitespace lines and adhere to lowercase
-    a = a.map(lowercaseIfCheckboxChecked).filter(removeEmptyLines);
-    b = b.map(lowercaseIfCheckboxChecked).filter(removeEmptyLines);
+    worker.postMessage([a, b]);
 
-    // Generate dictionaries
-    var aDict = listToDic(a);
-    var bDict = listToDic(b);
+    worker.onmessage = function (e) {
+        a = e.data[0];
+        b = e.data[1];
+        aDict = e.data[2];
+        bDict = e.data[3];
 
-    // Make lists distinct
-    a = dicToList(aDict);
-    b = dicToList(bDict);
+        // Change to distinct lists on UI
+        q("#a").value = listToStr(a);
+        q("#b").value = listToStr(b);
 
-    // Change to distinct lists on UI
-    q("#a").value = listToStr(a);
-    q("#b").value = listToStr(b);
+        // Calculate counts
+        q("#a-count").textContent = a.length;
+        q("#b-count").textContent = b.length;
 
-    // Calculate counts
-    q("#a-count").textContent = a.length;
-    q("#b-count").textContent = b.length;
+        // A and B
+        var bothList = both(a, bDict);
+        q("#a-and-b").value = listToStr(bothList);
+        q("#a-and-b-count").textContent = bothList.length;
 
-    // A and B
-    var bothList = both(a, bDict);
-    q("#a-and-b").value = listToStr(bothList);
-    q("#a-and-b-count").textContent = bothList.length;
+        // A not B
+        var aOnlyList = onlyFirst(a, bDict);
+        q("#a-not-b").value = listToStr(aOnlyList);
+        q("#a-not-b-count").textContent = aOnlyList.length;
 
-    // A not B
-    var aOnlyList = onlyFirst(a, bDict);
-    q("#a-not-b").value = listToStr(aOnlyList);
-    q("#a-not-b-count").textContent = aOnlyList.length;
-
-    // B not A
-    var bOnlyList = onlyFirst(b, aDict);
-    q("#b-not-a").value = listToStr(bOnlyList);
-    q("#b-not-a-count").textContent = bOnlyList.length;
+        // B not A
+        var bOnlyList = onlyFirst(b, aDict);
+        q("#b-not-a").value = listToStr(bOnlyList);
+        q("#b-not-a-count").textContent = bOnlyList.length;
+    }
 });
 
 q("#random-btn").addEventListener("click", function () {
-    q("#a").value = listToStr(randomList(100000, 999999, 10000));
-    q("#b").value = listToStr(randomList(100000, 999999, 10000));
+    q("#a").value = listToStr(randomList(100000, 999999, 100000));
+    q("#b").value = listToStr(randomList(100000, 999999, 100000));
 });
 
 q("#download-btn").addEventListener("click", function (e) {
