@@ -3,9 +3,10 @@ addHead();
 highlightMenu();
 
 function addHead() {
+    var titleText = "peheje";
     var meta = document.createElement("meta");
     meta.name = "description";
-    meta.content = "Peheje tools";
+    meta.content = titleText;
     document.head.appendChild(meta);
 
     var metaViewport = document.createElement("meta");
@@ -14,7 +15,7 @@ function addHead() {
     document.head.appendChild(metaViewport);
 
     var title = document.createElement("title");
-    title.innerHTML = "Peheje tools";
+    title.innerHTML = titleText;
     document.head.appendChild(title);
 
     var link = document.createElement("link");
