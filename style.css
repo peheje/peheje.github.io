@@ -9,7 +9,8 @@ textarea {
 }
 
 button {
-    font-size: medium;
+    border-radius: 4px;
+    font-size: 13px;
     background: lightgoldenrodyellow;
     min-height: 26px;
     min-width: 90px;
