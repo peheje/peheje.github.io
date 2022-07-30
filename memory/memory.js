@@ -3,6 +3,8 @@ var number = "";
 
 q("#submit").addEventListener("click", function () {
 
+    show("#restart");
+
     if (state === "guess") {
 
         if (q("#io").value === number) {
