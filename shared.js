@@ -158,3 +158,25 @@ function randomInt(min, max) {
     max = Math.floor(max);
     return Math.floor(Math.random() * (max - min)) + min;
 }
+
+function both(aList, bDict) {
+    var both = [];
+    for (var i = 0; i < aList.length; i++) {
+        var x = aList[i];
+        if (bDict[x]) {
+            both.push(x);
+        }
+    }
+    return both;
+}
+
+function onlyFirst(aList, bDict) {
+    var onlyA = [];
+    for (var i = 0; i < aList.length; i++) {
+        var x = aList[i];
+        if (!bDict[x]) {
+            onlyA.push(x);
+        }
+    }
+    return onlyA;
+}

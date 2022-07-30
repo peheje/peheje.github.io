@@ -1,35 +1,55 @@
-
-onmessage = function(e) {
 importScripts("../shared.js");
 
-    var a = e.data[0];
-    var b = e.data[1];
+onmessage = function(e) {
+    // Generate lists
+    var aList = strToList(e.data[0]);
+    var bList = strToList(e.data[1]);
+
+    postMessage(20);
 
     // Remove whitespace lines and adhere to lowercase
-    a = a.filter(removeEmptyLines);
-    b = b.filter(removeEmptyLines);
+    aList = aList.filter(removeEmptyLines);
+    bList = bList.filter(removeEmptyLines);
+
+    postMessage(30);
 
     // Generate dictionaries
-    var aDict = listToDic(a);
-    var bDict = listToDic(b);
+    var aDict = listToDic(aList);
+    var bDict = listToDic(bList);
+
+    postMessage(40);
 
     // Make lists distinct
-    a = dicToList(aDict);
-    b = dicToList(bDict);
+    aList = dicToList(aDict);
+    bList = dicToList(bDict);
 
-    postMessage([a, b, aDict, bDict])
-}
+    postMessage(55);
 
-function removeEmptyLines(v) {
-    return v.trim() !== "";
-}
+    var aStr = listToStr(aList);
+    var bStr = listToStr(bList);
 
-function dicToList(dic) {
-    var xs = [];
-    for (let key in dic) {
-        if (dic.hasOwnProperty(key)) {
-            xs.push(key);
-        }
-    }
-    return xs;
+    postMessage(65);
+
+    var bothList = both(aList, bDict);
+    var bothStr = listToStr(bothList);
+
+    postMessage(75);
+
+    var aOnlyList = onlyFirst(aList, bDict);
+    var aOnlyStr = listToStr(aOnlyList);
+
+    postMessage(85);
+
+    var bOnlyList = onlyFirst(bList, aDict);
+    var bOnlyStr = listToStr(bOnlyList);
+
+    postMessage(100);
+
+    postMessage([
+        aList, bList,
+        aStr, bStr,
+        bothList, bothStr,
+        aOnlyList, aOnlyStr,
+        bOnlyList, bOnlyStr
+    ])
 }
