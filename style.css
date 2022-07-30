@@ -22,7 +22,7 @@ button {
 
 .inline-block {
     display: inline-grid;
-    min-width: 300px;
+    min-width: 250px;
     margin-top: 20px;
 }
 
