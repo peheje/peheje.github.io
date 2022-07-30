@@ -54,7 +54,8 @@ nav a {
 }
 
 input {
-    font-size: medium;
+    padding-left: 8px;
+    font-size: 14px;
     height: 24px;
     vertical-align: middle;
 }
