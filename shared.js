@@ -58,6 +58,11 @@ function addMenu() {
 
     appendSeparator(nav);
 
+    var babyAnchor = createAnchor("Babynames", "/babynames/babynames.html");
+    nav.appendChild(babyAnchor);
+
+    appendSeparator(nav);
+
     var contactAnchor = createAnchor("Contact", "https://twitter.com/peheje");
     contactAnchor.target = "_blank";
     nav.appendChild(contactAnchor);

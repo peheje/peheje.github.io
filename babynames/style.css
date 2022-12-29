@@ -1,0 +1,76 @@
+html * {
+    font-family: monospace !important;
+}
+
+textarea {
+    min-height: 100px;
+    min-width: 350px;
+    white-space: pre;
+}
+
+button {
+    border-radius: 4px;
+    font-size: 13px;
+    background: lightgoldenrodyellow;
+    min-height: 26px;
+    min-width: 90px;
+}
+
+.margin-bottom-10 {
+    margin-bottom: 10px;
+}
+
+.inline-block {
+    display: inline-grid;
+    min-width: 250px;
+    margin-top: 20px;
+}
+
+.red {
+    color: red;
+}
+
+span {
+    color: darkgray;
+}
+
+body {
+    margin-top: 32px;
+    margin-left: 32px;
+}
+
+nav span {
+    color: black;
+}
+
+nav a {
+    text-decoration: none;
+    color: gray;
+    font-size: 14px;
+}
+
+.active {
+    font-weight: bold;
+    color: black;
+}
+
+input {
+    padding-left: 8px;
+    font-size: 14px;
+    height: 24px;
+    vertical-align: middle;
+}
+
+input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-left: 0;
+}
+
+.not-selectable {
+    user-select: none;
+}
+
+.display-none {
+    display: none;
+}
