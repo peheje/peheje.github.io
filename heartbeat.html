@@ -2,15 +2,20 @@
 
 <html lang="en">
 
-<body>
+<head>
+    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/hamster.png" type="image/png">
+</head>
 
+<body>
+    <div id="menu"></div>
     <p>Hit 'space' or the button below to the rythm of your heart. Reload page to reset.</p>
     <button id="heartbeat-btn" tabindex="-1">Beat</button>
     <b><p id="heartbeat"></p></b>
     <b id="beat" hidden class="red">Beat</b>
 
-    <script src="/shared.js"></script>
-    <script src="./heartbeat.js"></script>
+    <script src="bundle.js"></script>
 </body>
 
 </html>

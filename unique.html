@@ -2,7 +2,14 @@
 
 <html lang="en">
 
+<head>
+    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/hamster.png" type="image/png">
+</head>
+
 <body>
+    <div id="menu"></div>
     <div class="inline-block margin-bottom-10">
         <label for="original">Input: <span id="original-count">0</span></label>
         <textarea id="original"></textarea>
@@ -26,8 +33,7 @@
         <textarea id="unique" readonly></textarea>
     </div>
 
-    <script src="/shared.js"></script>
-    <script src="./unique.js"></script>
+    <script src="bundle.js"></script>
 </body>
 
 </html>
