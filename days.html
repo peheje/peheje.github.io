@@ -1,0 +1,38 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/hamster.png" type="image/png">
+</head>
+
+<body>
+    <div id="menu"></div>
+
+    <p>Both start and end day is included.</p>
+
+    <div class="inline-block">
+        <label for="start-day">Start day:</label>
+        <input id="start-day" type="date" />
+    </div>
+    <div class="inline-block">
+        <label for="end-day">End day:</label>
+        <input id="end-day" type="date" />
+    </div>
+
+    <p class="red" id="error"></p>
+
+    <div class="inline-block">
+        <label>Total days:</label>
+        <b id="total-days">-</b>
+        <br>
+        <label>Weekend-days:</label>
+        <b id="weekend-days">-</b>
+    </div>
+
+    <script src="bundle.js"></script>
+</body>
+
+</html>
