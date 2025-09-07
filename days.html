@@ -14,10 +14,23 @@
     <div class="inline-block">
         <label for="start-day">Start day:</label>
         <input id="start-day" type="date" />
+        <div id="start-time-wrapper" class="display-none">
+            <label for="start-time">Start time:</label>
+            <input id="start-time" type="time" value="00:00" />
+        </div>
     </div>
     <div class="inline-block">
         <label for="end-day">End day:</label>
         <input id="end-day" type="date" />
+        <div id="end-time-wrapper" class="display-none">
+            <label for="end-time">End time:</label>
+            <input id="end-time" type="time" value="00:00" />
+        </div>
+    </div>
+
+    <div>
+        <label for="enable-time" class="not-selectable">Enable time</label>
+        <input id="enable-time" type="checkbox" />
     </div>
 
     <p class="red" id="error"></p>
