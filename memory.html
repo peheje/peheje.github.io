@@ -10,31 +10,33 @@
 
 <body>
     <div id="menu"></div>
+    <main class="app-shell">
+        <section class="ab">
+            <div id="length-input" class="inline-block">
+                <label for="length">Length of number:</label>
+                <input id="length" name="length" type="number" step="1" value="5" min="1" />
+            </div>
+            <div id="interval-input" class="inline-block">
+                <label for="interval">Peek seconds:</label>
+                <input id="interval" name="interval" type="number" step="1" value="4" min="1" />
+            </div>
+        </section>
 
-    <div id="length-input" class="inline-block">
-        <label for="length">Length of number:</label>
-        <input id="length" name="length" type="number" step="1" value="5" min="1" />
-    </div>
-    <div id="interval-input" class="inline-block">
-        <label for="interval">Peek seconds:</label>
-        <input id="interval" name="interval" type="number" step="1" value="4" min="1" />
-    </div>
-    <div id="io-input" class="display-none">
-        <label for="io">Number:</label>
-        <input id="io" name="io" type="text" />
-    </div>
-
-    <div>
-        <div class="inline-block">
-            <button id="submit">Start</button>
+        <div id="io-input" class="inline-block display-none">
+            <label for="io">Number:</label>
+            <input id="io" name="io" type="text" />
         </div>
-        <div id="restart" class="display-none">
-            <button id="restart">Restart</button>
-        </div>
-    </div>
 
+        <div class="actions">
+            <div class="inline-block">
+                <button id="submit">Start</button>
+            </div>
+            <div id="restart" class="display-none">
+                <button id="restart">Restart</button>
+            </div>
+        </div>
+    </main>
+    <script src="bundle.js"></script>
 </body>
-
-<script src="bundle.js"></script>
 
 </html>

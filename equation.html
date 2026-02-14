@@ -10,25 +10,28 @@
 
 <body>
     <div id="menu"></div>
-    <br>
-    <div class="margin-bottom-10">
-        <label for="depth">Equation Depth:</label>
-        <input type="number" id="depth" min="1" max="10" value="1">
-        <button id="generate-btn" title="Generate a new equation">Generate</button>
-    </div>
-    <div class="margin-bottom-10">
-        <label for="equation">Equation:</label>
-        <p id="equation"/>
-    </div>
-    <div class="margin-bottom-10">
-        <label for="guess">Your Guess:</label>
-        <input type="number" id="guess">
-        <button id="check-btn" title="Check your answer">Check</button>
-    </div>
+    <main class="app-shell">
+        <div class="inline-block margin-bottom-10">
+            <label for="depth">Equation Depth:</label>
+            <input type="number" id="depth" min="1" max="10" value="1">
+            <button id="generate-btn" title="Generate a new equation">Generate</button>
+        </div>
 
-    <div>
-        <div id="result"></div>
-    </div>
+        <div class="inline-block margin-bottom-10">
+            <label for="equation">Equation:</label>
+            <p id="equation"></p>
+        </div>
+
+        <div class="inline-block margin-bottom-10">
+            <label for="guess">Your Guess:</label>
+            <input type="number" id="guess">
+            <button id="check-btn" title="Check your answer">Check</button>
+        </div>
+
+        <div class="result-line">
+            <div id="result"></div>
+        </div>
+    </main>
 
     <script src="bundle.js"></script>
 </body>

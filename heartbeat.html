@@ -10,10 +10,14 @@
 
 <body>
     <div id="menu"></div>
-    <p>Hit 'space' or the button below to the rythm of your heart. Reload page to reset.</p>
-    <button id="heartbeat-btn" tabindex="-1">Beat</button>
-    <b><p id="heartbeat"></p></b>
-    <b id="beat" hidden class="red">Beat</b>
+    <main class="app-shell">
+        <p class="result-line">Hit `space` or tap the button to your heartbeat rhythm.</p>
+        <div class="actions">
+            <button id="heartbeat-btn" tabindex="-1">Beat</button>
+        </div>
+        <p id="heartbeat" class="metric"></p>
+        <b id="beat" hidden class="red metric-pulse">Beat</b>
+    </main>
 
     <script src="bundle.js"></script>
 </body>

@@ -10,17 +10,20 @@
 
 <body>
     <div id="menu"></div>
+    <main class="app-shell">
+        <section class="ab">
+            <div class="inline-block">
+                <label for="millilitres">Volume ml:</label>
+                <input id="millilitres" name="millilitres" type="number" step="10" value="330" />
+            </div>
+            <div class="inline-block">
+                <label for="percentage">Percentage %:</label>
+                <input id="percentage" name="percentage" type="number" step="0.1" value="5.4" />
+            </div>
+        </section>
 
-    <div class="inline-block">
-        <label for="millilitres">Volume ml:</label>
-        <input id="millilitres" name="millilitres" type="number" step="10" value="330" />
-    </div>
-    <div class="inline-block">
-        <label for="percentage">Percentage %:</label>
-        <input id="percentage" name="percentage" type="number" step="0.1" value="5.4" />
-    </div>
-
-    <p>That's <span id="dk-units">0</span> units of alcohol (15 ml alcohol per unit)</p>
+        <p class="result-line">That's <span id="dk-units">0</span> units of alcohol (15 ml alcohol per unit)</p>
+    </main>
 
     <script src="bundle.js"></script>
 </body>

@@ -8,30 +8,31 @@
 </head>
 
 <body>
-  <div id="menu"></div>
-  <br>
-  <b id="name"></b>
-  <br>
-  <div class="inline-block margin-bottom-10">
-    <label for="liked">Liked:</label>
-    <textarea id="liked" readonly></textarea>
-  </div>
+    <div id="menu"></div>
+    <main class="app-shell">
+        <h2 id="name" class="name-prompt"></h2>
 
-  <div class="margin-bottom-10">
-    <input type="radio" id="girl" name="gender" value="girl">
-    <label for="girl" class="not-selectable">Girls</label><br>
-    <input type="radio" id="boy" name="gender" value="boy">
-    <label for="boy" class="not-selectable">Boys</label><br>
-  </div>
+        <div class="inline-block margin-bottom-10">
+            <label for="liked">Liked:</label>
+            <textarea id="liked" readonly></textarea>
+        </div>
 
-  <div>
-    <button id="yes">Yes</button>
-    <button id="no">No</button>
-    <button id="copy">Copy</button>
-    <button id="clear" class="red">Clear</button>
-  </div>
+        <div class="choice-row margin-bottom-10">
+            <input type="radio" id="girl" name="gender" value="girl">
+            <label for="girl" class="not-selectable">Girls</label>
+            <input type="radio" id="boy" name="gender" value="boy">
+            <label for="boy" class="not-selectable">Boys</label>
+        </div>
 
-  <script src="bundle.js"></script>
+        <div class="actions">
+            <button id="yes">Yes</button>
+            <button id="no">No</button>
+            <button id="copy">Copy</button>
+            <button id="clear" class="red">Clear</button>
+        </div>
+    </main>
+
+    <script src="bundle.js"></script>
 </body>
 
 </html>

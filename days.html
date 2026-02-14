@@ -10,38 +10,42 @@
 
 <body>
     <div id="menu"></div>
+    <main class="app-shell">
+        <section class="ab">
+            <div class="inline-block">
+                <label for="start-day">Start day:</label>
+                <input id="start-day" type="date" />
+            </div>
+            <div class="inline-block">
+                <label for="end-day">End day:</label>
+                <input id="end-day" type="date" />
+            </div>
+        </section>
 
-    <div class="inline-block">
-        <label for="start-day">Start day:</label>
-        <input id="start-day" type="date" />
-    </div>
-    <div class="inline-block">
-        <label for="end-day">End day:</label>
-        <input id="end-day" type="date" />
-    </div>
+        <p class="red" id="error"></p>
 
-    <p class="red" id="error"></p>
+        <section class="ab">
+            <div class="inline-block">
+                <label>Total duration</label>
+                <b id="total-duration">-</b>
+                <br>
+                <label>Weekend-days:</label>
+                <b id="weekend-days">-</b>
+                <br>
+                <label>Months:</label>
+                <b id="months">-</b>
+                <br>
+                <label>Years:</label>
+                <b id="years">-</b>
+            </div>
 
-    <div class="inline-block">
-        <label>Total duration</label>
-        <b id="total-duration">-</b>
-        <br>
-        <label>Weekend-days:</label>
-        <b id="weekend-days">-</b>
-        <br>
-        <label>Months:</label>
-        <b id="months">-</b>
-        <br>
-        <label>Years:</label>
-        <b id="years">-</b>
-    </div>
-
-    <div class="inline-block">
-        <label>Add days to end:</label>
-        <input id="add-days-input" class="margin-bottom-10" type="number" value="1" />
-        <button id="add-days-btn">Add</button>
-    </div>
-
+            <div class="inline-block">
+                <label>Add days to end:</label>
+                <input id="add-days-input" class="margin-bottom-10" type="number" value="1" />
+                <button id="add-days-btn">Add</button>
+            </div>
+        </section>
+    </main>
 
     <script src="bundle.js"></script>
 </body>

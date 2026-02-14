@@ -10,11 +10,15 @@
 
 <body>
     <div id="menu"></div>
-    <input id="image-selector" type="file"/>
-    <img id="image"></img>
-    <p id="text"></p>
+    <main class="app-shell">
+        <div class="inline-block">
+            <label for="image-selector">Select image:</label>
+            <input id="image-selector" type="file" />
+        </div>
+        <img id="image" alt="Selected" />
+        <p id="text" class="result-line"></p>
+    </main>
+    <script src="bundle.js"></script>
 </body>
-
-<script src="bundle.js"></script>
 
 </html>

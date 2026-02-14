@@ -10,28 +10,30 @@
 
 <body>
     <div id="menu"></div>
-    <div class="inline-block margin-bottom-10">
-        <label for="original">Input: <span id="original-count">0</span></label>
-        <textarea id="original"></textarea>
-    </div>
+    <main class="app-shell">
+        <div class="inline-block margin-bottom-10">
+            <label for="original">Input: <span id="original-count">0</span></label>
+            <textarea id="original"></textarea>
+        </div>
 
-    <div>
-        <button id="find-duplicates-btn" title="Trims, removes empty and finds duplicates.">Find
-            duplicates</button>
+        <div class="actions">
+            <button id="find-duplicates-btn" title="Trims, removes empty and finds duplicates.">Find duplicates</button>
+            <label for="case-insensitive" class="not-selectable">Lowercase</label>
+            <input type="checkbox" id="case-insensitive">
+        </div>
 
-        <label for="case-insensitive" class="not-selectable">Lowercase</label>
-        <input type="checkbox" id="case-insensitive">
-    </div>
+        <section class="ab">
+            <div class="inline-block">
+                <label for="duplicates">Duplicates: <span id="duplicates-count">0</span></label>
+                <textarea id="duplicates" readonly></textarea>
+            </div>
 
-    <div class="inline-block">
-        <label for="duplicates">Duplicates: <span id="duplicates-count">0</span></label>
-        <textarea id="duplicates" readonly></textarea>
-    </div>
-
-    <div class="inline-block">
-        <label for="unique">Unique: <span id="unique-count">0</span></label>
-        <textarea id="unique" readonly></textarea>
-    </div>
+            <div class="inline-block">
+                <label for="unique">Unique: <span id="unique-count">0</span></label>
+                <textarea id="unique" readonly></textarea>
+            </div>
+        </section>
+    </main>
 
     <script src="bundle.js"></script>
 </body>

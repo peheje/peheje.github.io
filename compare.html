@@ -11,44 +11,46 @@
 
 <body>
     <div id="menu"></div>
+    <main class="app-shell">
+        <section class="ab margin-bottom-10">
+            <div class="inline-block">
+                <label for="a">Left: <span id="a-count">0</span></label>
+                <textarea id="a"></textarea>
+            </div>
+            <div class="inline-block">
+                <label for="b">Right: <span id="b-count">0</span></label>
+                <textarea id="b"></textarea>
+            </div>
+        </section>
 
-    <div class="ab margin-bottom-10">
-        <div class="inline-block">
-            <label for="a">Left: <span id="a-count">0</span></label>
-            <textarea id="a"></textarea>
-        </div>
-        <div class="inline-block">
-            <label for="b">Right: <span id="b-count">0</span></label>
-            <textarea id="b"></textarea>
-        </div>
-    </div>
-
-    <div>
-        <button id="compare-btn" title="Trims, removes empty and duplicate lines then compares.">Compare</button>
-        <button id="random-btn" hidden>Randomize</button>
-
-        <label for="case-insensitive" class="not-selectable">Lowercase</label>
-        <input type="checkbox" id="case-insensitive">
-    </div>
-
-    <div class="inline-block">
-        <label for="both">In both: <span id="both-count">0</span></label>
-        <textarea id="both" readonly></textarea>
-    </div>
-
-    <div class="ab margin-bottom-10">
-        <div class="inline-block">
-            <label for="only-a">Only in left: <span id="only-a-count">0</span></label>
-            <textarea id="only-a" readonly></textarea>
+        <div class="actions">
+            <button id="compare-btn" title="Trims, removes empty and duplicate lines then compares.">Compare</button>
+            <button id="random-btn" hidden>Randomize</button>
+            <label for="case-insensitive" class="not-selectable">Lowercase</label>
+            <input type="checkbox" id="case-insensitive">
         </div>
 
         <div class="inline-block">
-            <label for="only-b">Only in right: <span id="only-b-count">0</span></label>
-            <textarea id="only-b" readonly></textarea>
+            <label for="both">In both: <span id="both-count">0</span></label>
+            <textarea id="both" readonly></textarea>
         </div>
-    </div>
 
-    <a id="download-btn" href="" download="compare.csv"><button>Download</button></a>
+        <section class="ab margin-bottom-10">
+            <div class="inline-block">
+                <label for="only-a">Only in left: <span id="only-a-count">0</span></label>
+                <textarea id="only-a" readonly></textarea>
+            </div>
+
+            <div class="inline-block">
+                <label for="only-b">Only in right: <span id="only-b-count">0</span></label>
+                <textarea id="only-b" readonly></textarea>
+            </div>
+        </section>
+
+        <div class="actions">
+            <a id="download-btn" href="" download="compare.csv"><button>Download</button></a>
+        </div>
+    </main>
 
     <script src="bundle.js"></script>
 </body>
