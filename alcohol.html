@@ -14,15 +14,25 @@
         <section class="ab">
             <div class="inline-block">
                 <label for="millilitres">Volume ml:</label>
-                <input id="millilitres" name="millilitres" type="number" step="10" value="330" />
+                <input id="millilitres" name="millilitres" type="number" step="10" value="330" data-stepper="true" />
             </div>
             <div class="inline-block">
                 <label for="percentage">Percentage %:</label>
-                <input id="percentage" name="percentage" type="number" step="0.1" value="5.4" />
+                <input id="percentage" name="percentage" type="number" step="0.1" value="5.4" data-stepper="true" />
             </div>
         </section>
 
         <p class="result-line">That's <span id="dk-units">0</span> units of alcohol (15 ml alcohol per unit)</p>
+
+        <section class="inline-block">
+            <div class="actions">
+                <button id="save-drink">Add drink</button>
+                <button id="clear-drinks" class="red">Clear all</button>
+            </div>
+            <p id="drink-edit-state" class="result-line display-none">Editing drink</p>
+            <p class="result-line">Tracked total: <span id="drink-total-units">0</span> units</p>
+            <div id="drink-log" class="drink-log"></div>
+        </section>
     </main>
 
     <script src="bundle.js"></script>

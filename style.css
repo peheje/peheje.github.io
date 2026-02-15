@@ -92,44 +92,6 @@ body::after {
     backdrop-filter: blur(8px);
 }
 
-.brand-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 14px;
-}
-
-.brand-mark {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    font-family: "Space Grotesk", sans-serif;
-    font-size: 0.84rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: #071627;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-}
-
-.brand-copy {
-    display: flex;
-    flex-direction: column;
-}
-
-.brand-copy strong {
-    font-family: "Space Grotesk", sans-serif;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-}
-
-.brand-copy small {
-    color: var(--muted);
-    font-size: 0.78rem;
-    margin-top: 2px;
-}
-
 .top-nav {
     display: flex;
     flex-wrap: wrap;
@@ -290,6 +252,107 @@ input[type="date"] {
     min-height: 42px;
 }
 
+input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.number-stepper {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.number-step-btn {
+    min-width: 42px;
+    width: 42px;
+    min-height: 42px;
+    padding: 0;
+    border: 1px solid rgba(157, 178, 216, 0.3);
+    color: var(--text);
+    background: linear-gradient(145deg, rgba(45, 64, 99, 0.92), rgba(30, 44, 72, 0.9));
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+}
+
+.number-step-btn:hover {
+    border-color: rgba(56, 212, 255, 0.5);
+}
+
+.btn-small {
+    min-width: 70px;
+    width: auto;
+    min-height: 36px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid rgba(157, 178, 216, 0.3);
+    color: var(--text);
+    background: linear-gradient(145deg, rgba(45, 64, 99, 0.92), rgba(30, 44, 72, 0.9));
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+}
+
+.btn-small:hover {
+    border-color: rgba(56, 212, 255, 0.5);
+}
+
+.drink-log {
+    display: grid;
+    gap: 10px;
+}
+
+.drink-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: rgba(20, 31, 50, 0.45);
+}
+
+.drink-row-text {
+    margin: 0;
+    color: var(--text);
+}
+
+.drink-row-actions {
+    display: inline-flex;
+    gap: 8px;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgba(5, 10, 20, 0.7);
+    backdrop-filter: blur(6px);
+}
+
+.modal-card {
+    width: min(520px, 100%);
+    display: grid;
+    gap: 12px;
+    padding: 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line);
+    background: linear-gradient(145deg, rgba(24, 37, 60, 0.96), rgba(15, 24, 40, 0.95));
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-card .result-line {
+    margin: 0;
+}
+
 input[type="checkbox"],
 input[type="radio"] {
     accent-color: var(--accent);
@@ -334,11 +397,19 @@ button.red {
     box-shadow: 0 10px 20px rgba(255, 107, 139, 0.22);
 }
 
-input:focus,
-textarea:focus,
+input:focus-visible,
+textarea:focus-visible,
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible,
 button:focus-visible {
     outline: 2px solid rgba(86, 243, 188, 0.85);
     outline-offset: 2px;
+}
+
+a:focus-visible {
+    outline: 2px solid rgba(56, 212, 255, 0.95);
+    outline-offset: 2px;
+    border-radius: 10px;
 }
 
 .result-line {

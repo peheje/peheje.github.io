@@ -13,7 +13,7 @@
     <main class="app-shell">
         <div class="inline-block margin-bottom-10">
             <label for="depth">Equation Depth:</label>
-            <input type="number" id="depth" min="1" max="10" value="1">
+            <input type="number" id="depth" min="1" max="10" value="1" data-stepper="true">
             <button id="generate-btn" title="Generate a new equation">Generate</button>
         </div>
 
@@ -24,11 +24,11 @@
 
         <div class="inline-block margin-bottom-10">
             <label for="guess">Your Guess:</label>
-            <input type="number" id="guess">
+            <input type="number" id="guess" data-stepper="true">
             <button id="check-btn" title="Check your answer">Check</button>
         </div>
 
-        <div class="result-line">
+        <div id="result-line" class="result-line display-none">
             <div id="result"></div>
         </div>
     </main>
