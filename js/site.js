@@ -47,6 +47,19 @@ const sites = [
 ];
 
 const internalSites = sites.filter((site) => site.url.startsWith("/"));
+const themes = [
+  { key: "warm", className: "", label: "W", title: "Warm theme" },
+  { key: "blue", className: "theme-blue", label: "B", title: "Blue theme" },
+  { key: "paper", className: "theme-paper", label: "P", title: "Paper theme" },
+];
+
+function getThemeDefinition(themeKey) {
+  return themes.find((theme) => theme.key === themeKey) || themes[0];
+}
+
+function getActiveTheme() {
+  return getThemeDefinition(getSavedTheme());
+}
 
 function getSavedTheme() {
   return localStorage.getItem("theme") || "";
@@ -57,7 +70,15 @@ function setSavedTheme(theme) {
 }
 
 function applyTheme() {
-  document.body.classList.toggle("theme-blue", getSavedTheme() === "blue");
+  const activeTheme = getActiveTheme();
+
+  themes.forEach((theme) => {
+    if (!theme.className) {
+      return;
+    }
+
+    document.body.classList.toggle(theme.className, theme.key === activeTheme.key);
+  });
 }
 
 function renderThemeToggle() {
@@ -71,14 +92,22 @@ function renderThemeToggle() {
     document.body.append(button);
   }
 
-  const isBlue = document.body.classList.contains("theme-blue");
-  button.textContent = isBlue ? "B" : "W";
+  function syncButton() {
+    const activeTheme = getActiveTheme();
+    button.textContent = activeTheme.label;
+    button.title = `Switch theme (current: ${activeTheme.title})`;
+  }
+
+  syncButton();
 
   button.onclick = () => {
-    const nextBlue = !document.body.classList.contains("theme-blue");
-    document.body.classList.toggle("theme-blue", nextBlue);
-    setSavedTheme(nextBlue ? "blue" : "warm");
-    button.textContent = nextBlue ? "B" : "W";
+    const activeTheme = getActiveTheme();
+    const currentIndex = themes.findIndex((theme) => theme.key === activeTheme.key);
+    const nextTheme = themes[(currentIndex + 1) % themes.length];
+
+    setSavedTheme(nextTheme.key);
+    applyTheme();
+    syncButton();
   };
 }
 

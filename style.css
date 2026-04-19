@@ -120,6 +120,66 @@ body.theme-blue {
     --pulse-glow-mid: rgba(56, 212, 255, 0.65);
 }
 
+body.theme-paper {
+    --bg: #f6f2e8;
+    --bg-soft: #efe9db;
+    --surface: rgba(248, 244, 235, 0.92);
+    --surface-strong: rgba(241, 236, 224, 0.98);
+    --line: rgba(108, 113, 116, 0.24);
+    --text: #374046;
+    --muted: #6f756f;
+    --accent: #d8c45d;
+    --accent-2: #cbb24a;
+    --danger: #cc6e53;
+    --shadow-lg: 0 18px 36px rgba(118, 108, 76, 0.16);
+    --shadow-sm: 0 8px 20px rgba(118, 108, 76, 0.1);
+    --radius-lg: 0;
+    --radius-md: 0;
+    --btn-radius: 0;
+    --input-radius: 0;
+    --nav-radius: 0;
+    --body-bg-1: #f9f6ef;
+    --body-bg-2: #f0ead8;
+    --body-bg-3: #f6f2e8;
+    --body-bg-4: #f2ede1;
+    --body-bg-5: #ece6d7;
+    --glow-1: rgba(216, 196, 93, 0.18);
+    --glow-2: rgba(147, 161, 161, 0.14);
+    --site-head-bg-1: rgba(247, 243, 234, 0.97);
+    --site-head-bg-2: rgba(239, 233, 219, 0.94);
+    --nav-bg: rgba(88, 110, 117, 0.05);
+    --nav-border: rgba(108, 113, 116, 0.18);
+    --nav-hover-border: rgba(181, 137, 0, 0.45);
+    --nav-hover-bg: rgba(216, 196, 93, 0.12);
+    --nav-active-text: #33362f;
+    --nav-active-shadow: rgba(203, 178, 74, 0.22);
+    --inline-block-bg-2: rgba(242, 237, 225, 0.95);
+    --actions-bg: rgba(243, 239, 229, 0.92);
+    --choice-row-bg: rgba(240, 234, 221, 0.88);
+    --input-border: rgba(108, 113, 116, 0.28);
+    --step-btn-border: rgba(108, 113, 116, 0.24);
+    --step-btn-bg-1: rgba(243, 235, 183, 0.96);
+    --step-btn-bg-2: rgba(225, 212, 133, 0.98);
+    --step-btn-hover: rgba(181, 137, 0, 0.35);
+    --drink-row-bg: rgba(241, 236, 225, 0.8);
+    --modal-bg-1: rgba(249, 245, 236, 0.98);
+    --modal-bg-2: rgba(238, 232, 218, 0.97);
+    --btn-text: #394046;
+    --btn-shadow: rgba(203, 178, 74, 0.18);
+    --btn-red-text: #fff8f4;
+    --btn-red-shadow: rgba(204, 110, 83, 0.2);
+    --focus-outline: rgba(181, 137, 0, 0.8);
+    --focus-link: rgba(181, 137, 0, 0.92);
+    --result-line-bg: rgba(240, 234, 221, 0.85);
+    --equation-text: #586267;
+    --image-bg: rgba(240, 234, 221, 0.72);
+    --notice-text: #5d5438;
+    --notice-bg: rgba(216, 196, 93, 0.18);
+    --notice-border: rgba(181, 137, 0, 0.28);
+    --pulse-glow: rgba(203, 178, 74, 0);
+    --pulse-glow-mid: rgba(203, 178, 74, 0.45);
+}
+
 *,
 *::before,
 *::after {
@@ -484,7 +544,7 @@ input[type="radio"] {
 
 button {
     appearance: none;
-    border: 0;
+    border: 1px solid var(--step-btn-border);
     border-radius: var(--btn-radius);
     min-height: 40px;
     min-width: 102px;
@@ -495,7 +555,7 @@ button {
     cursor: pointer;
     color: var(--btn-text);
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    box-shadow: 0 10px 20px var(--btn-shadow);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
     transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
@@ -518,7 +578,13 @@ button:disabled {
 button.red {
     color: var(--btn-red-text);
     background: linear-gradient(135deg, var(--danger), #c45a30);
-    box-shadow: 0 10px 20px var(--btn-red-shadow);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+}
+
+button:hover,
+.btn-small:hover,
+.number-step-btn:hover {
+    box-shadow: 0 14px 24px rgba(0, 0, 0, 0.18);
 }
 
 input:focus-visible,
