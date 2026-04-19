@@ -1,9 +1,13 @@
 const savedTheme = localStorage.getItem("theme");
+const themeClasses = {
+  blue: "theme-blue",
+  paper: "theme-paper",
+  forest: "theme-forest",
+  dusk: "theme-dusk",
+};
 
 document.documentElement.classList.add("page-loading");
 
-if (savedTheme === "blue") {
-  document.documentElement.classList.add("theme-blue");
-} else if (savedTheme === "paper") {
-  document.documentElement.classList.add("theme-paper");
+if (savedTheme && themeClasses[savedTheme]) {
+  document.documentElement.classList.add(themeClasses[savedTheme]);
 }

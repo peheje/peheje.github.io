@@ -56,6 +56,8 @@ const themes = [
   { key: "warm", className: "", label: "W", title: "Warm theme" },
   { key: "blue", className: "theme-blue", label: "B", title: "Blue theme" },
   { key: "paper", className: "theme-paper", label: "P", title: "Paper theme" },
+  { key: "forest", className: "theme-forest", label: "F", title: "Forest theme" },
+  { key: "dusk", className: "theme-dusk", label: "D", title: "Dusk theme" },
 ];
 const pageTransitionDurationMs = 220;
 
