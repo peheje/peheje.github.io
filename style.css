@@ -432,12 +432,32 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .modal-backdrop {
+    padding: 16px;
+}
+
+dialog.modal-backdrop[open] {
+    display: grid;
+    place-items: center;
+}
+
+dialog.modal-backdrop:not([open]) {
+    display: none;
+}
+
+dialog.modal-backdrop {
     position: fixed;
     inset: 0;
     z-index: 60;
-    display: grid;
-    place-items: center;
-    padding: 16px;
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    background: transparent;
+}
+
+dialog.modal-backdrop::backdrop {
     background: rgba(5, 10, 20, 0.7);
     backdrop-filter: blur(6px);
 }
@@ -544,6 +564,7 @@ a:focus-visible {
     margin: 0;
     font-family: "Space Grotesk", sans-serif;
     font-size: clamp(1.2rem, 2.2vw, 1.6rem);
+    color: var(--text);
 }
 
 #equation {
