@@ -697,6 +697,79 @@ a {
     border-radius: 50%;
 }
 
+.chart {
+    width: 100%;
+    height: auto;
+    min-height: 220px;
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--surface), var(--inline-block-bg-2));
+}
+
+.chart-wrap {
+    position: relative;
+}
+
+.chart-tooltip {
+    position: absolute;
+    z-index: 2;
+    width: max-content;
+    max-width: min(380px, calc(100% - 16px));
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    background: linear-gradient(145deg, var(--modal-bg-1), var(--modal-bg-2));
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+    pointer-events: none;
+    transform: translate(-50%, -100%);
+}
+
+.chart-grid {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+
+.chart-bar {
+    fill: var(--accent);
+    opacity: 0.92;
+}
+
+.chart-hitbox {
+    fill: transparent;
+    cursor: pointer;
+}
+
+.chart-axis {
+    fill: var(--muted);
+    font-size: 11px;
+}
+
+.chart-axis-y {
+    font-size: 10px;
+}
+
+.chart-summary,
+.ranking-list,
+.insight-list {
+    display: grid;
+    gap: 10px;
+}
+
+.ranking-row {
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    background: var(--result-line-bg);
+}
+
+.ranking-main {
+    color: var(--text);
+    font-weight: 700;
+}
+
+.ranking-meta {
+    margin: 6px 0 0;
+    color: var(--muted);
+}
+
 @keyframes topIn {
     from {
         opacity: 0;

@@ -40,6 +40,11 @@ const sites = [
     about: "Generate random equations and solve for X.",
   },
   {
+    url: "/poe.html",
+    name: "Poe",
+    about: "Parse Poe AI usage CSV files locally and inspect points, costs, and usage patterns.",
+  },
+  {
     url: "https://twitter.com/peheje",
     name: "Contact",
     about: "",

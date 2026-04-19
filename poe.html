@@ -1,0 +1,109 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/hamster.png" type="image/png">
+</head>
+
+<body>
+    <div id="menu"></div>
+    <main class="app-shell">
+        <section class="ab">
+            <div class="inline-block">
+                <label for="poe-file">Poe CSV file:</label>
+                <input id="poe-file" type="file" accept=".csv,text/csv">
+                <p class="result-line">CSV stays local in your browser. Nothing is uploaded.</p>
+            </div>
+            <div class="inline-block">
+                <label for="poe-limit">Monthly subscription limit (points):</label>
+                <input id="poe-limit" type="number" min="1" step="10000" value="1000000" data-stepper="true">
+            </div>
+            <div class="inline-block">
+                <label for="poe-reset-day">Cycle reset day of month:</label>
+                <input id="poe-reset-day" type="number" min="1" max="31" step="1" value="1" data-stepper="true">
+            </div>
+        </section>
+
+        <p id="poe-status" class="result-line">Choose a Poe usage CSV export to see usage breakdowns.</p>
+
+        <section class="ab">
+            <div class="inline-block">
+                <label>Total requests</label>
+                <p id="poe-total-requests" class="metric">0</p>
+            </div>
+            <div class="inline-block">
+                <label>Total points</label>
+                <p id="poe-total-points" class="metric">0</p>
+            </div>
+            <div class="inline-block">
+                <label>Total dollars</label>
+                <p id="poe-total-dollars" class="metric">$0.00</p>
+            </div>
+            <div class="inline-block">
+                <label>Average points / request</label>
+                <p id="poe-average-points" class="metric">0</p>
+            </div>
+        </section>
+
+        <section class="ab">
+            <div class="inline-block">
+                <label>Current cycle points</label>
+                <p id="poe-cycle-points" class="metric">0</p>
+                <p id="poe-cycle-range" class="result-line">-</p>
+            </div>
+            <div class="inline-block">
+                <label>Current cycle dollars</label>
+                <p id="poe-cycle-dollars" class="metric">$0.00</p>
+                <p id="poe-cycle-share" class="result-line">0% of your point budget used</p>
+            </div>
+            <div class="inline-block">
+                <label>Remaining points</label>
+                <p id="poe-remaining-points" class="metric">0</p>
+                <p id="poe-pace-note" class="result-line">Load a file to estimate your pace.</p>
+            </div>
+            <div class="inline-block">
+                <label>Projected exhaustion</label>
+                <p id="poe-exhaustion-date" class="metric">-</p>
+                <p id="poe-days-left-note" class="result-line">-</p>
+            </div>
+        </section>
+
+        <section class="inline-block">
+            <label>Points per day</label>
+            <div id="poe-daily-chart-wrap" class="chart-wrap">
+                <svg id="poe-daily-chart" class="chart" viewBox="0 0 640 220" role="img" aria-label="Points per day chart"></svg>
+                <div id="poe-daily-tooltip" class="chart-tooltip display-none"></div>
+            </div>
+            <div id="poe-daily-summary" class="chart-summary"></div>
+        </section>
+
+        <section class="ab">
+            <div class="inline-block">
+                <label>Usage by model</label>
+                <div id="poe-model-breakdown" class="ranking-list"></div>
+            </div>
+            <div class="inline-block">
+                <label>Top apps</label>
+                <div id="poe-app-breakdown" class="ranking-list"></div>
+            </div>
+        </section>
+
+        <section class="ab">
+            <div class="inline-block">
+                <label>Largest requests</label>
+                <div id="poe-outliers" class="ranking-list"></div>
+            </div>
+            <div class="inline-block">
+                <label>Insights</label>
+                <div id="poe-insights" class="insight-list"></div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="js/pages/poe.js"></script>
+</body>
+
+</html>
