@@ -82,6 +82,7 @@ function applyTheme() {
       return;
     }
 
+    document.documentElement.classList.toggle(theme.className, theme.key === activeTheme.key);
     document.body.classList.toggle(theme.className, theme.key === activeTheme.key);
   });
 }

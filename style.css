@@ -60,6 +60,7 @@
     --pulse-glow-mid: rgba(232, 160, 69, 0.65);
 }
 
+html.theme-blue,
 body.theme-blue {
     --bg: #0f1726;
     --bg-soft: #18233a;
@@ -120,6 +121,7 @@ body.theme-blue {
     --pulse-glow-mid: rgba(56, 212, 255, 0.65);
 }
 
+html.theme-paper,
 body.theme-paper {
     --bg: #f6f2e8;
     --bg-soft: #efe9db;
