@@ -209,6 +209,15 @@ body {
     overflow-x: hidden;
 }
 
+html.page-loading body {
+    opacity: 0;
+}
+
+body.page-leaving {
+    pointer-events: none;
+    animation: pageFadeOut 0.22s ease both;
+}
+
 body::before,
 body::after {
     content: "";
@@ -819,6 +828,27 @@ a {
     }
     to {
         transform: translate3d(24px, -18px, 0);
+    }
+}
+
+html.page-loading #menu,
+html.page-loading .app-shell,
+body.page-loaded #menu,
+body.page-loaded .app-shell,
+body.page-loaded .app-shell > *:not(.display-none) {
+    opacity: 1;
+    transform: none;
+    animation: none;
+}
+
+@keyframes pageFadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-8px);
     }
 }
 

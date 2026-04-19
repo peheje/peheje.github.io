@@ -57,6 +57,7 @@ const themes = [
   { key: "blue", className: "theme-blue", label: "B", title: "Blue theme" },
   { key: "paper", className: "theme-paper", label: "P", title: "Paper theme" },
 ];
+const pageTransitionDurationMs = 220;
 
 function getThemeDefinition(themeKey) {
   return themes.find((theme) => theme.key === themeKey) || themes[0];
@@ -117,6 +118,17 @@ function renderThemeToggle() {
   };
 }
 
+function navigateWithTransition(url) {
+  if (!url || document.body.classList.contains("page-leaving")) {
+    return;
+  }
+
+  document.body.classList.add("page-leaving");
+  window.setTimeout(() => {
+    window.location.href = url;
+  }, pageTransitionDurationMs);
+}
+
 function switchToRelativeSite(direction) {
   const currentIndex = internalSites.findIndex((site) => site.url === window.location.pathname);
 
@@ -125,7 +137,62 @@ function switchToRelativeSite(direction) {
   }
 
   const nextIndex = (currentIndex + direction + internalSites.length) % internalSites.length;
-  window.location.pathname = internalSites[nextIndex].url;
+  navigateWithTransition(internalSites[nextIndex].url);
+}
+
+function initPageTransitions() {
+  document.addEventListener("click", (event) => {
+    if (event.defaultPrevented || event.button !== 0) {
+      return;
+    }
+
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+
+    const target = event.target;
+
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    const link = target.closest("a[href]");
+
+    if (!link) {
+      return;
+    }
+
+    if (link.hasAttribute("download") || link.target === "_blank") {
+      return;
+    }
+
+    const destination = new URL(link.href, window.location.href);
+
+    if (destination.origin !== window.location.origin) {
+      return;
+    }
+
+    if (destination.pathname === window.location.pathname && destination.search === window.location.search && destination.hash === window.location.hash) {
+      return;
+    }
+
+    event.preventDefault();
+    navigateWithTransition(destination.href);
+  });
+}
+
+function revealPage() {
+  const finishReveal = () => {
+    document.documentElement.classList.remove("page-loading");
+    document.body.classList.add("page-loaded");
+  };
+
+  if (document.readyState === "interactive" || document.readyState === "complete") {
+    finishReveal();
+    return;
+  }
+
+  document.addEventListener("DOMContentLoaded", finishReveal, { once: true });
 }
 
 function initGlobalKeyboardShortcuts() {
@@ -214,6 +281,8 @@ export function mountSiteShell() {
   applyTheme();
   renderThemeToggle();
   initGlobalKeyboardShortcuts();
+  initPageTransitions();
+  revealPage();
 
   return site;
 }
