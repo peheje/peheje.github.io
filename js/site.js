@@ -40,6 +40,11 @@ const sites = [
     about: "Generate random equations and solve for X.",
   },
   {
+    url: "/neck.html",
+    name: "Neck",
+    about: "Run a local repeating reminder timer for neck rolls during the workday.",
+  },
+  {
     url: "/poe.html",
     name: "Poe",
     about: "Parse Poe AI usage CSV files locally and inspect points, costs, and usage patterns.",
@@ -123,6 +128,14 @@ function renderThemeToggle() {
 function navigateWithTransition(url) {
   if (!url || document.body.classList.contains("page-leaving")) {
     return;
+  }
+
+  if (window.__neckReminderGuardActive) {
+    const confirmed = window.confirm("A neck reminder is still active. Leave this page anyway?");
+
+    if (!confirmed) {
+      return;
+    }
   }
 
   document.body.classList.add("page-leaving");
