@@ -3,6 +3,7 @@ import { mountSiteShell } from "../site.js";
 
 const settingsKey = "neck-reminder-settings";
 const stateKey = "neck-reminder-state";
+const settingsUiKey = "neck-reminder-settings-ui";
 const pageTitleBase = "Neck | peheje";
 const defaultSettings = {
   intervalValue: 30,
@@ -179,6 +180,8 @@ function initNeckPage() {
   const snoozeButton = getElement("neck-snooze");
   const resetButton = getElement("neck-reset");
   const testAlertButton = getElement("neck-test-alert");
+  const settingsToggleButton = getElement("neck-settings-toggle");
+  const settingsSectionsElement = getElement("neck-settings-sections");
   const enableNotificationsButton = getElement("neck-enable-notifications");
   const countdownElement = getElement("neck-countdown");
   const statusElement = getElement("neck-status");
@@ -199,9 +202,14 @@ function initNeckPage() {
   let repeatTimeoutId = 0;
   let renderIntervalId = 0;
   let activeNotification = null;
+  let settingsCollapsed = localStorage.getItem(settingsUiKey) === "collapsed";
 
   function persistSettings() {
     saveJson(settingsKey, settings);
+  }
+
+  function persistSettingsUi() {
+    localStorage.setItem(settingsUiKey, settingsCollapsed ? "collapsed" : "expanded");
   }
 
   function persistState() {
@@ -265,6 +273,23 @@ function initNeckPage() {
       });
     } catch {
       // Ignore notification errors; sound and on-page state still provide fallback feedback.
+    }
+  }
+
+  async function ensureNotificationPermission() {
+    if (!("Notification" in window) || !settings.notificationsEnabled) {
+      return Notification.permission;
+    }
+
+    if (Notification.permission !== "default") {
+      updateNotificationStatus();
+      return Notification.permission;
+    }
+
+    try {
+      return await Notification.requestPermission();
+    } finally {
+      updateNotificationStatus();
     }
   }
 
@@ -332,6 +357,14 @@ function initNeckPage() {
     resetButton.classList.toggle("display-none", isIdle);
   }
 
+  function renderSettingsUi() {
+    settingsSectionsElement?.classList.toggle("display-none", settingsCollapsed);
+    if (settingsToggleButton) {
+      settingsToggleButton.textContent = settingsCollapsed ? "Show setup" : "Hide setup";
+      settingsToggleButton.setAttribute("aria-expanded", settingsCollapsed ? "false" : "true");
+    }
+  }
+
   function render() {
     const now = Date.now();
     let countdownText = formatDuration(getIntervalDurationMs(settings));
@@ -369,6 +402,7 @@ function initNeckPage() {
     statusElement.textContent = statusText;
     statePillElement.textContent = pillText;
     renderButtons();
+    renderSettingsUi();
     updateNotificationStatus();
     updateTitle();
   }
@@ -551,6 +585,7 @@ function initNeckPage() {
   startButton.addEventListener("click", () => {
     notifier.unlock();
     readSettingsFromInputs();
+    ensureNotificationPermission();
     scheduleNextCycle();
   });
 
@@ -594,6 +629,7 @@ function initNeckPage() {
   testAlertButton.addEventListener("click", async () => {
     notifier.unlock();
     readSettingsFromInputs();
+    await ensureNotificationPermission();
 
     if (settings.soundEnabled) {
       notifier.chime(1);
@@ -601,6 +637,12 @@ function initNeckPage() {
 
     await maybeNotify("Neck rolls", "Test alert. If you noticed this, the page can nudge you later too.");
     statusElement.textContent = "Test alert sent. If you heard nothing, your browser may still need user interaction or audio permission.";
+  });
+
+  settingsToggleButton?.addEventListener("click", () => {
+    settingsCollapsed = !settingsCollapsed;
+    persistSettingsUi();
+    renderSettingsUi();
   });
 
   document.addEventListener("visibilitychange", () => {

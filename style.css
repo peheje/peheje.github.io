@@ -983,6 +983,11 @@ a {
     box-shadow: var(--shadow-lg);
 }
 
+.neck-settings-sections {
+    display: grid;
+    gap: 14px;
+}
+
 .neck-interval-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 140px;
@@ -1050,10 +1055,17 @@ a {
 }
 
 .neck-inline-actions {
+    display: inline-flex;
+    justify-self: start;
+    width: fit-content;
     padding: 0;
     border: 0;
     background: transparent;
     box-shadow: none;
+}
+
+.neck-inline-actions .btn-small {
+    min-width: 108px;
 }
 
 @keyframes neckAlertPulse {

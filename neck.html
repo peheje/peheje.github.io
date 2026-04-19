@@ -12,33 +12,15 @@
 <body>
     <div id="menu"></div>
     <main class="app-shell">
-        <section class="ab">
-            <div class="inline-block">
-                <label for="neck-interval">Reminder interval:</label>
-                <div class="neck-interval-grid">
-                    <input id="neck-interval" type="number" min="1" max="240" step="1" value="30" data-stepper="true">
-                    <select id="neck-interval-unit">
-                        <option value="minutes" selected>minutes</option>
-                        <option value="seconds">seconds</option>
-                    </select>
-                </div>
-            </div>
-            <div class="inline-block">
-                <label for="neck-repeat-count">Repeat alerts:</label>
-                <input id="neck-repeat-count" type="number" min="1" max="10" step="1" value="5" data-stepper="true">
-            </div>
-            <div class="inline-block">
-                <label for="neck-repeat-spacing">Repeat spacing (seconds):</label>
-                <input id="neck-repeat-spacing" type="number" min="3" max="300" step="1" value="20" data-stepper="true">
-            </div>
-        </section>
-
         <section class="neck-panel neck-timer-panel">
             <p id="neck-state-pill" class="notice">Idle</p>
             <p id="neck-countdown" class="neck-countdown">30:00</p>
             <p id="neck-status" class="result-line">Start the timer to get a recurring neck-roll reminder.</p>
             <p id="neck-next-due" class="result-line">Next reminder: -</p>
             <p id="neck-repeat-progress" class="result-line">Alert progress: -</p>
+            <div class="actions neck-inline-actions">
+                <button id="neck-settings-toggle" type="button" class="btn-small">Hide setup</button>
+            </div>
         </section>
 
         <section class="actions">
@@ -50,32 +32,55 @@
             <button id="neck-reset" class="red display-none">Reset</button>
         </section>
 
-        <section class="ab">
-            <div class="inline-block">
-                <label>Alerting</label>
-                <div class="toggle-stack">
-                    <label class="toggle-row" for="neck-sound-enabled">
-                        <input id="neck-sound-enabled" type="checkbox" checked>
-                        <span>Play a small sound</span>
-                    </label>
-                    <label class="toggle-row" for="neck-notifications-enabled">
-                        <input id="neck-notifications-enabled" type="checkbox" checked>
-                        <span>Use browser notifications</span>
-                    </label>
+        <div id="neck-settings-sections" class="neck-settings-sections">
+            <section class="ab">
+                <div class="inline-block">
+                    <label for="neck-interval">Reminder interval:</label>
+                    <div class="neck-interval-grid">
+                        <input id="neck-interval" type="number" min="1" max="240" step="1" value="30" data-stepper="true">
+                        <select id="neck-interval-unit">
+                            <option value="minutes" selected>minutes</option>
+                            <option value="seconds">seconds</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="actions neck-inline-actions">
-                    <button id="neck-enable-notifications" type="button">Allow notifications</button>
-                    <button id="neck-test-alert" type="button">Test alert</button>
+                <div class="inline-block">
+                    <label for="neck-repeat-count">Repeat alerts:</label>
+                    <input id="neck-repeat-count" type="number" min="1" max="10" step="1" value="5" data-stepper="true">
                 </div>
-                <p id="neck-notification-status" class="result-line">Notification permission: unknown.</p>
-            </div>
-            <div class="inline-block">
-                <label>How it works</label>
-                <p class="result-line">The timer runs locally in this tab. When a reminder is due, it keeps alerting until you press Done, snooze it, or reset it.</p>
-                <p class="result-line">If a session is active, the page will warn before you navigate away or close the tab.</p>
-                <p class="result-line">Pause it at lunch, then resume when you are back.</p>
-            </div>
-        </section>
+                <div class="inline-block">
+                    <label for="neck-repeat-spacing">Repeat spacing (seconds):</label>
+                    <input id="neck-repeat-spacing" type="number" min="3" max="300" step="1" value="20" data-stepper="true">
+                </div>
+            </section>
+
+            <section class="ab">
+                <div class="inline-block">
+                    <label>Alerting</label>
+                    <div class="toggle-stack">
+                        <label class="toggle-row" for="neck-sound-enabled">
+                            <input id="neck-sound-enabled" type="checkbox" checked>
+                            <span>Play a small sound</span>
+                        </label>
+                        <label class="toggle-row" for="neck-notifications-enabled">
+                            <input id="neck-notifications-enabled" type="checkbox" checked>
+                            <span>Use browser notifications</span>
+                        </label>
+                    </div>
+                    <div class="actions neck-inline-actions">
+                        <button id="neck-enable-notifications" type="button">Allow notifications</button>
+                        <button id="neck-test-alert" type="button">Test alert</button>
+                    </div>
+                    <p id="neck-notification-status" class="result-line">Notification permission: unknown.</p>
+                </div>
+                <div class="inline-block">
+                    <label>How it works</label>
+                    <p class="result-line">The timer runs locally in this tab. When a reminder is due, it keeps alerting until you press Done, snooze it, or reset it.</p>
+                    <p class="result-line">If a session is active, the page will warn before you navigate away or close the tab.</p>
+                    <p class="result-line">Pause it at lunch, then resume when you are back.</p>
+                </div>
+            </section>
+        </div>
     </main>
 
     <script type="module" src="js/pages/neck.js"></script>
