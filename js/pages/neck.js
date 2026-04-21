@@ -312,10 +312,6 @@ function initNeckPage() {
     render();
   }
 
-  function buildRunningStatus(remainingMs) {
-    return `Running. Next neck-roll reminder in ${formatDuration(remainingMs)}. Current interval: ${getIntervalLabel(settings)}.`;
-  }
-
   function buildPausedStatus() {
     return `Paused with ${formatDuration(state.pausedRemainingMs || 0)} remaining. Resume when you are back from lunch or a break.`;
   }
@@ -379,11 +375,10 @@ function initNeckPage() {
     timerPanelElement?.classList.remove("neck-alerting", "neck-paused", "neck-running");
 
     if (state.phase === "running") {
-      const remainingMs = Math.max(0, (state.dueAt || 0) - now);
-      countdownText = formatDuration(remainingMs);
+      countdownText = formatDuration(Math.max(0, (state.dueAt || 0) - now));
       nextDueText = `Next reminder: ${formatClockTime(state.dueAt)}`;
-      statusText = buildRunningStatus(remainingMs);
-      pillText = "Running";
+      statusText = "";
+      pillText = "";
       timerPanelElement?.classList.add("neck-running");
     } else if (state.phase === "paused") {
       countdownText = formatDuration(state.pausedRemainingMs || 0);
@@ -404,6 +399,9 @@ function initNeckPage() {
     repeatProgressElement.textContent = repeatProgressText;
     statusElement.textContent = statusText;
     statePillElement.textContent = pillText;
+    statusElement.classList.toggle("display-none", !statusText);
+    statePillElement.classList.toggle("display-none", !pillText);
+    repeatProgressElement.classList.toggle("display-none", state.phase !== "alerting");
     renderButtons();
     renderSettingsUi();
     updateNotificationStatus();
