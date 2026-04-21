@@ -215,6 +215,9 @@ function initNeckPage() {
   function persistState() {
     saveJson(stateKey, state);
     window.__neckReminderGuardActive = isActivePhase(state.phase);
+    window.__activePageGuardMessage = isActivePhase(state.phase)
+      ? "A neck reminder is still active. Leave this page anyway?"
+      : "";
   }
 
   function syncInputsFromSettings() {

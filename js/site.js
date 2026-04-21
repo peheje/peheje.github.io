@@ -40,6 +40,11 @@ const sites = [
     about: "Generate random equations and solve for X.",
   },
   {
+    url: "/timer.html",
+    name: "Timer",
+    about: "A simple visual countdown timer for kids and everyday transitions.",
+  },
+  {
     url: "/neck.html",
     name: "Neck",
     about: "Run a local repeating reminder timer for neck rolls during the workday.",
@@ -65,6 +70,18 @@ const themes = [
   { key: "dusk", className: "theme-dusk", label: "D", title: "Dusk theme" },
 ];
 const pageTransitionDurationMs = 220;
+
+function getNavigationGuardMessage() {
+  if (typeof window.__activePageGuardMessage === "string" && window.__activePageGuardMessage.trim()) {
+    return window.__activePageGuardMessage.trim();
+  }
+
+  if (window.__neckReminderGuardActive) {
+    return "A neck reminder is still active. Leave this page anyway?";
+  }
+
+  return "";
+}
 
 function getThemeDefinition(themeKey) {
   return themes.find((theme) => theme.key === themeKey) || themes[0];
@@ -130,8 +147,10 @@ function navigateWithTransition(url) {
     return;
   }
 
-  if (window.__neckReminderGuardActive) {
-    const confirmed = window.confirm("A neck reminder is still active. Leave this page anyway?");
+  const guardMessage = getNavigationGuardMessage();
+
+  if (guardMessage) {
+    const confirmed = window.confirm(guardMessage);
 
     if (!confirmed) {
       return;

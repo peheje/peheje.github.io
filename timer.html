@@ -1,0 +1,61 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/hamster.png" type="image/png">
+</head>
+
+<body>
+    <div id="menu"></div>
+    <main class="app-shell">
+        <section class="kid-timer-panel">
+            <p id="timer-state-pill" class="notice">Ready</p>
+            <div class="kid-timer-visual-wrap">
+                <div id="timer-visual" class="kid-timer-visual">
+                    <svg class="kid-timer-svg" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+                        <circle class="kid-timer-face" cx="50" cy="50" r="46"></circle>
+                        <path id="timer-progress-shape" class="kid-timer-progress-shape"></path>
+                    </svg>
+                    <div class="kid-timer-gloss"></div>
+                    <div class="kid-timer-center">
+                        <p id="timer-visual-label" class="kid-timer-visual-label">Time left</p>
+                        <p id="timer-countdown" class="kid-timer-countdown">10:00</p>
+                    </div>
+                </div>
+            </div>
+            <p id="timer-status" class="result-line">When the circle is gone, it is time to eat.</p>
+            <p id="timer-helper" class="result-line">Pick a quick start or choose your own minutes.</p>
+        </section>
+
+        <section class="actions kid-timer-presets" aria-label="Quick timer presets">
+            <button id="timer-preset-5" type="button">5 min</button>
+            <button id="timer-preset-10" type="button">10 min</button>
+            <button id="timer-preset-15" type="button">15 min</button>
+        </section>
+
+        <section class="ab">
+            <div class="inline-block">
+                <label for="timer-custom-minutes">Choose minutes:</label>
+                <input id="timer-custom-minutes" type="number" min="1" max="180" step="1" value="10" data-stepper="true">
+                <div class="actions kid-timer-inline-actions">
+                    <button id="timer-start-custom" type="button">Start</button>
+                    <button id="timer-reset" type="button" class="red display-none">Reset</button>
+                </div>
+            </div>
+
+            <div class="inline-block">
+                <label>How it works</label>
+                <p class="result-line">The timer runs locally in this browser tab and keeps going if you reload the page.</p>
+                <p class="result-line">It plays one small sound when time is up and then stays on the done screen until you start again or reset.</p>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="js/pages/timer.js"></script>
+</body>
+
+</html>
