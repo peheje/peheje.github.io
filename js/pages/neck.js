@@ -661,7 +661,7 @@ function initNeckPage() {
   });
 
   window.addEventListener("beforeunload", (event) => {
-    if (!isActivePhase(state.phase)) {
+    if (!isActivePhase(state.phase) || window.__suppressActivePageBeforeUnload) {
       return;
     }
 

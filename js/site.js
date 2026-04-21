@@ -70,6 +70,7 @@ const themes = [
   { key: "dusk", className: "theme-dusk", label: "D", title: "Dusk theme" },
 ];
 const pageTransitionDurationMs = 220;
+window.__suppressActivePageBeforeUnload = false;
 
 function getNavigationGuardMessage() {
   if (typeof window.__activePageGuardMessage === "string" && window.__activePageGuardMessage.trim()) {
@@ -159,6 +160,7 @@ function navigateWithTransition(url) {
 
   document.body.classList.add("page-leaving");
   window.setTimeout(() => {
+    window.__suppressActivePageBeforeUnload = true;
     window.location.href = url;
   }, pageTransitionDurationMs);
 }

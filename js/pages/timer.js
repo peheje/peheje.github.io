@@ -460,7 +460,7 @@ function initTimerPage() {
   });
 
   window.addEventListener("beforeunload", (event) => {
-    if (!isTimerActive(state)) {
+    if (!isTimerActive(state) || window.__suppressActivePageBeforeUnload) {
       return;
     }
 
