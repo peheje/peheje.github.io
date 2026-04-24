@@ -271,12 +271,6 @@ function buildNavLink(site) {
 }
 
 export function mountSiteShell() {
-  if (window.location.pathname === "/compare/compare.html") {
-    window.setTimeout(() => {
-      window.location.pathname = "/compare.html";
-    }, 6000);
-  }
-
   const site = sites.find((entry) => entry.url === window.location.pathname);
 
   if (!site) {

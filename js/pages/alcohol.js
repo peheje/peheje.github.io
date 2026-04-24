@@ -4,6 +4,15 @@ import { mountSiteShell } from "../site.js";
 
 const storageKey = "alcohol-drinks";
 
+function isDrink(value) {
+  return Boolean(
+    value &&
+      Number.isFinite(value.Millilitres) &&
+      Number.isFinite(value.Percentage) &&
+      Number.isFinite(value.Units)
+  );
+}
+
 function formatUnits(units) {
   return units.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
 }
@@ -21,7 +30,7 @@ function loadDrinks() {
 
   try {
     const parsed = JSON.parse(source);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.filter(isDrink) : [];
   } catch {
     return [];
   }
@@ -47,20 +56,20 @@ function initAlcoholPage() {
   let drinks = loadDrinks();
   let editingIndex = null;
 
-  function sanitizeInputs() {
-    if (millilitresInput.valueAsNumber < 0) {
-      millilitresInput.valueAsNumber = 0;
-    }
+  function getInputNumber(input, fallback) {
+    return Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : fallback;
+  }
 
-    if (percentageInput.valueAsNumber > 100) {
-      percentageInput.valueAsNumber = 100;
-    } else if (percentageInput.valueAsNumber < 0) {
-      percentageInput.valueAsNumber = 0;
-    }
+  function sanitizeInputs() {
+    const millilitres = Math.max(0, getInputNumber(millilitresInput, 0));
+    const percentage = Math.min(100, Math.max(0, getInputNumber(percentageInput, 0)));
+
+    millilitresInput.valueAsNumber = millilitres;
+    percentageInput.valueAsNumber = percentage;
   }
 
   function calculateAndShowUnits() {
-    unitsElement.textContent = formatUnits(calculateUnits(millilitresInput.valueAsNumber, percentageInput.valueAsNumber));
+    unitsElement.textContent = formatUnits(calculateUnits(getInputNumber(millilitresInput, 0), getInputNumber(percentageInput, 0)));
   }
 
   function updateButtons() {
@@ -160,11 +169,13 @@ function initAlcoholPage() {
 
   saveDrinkButton.addEventListener("click", () => {
     sanitizeInputs();
+    const millilitres = getInputNumber(millilitresInput, 0);
+    const percentage = getInputNumber(percentageInput, 0);
 
     const drink = {
-      Millilitres: millilitresInput.valueAsNumber,
-      Percentage: percentageInput.valueAsNumber,
-      Units: calculateUnits(millilitresInput.valueAsNumber, percentageInput.valueAsNumber),
+      Millilitres: millilitres,
+      Percentage: percentage,
+      Units: calculateUnits(millilitres, percentage),
     };
 
     if (editingIndex !== null && editingIndex >= 0 && editingIndex < drinks.length) {
