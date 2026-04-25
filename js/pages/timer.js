@@ -96,6 +96,35 @@ function describePieWedge(progress) {
   ].join(" ");
 }
 
+function createWakeLockManager() {
+  let wakeLock = null;
+
+  async function request() {
+    try {
+      if ("wakeLock" in navigator && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => {
+          wakeLock = null;
+        });
+        return true;
+      }
+    } catch (err) {
+      console.warn("Could not keep screen awake:", err);
+      return false;
+    }
+    return undefined;
+  }
+
+  function release() {
+    if (wakeLock) {
+      wakeLock.release();
+      wakeLock = null;
+    }
+  }
+
+  return { request, release };
+}
+
 function createNotifier() {
   let audioContext = null;
 
@@ -159,6 +188,7 @@ function initTimerPage() {
   initNumberSteppers();
 
   const notifier = createNotifier();
+  const wakeLockManager = createWakeLockManager();
   const customMinutesInput = getElement("timer-custom-minutes");
   const startCustomButton = getElement("timer-start-custom");
   const resetButton = getElement("timer-reset");
@@ -181,6 +211,7 @@ function initTimerPage() {
   };
   let animationFrameId = 0;
   let completedChimeForFinishAt = null;
+  let wakeLockNotice = "";
   let lastRenderedCountdown = "";
   let lastRenderedTitle = "";
   let lastRenderedProgressPath = "";
@@ -260,7 +291,7 @@ function initTimerPage() {
       const durationMs = Math.max(1000, state.durationMs || idleDurationMs);
 
       countdownText = formatDuration(remainingMs);
-      statusText = "";
+      statusText = wakeLockNotice || "";
       helperText = "";
       pillText = "";
       progress = remainingMs / durationMs;
@@ -320,6 +351,8 @@ function initTimerPage() {
       finishedAt,
     };
     persistState();
+    wakeLockManager.release();
+    wakeLockNotice = "";
 
     if (completedChimeForFinishAt !== finishedAt) {
       completedChimeForFinishAt = finishedAt;
@@ -340,6 +373,16 @@ function initTimerPage() {
     const durationMs = safeMinutes * 60000;
 
     notifier.unlock();
+    wakeLockManager.request().then((granted) => {
+      if (granted === false) {
+        wakeLockNotice = "Screen may turn off while running";
+        render();
+        setTimeout(() => {
+          wakeLockNotice = "";
+          render();
+        }, 5000);
+      }
+    });
     settings = {
       ...settings,
       customMinutes: safeMinutes,
@@ -360,6 +403,8 @@ function initTimerPage() {
 
   function resetTimer() {
     completedChimeForFinishAt = null;
+    wakeLockManager.release();
+    wakeLockNotice = "";
     setState({
       phase: "idle",
       durationMs: getIdleDurationMs(),
@@ -448,6 +493,9 @@ function initTimerPage() {
       reconcileStateWithTime();
       render();
       scheduleRenderLoop();
+      if (state.phase === "running") {
+        wakeLockManager.request();
+      }
     } else {
       stopRenderLoop();
     }
