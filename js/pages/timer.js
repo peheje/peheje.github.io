@@ -127,6 +127,8 @@ function createWakeLockManager() {
 
 function createNotifier() {
   let audioContext = null;
+  let alarmTimeoutId = null;
+  let alarmLevel = 0;
 
   function ensureAudioContext() {
     if (!audioContext) {
@@ -171,14 +173,95 @@ function createNotifier() {
     oscillator.stop(stopAt + 0.02);
   }
 
+  function playSequence(tones) {
+    let accumulatedDelay = 0;
+
+    for (const tone of tones) {
+      playTone(tone.frequency, tone.duration, accumulatedDelay, tone.gain, tone.type);
+      accumulatedDelay += tone.duration + (tone.gap || 0);
+    }
+  }
+
+  function scheduleNextAlarm() {
+    const configs = [
+      {
+        tones: [
+          { frequency: 523.25, duration: 0.16, gain: 0.045, type: "sine", gap: 0 },
+          { frequency: 659.25, duration: 0.2, gain: 0.05, type: "triangle", gap: 0 },
+          { frequency: 783.99, duration: 0.24, gain: 0.055, type: "triangle", gap: 0 },
+        ],
+      },
+      {
+        tones: [
+          { frequency: 659.25, duration: 0.18, gain: 0.08, type: "sine", gap: 0.2 },
+          { frequency: 783.99, duration: 0.18, gain: 0.08, type: "sine", gap: 0 },
+        ],
+      },
+      {
+        tones: [
+          { frequency: 783.99, duration: 0.15, gain: 0.12, type: "triangle", gap: 0.15 },
+          { frequency: 880, duration: 0.15, gain: 0.12, type: "triangle", gap: 0.15 },
+          { frequency: 783.99, duration: 0.15, gain: 0.12, type: "triangle", gap: 0 },
+        ],
+      },
+      {
+        tones: [
+          { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0.12 },
+          { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0.12 },
+          { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0.12 },
+          { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0 },
+        ],
+      },
+      {
+        tones: [
+          { frequency: 1047, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
+          { frequency: 1175, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
+          { frequency: 1047, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
+          { frequency: 1175, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
+          { frequency: 1047, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
+          { frequency: 1175, duration: 0.1, gain: 0.25, type: "square", gap: 0 },
+        ],
+      },
+      {
+        tones: [
+          { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+          { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+          { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+          { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+          { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+          { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+          { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+          { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0 },
+        ],
+      },
+    ];
+
+    const config = configs[Math.min(alarmLevel, configs.length - 1)];
+    playSequence(config.tones);
+
+    alarmLevel += 1;
+    alarmTimeoutId = setTimeout(scheduleNextAlarm, 3000);
+  }
+
+  function stopAlarm() {
+    if (alarmTimeoutId) {
+      clearTimeout(alarmTimeoutId);
+      alarmTimeoutId = null;
+    }
+    alarmLevel = 0;
+  }
+
   return {
     unlock() {
       ensureAudioContext();
     },
     done() {
-      playTone(523.25, 0.16, 0, 0.045, "sine");
-      playTone(659.25, 0.2, 0.16, 0.05, "triangle");
-      playTone(783.99, 0.24, 0.36, 0.055, "triangle");
+      stopAlarm();
+      alarmLevel = 0;
+      scheduleNextAlarm();
+    },
+    stop() {
+      stopAlarm();
     },
   };
 }
@@ -369,6 +452,8 @@ function initTimerPage() {
   }
 
   function startTimer(durationMinutes) {
+    notifier.stop();
+
     const safeMinutes = clampNumber(durationMinutes, 1, 180, defaultSettings.lastDurationMinutes);
     const durationMs = safeMinutes * 60000;
 
@@ -403,6 +488,7 @@ function initTimerPage() {
 
   function resetTimer() {
     completedChimeForFinishAt = null;
+    notifier.stop();
     wakeLockManager.release();
     wakeLockNotice = "";
     setState({
