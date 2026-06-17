@@ -14,15 +14,43 @@
     <main class="app-shell">
         <section class="ab">
             <div class="inline-block heic-drop-zone" id="heic-drop-zone">
-                <label for="heic-files">HEIC or HEIF images:</label>
-                <input id="heic-files" type="file" accept=".heic,.heif,image/heic,image/heif" multiple>
-                <p class="result-line">Images stay local. Conversion runs in this browser and does not upload files.</p>
+                <label for="heic-files">Images:</label>
+                <input id="heic-files" type="file" accept=".heic,.heif,.jpg,.jpeg,.png,.webp,.gif,image/heic,image/heif,image/jpeg,image/png,image/webp,image/gif" multiple>
+                <p class="result-line">Images stay local. Processing runs in this browser and does not upload files.</p>
             </div>
 
             <div class="inline-block">
+                <label>Action:</label>
+                <label class="choice-row">
+                    <input type="radio" name="output-action" value="jpeg" checked>
+                    Convert HEIC/HEIF to JPEG
+                </label>
+                <label class="choice-row">
+                    <input type="radio" name="output-action" value="clean">
+                    Clean metadata, keep format
+                </label>
+            </div>
+
+            <div class="inline-block" id="jpeg-quality-panel">
                 <label for="jpeg-quality">JPEG quality: <span id="jpeg-quality-value">90%</span></label>
                 <input id="jpeg-quality" type="range" min="50" max="100" step="1" value="90">
                 <p class="result-line">Higher quality keeps more detail and creates larger JPEG files.</p>
+            </div>
+
+            <div class="inline-block" id="metadata-panel">
+                <label>Metadata:</label>
+                <label class="choice-row">
+                    <input type="radio" name="metadata-mode" value="strip" checked>
+                    Strip all
+                </label>
+                <label class="choice-row">
+                    <input type="radio" name="metadata-mode" value="basic">
+                    Keep camera and date
+                </label>
+                <label class="choice-row">
+                    <input type="radio" name="metadata-mode" value="location">
+                    Keep camera, date, and location
+                </label>
             </div>
         </section>
 
@@ -31,7 +59,14 @@
             <button id="clear-btn" type="button" class="red" disabled>Clear</button>
         </div>
 
-        <p id="heic-status" class="result-line">Choose one or more HEIC files to begin.</p>
+        <p id="heic-status" class="result-line">Choose one or more images to begin.</p>
+
+        <section class="inline-block">
+            <label>Source metadata</label>
+            <div id="heic-metadata" class="heic-metadata-list">
+                <p class="result-line">Select files to inspect embedded metadata.</p>
+            </div>
+        </section>
 
         <section class="inline-block">
             <label>Converted JPEGs</label>

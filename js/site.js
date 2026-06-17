@@ -57,7 +57,7 @@ const sites = [
   {
     url: "/heic.html",
     name: "HEIC",
-    about: "Convert local HEIC and HEIF images to JPEG in your browser.",
+    about: "Convert HEIC/HEIF images and clean image metadata locally in your browser.",
   },
   {
     url: "https://twitter.com/peheje",

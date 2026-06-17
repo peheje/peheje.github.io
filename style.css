@@ -921,6 +921,26 @@ input[type="range"] {
     gap: 10px;
 }
 
+.heic-metadata-list {
+    display: grid;
+    gap: 10px;
+}
+
+.heic-metadata-row {
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--input-radius);
+    background: var(--result-line-bg);
+}
+
+.heic-metadata-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
 .heic-result {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 80px auto;
