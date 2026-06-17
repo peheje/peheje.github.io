@@ -55,6 +55,11 @@ const sites = [
     about: "Parse Poe AI usage CSV files locally and inspect points, costs, and usage patterns.",
   },
   {
+    url: "/heic.html",
+    name: "HEIC",
+    about: "Convert local HEIC and HEIF images to JPEG in your browser.",
+  },
+  {
     url: "https://twitter.com/peheje",
     name: "Contact",
     about: "",

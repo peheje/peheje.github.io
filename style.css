@@ -902,6 +902,84 @@ a {
     display: none !important;
 }
 
+input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+}
+
+.heic-drop-zone {
+    border-style: dashed;
+}
+
+.heic-drop-zone-active {
+    border-color: var(--accent);
+    background: linear-gradient(145deg, var(--surface-strong), var(--inline-block-bg-2));
+}
+
+.heic-results {
+    display: grid;
+    gap: 10px;
+}
+
+.heic-result {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 80px auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--input-radius);
+    background: var(--result-line-bg);
+}
+
+.heic-result-error {
+    grid-template-columns: minmax(0, 1fr);
+    border-color: var(--notice-border);
+    background: var(--notice-bg);
+}
+
+.heic-result-details {
+    min-width: 0;
+}
+
+.heic-result-title,
+.heic-result-meta {
+    margin: 0;
+}
+
+.heic-result-title {
+    color: var(--text);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.heic-result-meta {
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+.heic-preview {
+    width: 80px;
+    height: 60px;
+    object-fit: cover;
+    border: 1px solid var(--line);
+    border-radius: var(--input-radius);
+    background: var(--image-bg);
+}
+
+.heic-download {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 8px 12px;
+    border-radius: var(--btn-radius);
+    color: var(--btn-text);
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    font-weight: 700;
+    text-decoration: none;
+}
+
 .theme-toggle {
     position: fixed;
     bottom: 16px;
@@ -1343,6 +1421,19 @@ body.page-loaded .app-shell > *:not(.display-none) {
 
     textarea {
         min-height: 130px;
+    }
+
+    .heic-result {
+        grid-template-columns: 64px minmax(0, 1fr);
+    }
+
+    .heic-result-details {
+        grid-column: 1 / -1;
+    }
+
+    .heic-preview {
+        width: 64px;
+        height: 52px;
     }
 
     .neck-interval-grid {
