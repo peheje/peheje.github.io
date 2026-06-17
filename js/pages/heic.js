@@ -12,6 +12,8 @@ let exifrLoadPromise;
 let piexifLoadPromise;
 let activeResults = [];
 let metadataByFileKey = new Map();
+let metadataReadPromise = Promise.resolve();
+let zipUrl = "";
 const metadataTags = [
   "Make",
   "Model",
@@ -36,6 +38,12 @@ const metadataTags = [
   "ImageHeight",
 ];
 const cleanableTypes = new Set(["jpeg", "png", "webp", "gif"]);
+const settingsKey = "image-tool-settings";
+const outputFormats = {
+  jpeg: { mimeType: "image/jpeg", extension: "jpg", label: "JPEG", usesQuality: true },
+  png: { mimeType: "image/png", extension: "png", label: "PNG", usesQuality: false },
+  webp: { mimeType: "image/webp", extension: "webp", label: "WebP", usesQuality: true },
+};
 
 function getElement(id) {
   return document.getElementById(id);
@@ -52,9 +60,10 @@ function formatBytes(bytes) {
   return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: unitIndex === 0 ? 0 : 1 }).format(value)} ${units[unitIndex]}`;
 }
 
-function getJpegName(fileName) {
+function getOutputName(fileName, outputFormat) {
+  const format = outputFormats[outputFormat] || outputFormats.jpeg;
   const baseName = fileName.replace(/\.[^.]+$/, "") || "converted-image";
-  return `${baseName}.jpg`;
+  return `${baseName}.${format.extension}`;
 }
 
 function getCleanName(fileName) {
@@ -78,6 +87,11 @@ function getFileKey(file) {
 
 function getQuality() {
   return Number.parseInt(getElement("jpeg-quality").value, 10) / 100;
+}
+
+function getOutputFormat() {
+  const format = getElement("output-format").value;
+  return outputFormats[format] ? format : "jpeg";
 }
 
 function getMetadataMode() {
@@ -114,13 +128,66 @@ function getImageType(file) {
   return "unknown";
 }
 
+function readSavedSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(settingsKey) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function setCheckedRadio(name, value) {
+  const input = document.querySelector(`input[name="${name}"][value="${value}"]`);
+
+  if (input) {
+    input.checked = true;
+  }
+}
+
+function applySavedSettings() {
+  const settings = readSavedSettings();
+
+  if (settings.outputAction) {
+    setCheckedRadio("output-action", settings.outputAction);
+  }
+
+  if (outputFormats[settings.outputFormat]) {
+    getElement("output-format").value = settings.outputFormat;
+  }
+
+  if (Number.isFinite(settings.quality)) {
+    getElement("jpeg-quality").value = String(Math.min(100, Math.max(50, Math.round(settings.quality))));
+  }
+
+  if (settings.metadataMode) {
+    setCheckedRadio("metadata-mode", settings.metadataMode);
+  }
+}
+
+function saveSettings() {
+  const settings = {
+    outputAction: getOutputAction(),
+    outputFormat: getOutputFormat(),
+    quality: Math.round(getQuality() * 100),
+    metadataMode: getMetadataMode(),
+  };
+
+  localStorage.setItem(settingsKey, JSON.stringify(settings));
+}
+
 function syncControls({ preserveStatus = false } = {}) {
   const selectedCount = getSelectedFiles().length;
   const outputAction = getOutputAction();
+  const outputFormat = getOutputFormat();
+  const format = outputFormats[outputFormat];
   getElement("convert-btn").disabled = selectedCount === 0;
   getElement("clear-btn").disabled = selectedCount === 0 && activeResults.length === 0;
+  getElement("download-all").classList.toggle("disabled", activeResults.length === 0);
+  getElement("download-all").setAttribute("aria-disabled", activeResults.length === 0 ? "true" : "false");
   getElement("convert-btn").textContent = outputAction === "clean" ? "Clean" : "Convert";
-  getElement("jpeg-quality-panel").classList.toggle("display-none", outputAction !== "jpeg");
+  getElement("output-format-panel").classList.toggle("display-none", outputAction !== "jpeg");
+  getElement("jpeg-quality-panel").classList.toggle("display-none", outputAction !== "jpeg" || !format.usesQuality);
+  getElement("jpeg-quality-label").textContent = format.label;
 
   if (preserveStatus) {
     return;
@@ -140,12 +207,21 @@ function syncQualityLabel() {
 function clearResults() {
   activeResults.forEach((result) => URL.revokeObjectURL(result.url));
   activeResults = [];
+  if (zipUrl) {
+    URL.revokeObjectURL(zipUrl);
+    zipUrl = "";
+  }
+  const downloadAll = getElement("download-all");
+  downloadAll.href = "#";
+  downloadAll.classList.add("disabled");
+  downloadAll.setAttribute("aria-disabled", "true");
   getElement("heic-results").replaceChildren();
 }
 
 function clearAll() {
   getElement("heic-files").value = "";
   metadataByFileKey = new Map();
+  metadataReadPromise = Promise.resolve();
   clearResults();
   renderMetadataList([]);
   syncControls();
@@ -162,6 +238,115 @@ function concatUint8Arrays(parts) {
   });
 
   return output;
+}
+
+function makeCrc32Table() {
+  return Array.from({ length: 256 }, (_, index) => {
+    let value = index;
+
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    }
+
+    return value >>> 0;
+  });
+}
+
+const crc32Table = makeCrc32Table();
+
+function getCrc32(bytes) {
+  let crc = 0xffffffff;
+
+  bytes.forEach((byte) => {
+    crc = crc32Table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  });
+
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function getZipDateTime(date = new Date()) {
+  const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+  const dosDate = ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+  return { dosTime, dosDate };
+}
+
+function getUniqueZipName(name, usedNames) {
+  const normalized = (name || "image").replace(/[\\/:*?"<>|]+/g, "-");
+  const extensionMatch = normalized.match(/(\.[^.]+)$/);
+  const extension = extensionMatch ? extensionMatch[1] : "";
+  const baseName = extension ? normalized.slice(0, -extension.length) : normalized;
+  let candidate = normalized;
+  let copyIndex = 2;
+
+  while (usedNames.has(candidate)) {
+    candidate = `${baseName}-${copyIndex}${extension}`;
+    copyIndex += 1;
+  }
+
+  usedNames.add(candidate);
+  return candidate;
+}
+
+async function createZipBlob(results) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  const usedNames = new Set();
+  let offset = 0;
+  const { dosTime, dosDate } = getZipDateTime();
+
+  for (const result of results) {
+    if (result.status !== "done" || !(result.blob instanceof Blob)) {
+      continue;
+    }
+
+    const nameBytes = encoder.encode(getUniqueZipName(result.outputName, usedNames));
+    const fileBytes = new Uint8Array(await result.blob.arrayBuffer());
+    const crc = getCrc32(fileBytes);
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+
+    writeUint32LittleEndian(localHeader, 0, 0x04034b50);
+    writeUint16LittleEndian(localHeader, 4, 20);
+    writeUint16LittleEndian(localHeader, 6, 0x0800);
+    writeUint16LittleEndian(localHeader, 8, 0);
+    writeUint16LittleEndian(localHeader, 10, dosTime);
+    writeUint16LittleEndian(localHeader, 12, dosDate);
+    writeUint32LittleEndian(localHeader, 14, crc);
+    writeUint32LittleEndian(localHeader, 18, fileBytes.length);
+    writeUint32LittleEndian(localHeader, 22, fileBytes.length);
+    writeUint16LittleEndian(localHeader, 26, nameBytes.length);
+    localHeader.set(nameBytes, 30);
+
+    const centralHeader = new Uint8Array(46 + nameBytes.length);
+    writeUint32LittleEndian(centralHeader, 0, 0x02014b50);
+    writeUint16LittleEndian(centralHeader, 4, 20);
+    writeUint16LittleEndian(centralHeader, 6, 20);
+    writeUint16LittleEndian(centralHeader, 8, 0x0800);
+    writeUint16LittleEndian(centralHeader, 10, 0);
+    writeUint16LittleEndian(centralHeader, 12, dosTime);
+    writeUint16LittleEndian(centralHeader, 14, dosDate);
+    writeUint32LittleEndian(centralHeader, 16, crc);
+    writeUint32LittleEndian(centralHeader, 20, fileBytes.length);
+    writeUint32LittleEndian(centralHeader, 24, fileBytes.length);
+    writeUint16LittleEndian(centralHeader, 28, nameBytes.length);
+    writeUint32LittleEndian(centralHeader, 42, offset);
+    centralHeader.set(nameBytes, 46);
+
+    localParts.push(localHeader, fileBytes);
+    centralParts.push(centralHeader);
+    offset += localHeader.length + fileBytes.length;
+  }
+
+  const centralDirectory = concatUint8Arrays(centralParts);
+  const end = new Uint8Array(22);
+  const fileCount = centralParts.length;
+  writeUint32LittleEndian(end, 0, 0x06054b50);
+  writeUint16LittleEndian(end, 8, fileCount);
+  writeUint16LittleEndian(end, 10, fileCount);
+  writeUint32LittleEndian(end, 12, centralDirectory.length);
+  writeUint32LittleEndian(end, 16, offset);
+
+  return new Blob([...localParts, centralDirectory, end], { type: "application/zip" });
 }
 
 function bytesStartWith(bytes, values, offset = 0) {
@@ -181,6 +366,11 @@ function writeUint32LittleEndian(bytes, offset, value) {
   bytes[offset + 1] = (value >>> 8) & 0xff;
   bytes[offset + 2] = (value >>> 16) & 0xff;
   bytes[offset + 3] = (value >>> 24) & 0xff;
+}
+
+function writeUint16LittleEndian(bytes, offset, value) {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >>> 8) & 0xff;
 }
 
 function readUint32BigEndian(bytes, offset) {
@@ -570,11 +760,15 @@ async function readSelectedMetadata() {
     }
 
     renderMetadataList(files);
-    syncControls();
+    if (activeResults.length === 0) {
+      syncControls();
+    }
   } catch (error) {
     metadataByFileKey = new Map(files.map((file) => [getFileKey(file), null]));
     renderMetadataList(files);
-    setStatus(error instanceof Error ? error.message : "Could not read metadata.");
+    if (activeResults.length === 0) {
+      setStatus(error instanceof Error ? error.message : "Could not read metadata.");
+    }
   }
 }
 
@@ -590,6 +784,60 @@ function blobToDataUrl(blob) {
 async function dataUrlToBlob(dataUrl) {
   const response = await fetch(dataUrl);
   return response.blob();
+}
+
+function blobToImage(blob) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(blob);
+
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read this image in the browser."));
+    };
+    image.src = url;
+  });
+}
+
+async function rasterImageToFormat(blob, outputFormat, quality) {
+  const format = outputFormats[outputFormat] || outputFormats.jpeg;
+  const image = await blobToImage(blob);
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+
+  if (!width || !height) {
+    throw new Error("Could not determine image dimensions.");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("This browser could not create an image canvas.");
+  }
+
+  if (outputFormat === "jpeg") {
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+  }
+
+  context.drawImage(image, 0, 0, width, height);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob && blob.type === format.mimeType) {
+        resolve(blob);
+      } else {
+        reject(new Error(`Could not export ${format.label} from this image.`));
+      }
+    }, format.mimeType, format.usesQuality ? quality : undefined);
+  });
 }
 
 function decimalToGpsRationals(value) {
@@ -760,30 +1008,82 @@ function renderResults(results) {
   getElement("heic-results").replaceChildren(...results.map(createResultRow));
 }
 
-async function convertFile(heic2any, file, quality, metadataMode) {
+async function updateZipDownload() {
+  const downloadAll = getElement("download-all");
+
+  if (activeResults.length === 0) {
+    downloadAll.href = "#";
+    downloadAll.classList.add("disabled");
+    downloadAll.setAttribute("aria-disabled", "true");
+    return;
+  }
+
+  if (zipUrl) {
+    URL.revokeObjectURL(zipUrl);
+  }
+
+  const zipBlob = await createZipBlob(activeResults);
+  zipUrl = URL.createObjectURL(zipBlob);
+  downloadAll.href = zipUrl;
+  downloadAll.download = activeResults.length === 1 ? "image.zip" : "images.zip";
+  downloadAll.classList.remove("disabled");
+  downloadAll.setAttribute("aria-disabled", "false");
+}
+
+async function heicToFormat(file, outputFormat, quality) {
+  const format = outputFormats[outputFormat] || outputFormats.jpeg;
+  const heic2any = await loadHeic2Any();
+  const converted = await heic2any({
+    blob: file,
+    toType: outputFormat === "webp" ? "image/png" : format.mimeType,
+    quality,
+  });
+  const blob = Array.isArray(converted) ? converted[0] : converted;
+
+  if (!(blob instanceof Blob)) {
+    throw new Error(`The converter did not return a ${format.label} blob.`);
+  }
+
+  return outputFormat === "webp" ? rasterImageToFormat(blob, outputFormat, quality) : blob;
+}
+
+async function convertFile(file, outputFormat, quality, metadataMode) {
   try {
-    const converted = await heic2any({
-      blob: file,
-      toType: "image/jpeg",
-      quality,
-    });
-    let blob = Array.isArray(converted) ? converted[0] : converted;
+    const format = outputFormats[outputFormat] || outputFormats.jpeg;
+    const type = getImageType(file);
+    let blob;
+
+    if (type === "heic") {
+      blob = await heicToFormat(file, outputFormat, quality);
+    } else if (cleanableTypes.has(type)) {
+      blob = await rasterImageToFormat(file, outputFormat, quality);
+    } else {
+      throw new Error("Conversion supports HEIC, HEIF, JPEG, PNG, WebP, and GIF files.");
+    }
 
     if (!(blob instanceof Blob)) {
-      throw new Error("The converter did not return a JPEG blob.");
+      throw new Error(`The converter did not return a ${format.label} blob.`);
     }
 
     const metadata = metadataByFileKey.get(getFileKey(file));
-    const result = await applyJpegMetadataPreset(blob, metadata, metadataMode);
-    blob = result.blob;
+    let metadataNote = "stripped metadata";
+
+    if (outputFormat === "jpeg") {
+      const result = await applyJpegMetadataPreset(blob, metadata, metadataMode);
+      blob = result.blob;
+      metadataNote = result.metadataNote;
+    } else if (metadataMode !== "strip") {
+      metadataNote = "stripped metadata; keeping selected fields is only supported for JPEG";
+    }
 
     return {
       status: "done",
       sourceName: file.name,
       sourceSize: file.size,
-      outputName: getJpegName(file.name),
+      outputName: getOutputName(file.name, outputFormat),
       outputSize: blob.size,
-      metadataNote: result.metadataNote,
+      metadataNote,
+      blob,
       url: URL.createObjectURL(blob),
     };
   } catch (error) {
@@ -818,6 +1118,7 @@ async function cleanFile(file, metadataMode) {
       outputName: getCleanName(file.name),
       outputSize: blob.size,
       metadataNote,
+      blob,
       url: URL.createObjectURL(blob),
     };
   } catch (error) {
@@ -843,12 +1144,18 @@ async function convertFiles() {
   clearButton.disabled = true;
   clearResults();
   const outputAction = getOutputAction();
-  setStatus(outputAction === "clean" ? "Cleaning metadata..." : "Loading HEIC converter...");
+  setStatus(outputAction === "clean" ? "Cleaning metadata..." : "Preparing images...");
 
   try {
-    const heic2any = outputAction === "jpeg" ? await loadHeic2Any() : null;
     const quality = getQuality();
+    const outputFormat = getOutputFormat();
     const metadataMode = getMetadataMode();
+    const needsMetadata = metadataMode !== "strip" && (outputAction === "clean" || outputFormat === "jpeg");
+
+    if (needsMetadata) {
+      await metadataReadPromise.catch(() => undefined);
+    }
+
     const results = [];
 
     for (let index = 0; index < files.length; index += 1) {
@@ -856,7 +1163,7 @@ async function convertFiles() {
       setStatus(`${outputAction === "clean" ? "Cleaning" : "Converting"} ${index + 1} of ${files.length}: ${file.name}`);
       const result = outputAction === "clean"
         ? await cleanFile(file, metadataMode)
-        : await convertFile(heic2any, file, quality, metadataMode);
+        : await convertFile(file, outputFormat, quality, metadataMode);
       results.push(result);
 
       if (result.status === "done") {
@@ -868,6 +1175,7 @@ async function convertFiles() {
 
     const successfulCount = results.filter((result) => result.status === "done").length;
     const failedCount = results.length - successfulCount;
+    await updateZipDownload();
     setStatus(`${successfulCount} ${outputAction === "clean" ? "cleaned" : "converted"}${failedCount ? `, ${failedCount} failed` : ""}.`);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : "Could not start processing.");
@@ -886,7 +1194,7 @@ function handleDrop(event) {
 
   getElement("heic-files").files = event.dataTransfer.files;
   syncControls();
-  readSelectedMetadata();
+  metadataReadPromise = readSelectedMetadata();
 }
 
 function initDropZone() {
@@ -904,16 +1212,36 @@ function initDropZone() {
 
 function initHeicPage() {
   mountSiteShell();
+  applySavedSettings();
   syncQualityLabel();
+  syncControls();
   initDropZone();
   getElement("heic-files").addEventListener("change", () => {
     clearResults();
     syncControls();
-    readSelectedMetadata();
+    metadataReadPromise = readSelectedMetadata();
   });
-  getElement("jpeg-quality").addEventListener("input", syncQualityLabel);
+  getElement("jpeg-quality").addEventListener("input", () => {
+    syncQualityLabel();
+    saveSettings();
+  });
+  getElement("output-format").addEventListener("change", () => {
+    syncControls();
+    saveSettings();
+  });
   document.querySelectorAll('input[name="output-action"]').forEach((input) => {
-    input.addEventListener("change", () => syncControls());
+    input.addEventListener("change", () => {
+      syncControls();
+      saveSettings();
+    });
+  });
+  document.querySelectorAll('input[name="metadata-mode"]').forEach((input) => {
+    input.addEventListener("change", saveSettings);
+  });
+  getElement("download-all").addEventListener("click", (event) => {
+    if (activeResults.length === 0) {
+      event.preventDefault();
+    }
   });
   getElement("convert-btn").addEventListener("click", convertFiles);
   getElement("clear-btn").addEventListener("click", clearAll);

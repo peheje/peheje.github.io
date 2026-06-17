@@ -23,7 +23,7 @@
                 <label>Action:</label>
                 <label class="choice-row">
                     <input type="radio" name="output-action" value="jpeg" checked>
-                    Convert HEIC/HEIF to JPEG
+                    Convert
                 </label>
                 <label class="choice-row">
                     <input type="radio" name="output-action" value="clean">
@@ -31,10 +31,20 @@
                 </label>
             </div>
 
+            <div class="inline-block" id="output-format-panel">
+                <label for="output-format">Output:</label>
+                <select id="output-format">
+                    <option value="jpeg">JPEG</option>
+                    <option value="png">PNG</option>
+                    <option value="webp">WebP</option>
+                </select>
+                <p class="result-line">GIF conversion uses the first frame. Use clean metadata to keep animation.</p>
+            </div>
+
             <div class="inline-block" id="jpeg-quality-panel">
-                <label for="jpeg-quality">JPEG quality: <span id="jpeg-quality-value">90%</span></label>
+                <label for="jpeg-quality"><span id="jpeg-quality-label">JPEG</span> quality: <span id="jpeg-quality-value">90%</span></label>
                 <input id="jpeg-quality" type="range" min="50" max="100" step="1" value="90">
-                <p class="result-line">Higher quality keeps more detail and creates larger JPEG files.</p>
+                <p class="result-line">Higher quality keeps more detail and creates larger files.</p>
             </div>
 
             <div class="inline-block" id="metadata-panel">
@@ -56,6 +66,7 @@
 
         <div class="actions">
             <button id="convert-btn" type="button" disabled>Convert</button>
+            <a id="download-all" class="button-link disabled" href="#" download="images.zip" aria-disabled="true">Download all ZIP</a>
             <button id="clear-btn" type="button" class="red" disabled>Clear</button>
         </div>
 
@@ -69,7 +80,7 @@
         </section>
 
         <section class="inline-block">
-            <label>Converted JPEGs</label>
+            <label>Results</label>
             <div id="heic-results" class="heic-results"></div>
         </section>
     </main>

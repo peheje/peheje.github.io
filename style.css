@@ -707,12 +707,39 @@ button {
     transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
-button:hover {
+.button-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    min-width: 102px;
+    padding: 9px 14px;
+    border: 1px solid var(--step-btn-border);
+    border-radius: var(--btn-radius);
+    color: var(--btn-text);
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.button-link.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    pointer-events: none;
+}
+
+button:hover,
+.button-link:hover {
     transform: translateY(-1px);
     filter: saturate(1.07);
 }
 
-button:active {
+button:active,
+.button-link:active {
     transform: translateY(1px);
 }
 
@@ -730,6 +757,7 @@ button.red {
 }
 
 button:hover,
+.button-link:hover,
 .btn-small:hover,
 .number-step-btn:hover {
     box-shadow: 0 14px 24px rgba(0, 0, 0, 0.18);
