@@ -1,5 +1,6 @@
 import { mountSiteShell } from "../site.js";
 
+// Browser HEIC conversion uses heic2any, MIT licensed: https://github.com/alexcorvi/heic2any
 const heic2anyUrl = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
 
 let heic2anyLoadPromise;
@@ -103,13 +104,13 @@ function createResultRow(result) {
 
   const title = document.createElement("p");
   title.className = "heic-result-title";
-  title.textContent = result.sourceName;
+  title.textContent = result.status === "done" ? result.outputName : result.sourceName;
 
   const meta = document.createElement("p");
   meta.className = "heic-result-meta";
 
   if (result.status === "done") {
-    meta.textContent = `${formatBytes(result.sourceSize)} -> ${formatBytes(result.outputSize)}`;
+    meta.textContent = `${result.sourceName} - ${formatBytes(result.sourceSize)} -> ${formatBytes(result.outputSize)}`;
   } else {
     meta.textContent = result.message;
   }
