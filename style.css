@@ -1029,17 +1029,34 @@ input[type="range"] {
 }
 
 .theme-toggle {
-    position: fixed;
-    bottom: 16px;
-    right: 16px;
-    z-index: 100;
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     min-width: auto;
-    min-height: 44px;
-    width: 44px;
-    height: 44px;
+    min-height: auto;
+    width: 32px;
+    height: 32px;
     padding: 0;
-    font-size: 1.2rem;
+    border: 1px solid var(--nav-border);
     border-radius: 50%;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--muted);
+    background: var(--nav-bg);
+    cursor: pointer;
+    transition: color 0.2s ease, transform 0.15s ease, border-color 0.2s ease, background 0.2s ease;
+    box-shadow: none;
+}
+
+.theme-toggle:hover {
+    transform: translateY(-1px);
+    color: var(--text);
+    border-color: var(--nav-hover-border);
+    background: var(--nav-hover-bg);
+    box-shadow: none;
+    filter: none;
 }
 
 .chart {

@@ -194,14 +194,18 @@ function applyTheme() {
 }
 
 function renderThemeToggle() {
-  let button = document.querySelector(".theme-toggle");
+  const nav = document.querySelector(".top-nav");
+  if (!nav) return;
+
+  let button = nav.querySelector(".theme-toggle");
 
   if (!button) {
     button = document.createElement("button");
     button.type = "button";
     button.className = "theme-toggle";
     button.title = "Toggle theme";
-    document.body.append(button);
+    
+    nav.append(button);
   }
 
   function syncButton() {
@@ -212,7 +216,8 @@ function renderThemeToggle() {
 
   syncButton();
 
-  button.onclick = () => {
+  button.onclick = (e) => {
+    e.preventDefault();
     const activeTheme = getActiveTheme();
     const currentIndex = themes.findIndex((theme) => theme.key === activeTheme.key);
     const nextTheme = themes[(currentIndex + 1) % themes.length];
