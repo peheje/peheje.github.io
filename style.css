@@ -1220,10 +1220,16 @@ html.theme-blue .kid-timer-panel {
     background: linear-gradient(145deg, rgba(185, 215, 250, 0.88), rgba(140, 185, 235, 0.92));
 }
 
-html.theme-forest .kid-timer-panel,
-html.theme-dusk .kid-timer-panel,
 html.theme-paper .kid-timer-panel {
     background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 80%, #ffd58a 20%), color-mix(in srgb, var(--inline-block-bg-2) 72%, #ffb454 28%));
+}
+
+html.theme-dusk .kid-timer-panel {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 80%, var(--accent) 15%), color-mix(in srgb, var(--inline-block-bg-2) 72%, var(--accent-2) 20%));
+}
+
+html.theme-forest .kid-timer-panel {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 80%, var(--accent-2) 20%), color-mix(in srgb, var(--inline-block-bg-2) 72%, var(--accent-2) 28%));
 }
 
 .kid-timer-visual-wrap {
@@ -1250,6 +1256,16 @@ html.theme-blue .kid-timer-visual {
     border-color: rgba(52, 98, 155, 0.14);
 }
 
+html.theme-forest .kid-timer-visual {
+    background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.66), transparent 28%);
+    border-color: rgba(67, 102, 54, 0.16);
+}
+
+html.theme-dusk .kid-timer-visual {
+    background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.62), transparent 28%);
+    border-color: rgba(199, 140, 255, 0.14);
+}
+
 .kid-timer-svg {
     position: absolute;
     inset: 0;
@@ -1259,11 +1275,19 @@ html.theme-blue .kid-timer-visual {
 }
 
 .kid-timer-face {
-    fill: rgba(255, 239, 214, 0.2);
+    fill: rgba(255, 239, 214, 0.85);
 }
 
 html.theme-blue .kid-timer-face {
     fill: rgba(226, 241, 255, 0.74);
+}
+
+html.theme-forest .kid-timer-face {
+    fill: rgba(169, 184, 158, 0.24);
+}
+
+html.theme-dusk .kid-timer-face {
+    fill: rgba(188, 174, 212, 0.24);
 }
 
 .kid-timer-progress-shape {
@@ -1272,6 +1296,14 @@ html.theme-blue .kid-timer-face {
 
 html.theme-blue .kid-timer-progress-shape {
     fill: #5ba4ff;
+}
+
+html.theme-forest .kid-timer-progress-shape {
+    fill: #8fc27a;
+}
+
+html.theme-dusk .kid-timer-progress-shape {
+    fill: #ff9fb3;
 }
 
 .kid-timer-gloss {
@@ -1320,6 +1352,24 @@ html.theme-blue .kid-timer-visual-label {
     color: rgba(23, 75, 130, 0.76);
 }
 
+html.theme-forest .kid-timer-countdown {
+    color: #ebf2e3;
+    text-shadow: 0 3px 16px rgba(0, 0, 0, 0.35);
+}
+
+html.theme-forest .kid-timer-visual-label {
+    color: rgba(235, 242, 227, 0.76);
+}
+
+html.theme-dusk .kid-timer-countdown {
+    color: #f6efff;
+    text-shadow: 0 3px 16px rgba(0, 0, 0, 0.35);
+}
+
+html.theme-dusk .kid-timer-visual-label {
+    color: rgba(246, 239, 255, 0.74);
+}
+
 .kid-timer-presets {
     gap: 12px;
 }
@@ -1357,6 +1407,22 @@ html.theme-blue .kid-timer-finished {
 
 html.theme-blue .kid-timer-finished .kid-timer-countdown {
     color: #1e63ab;
+}
+
+html.theme-forest .kid-timer-finished {
+    box-shadow: inset 0 16px 30px rgba(255, 255, 255, 0.3), 0 22px 42px rgba(0, 0, 0, 0.18), 0 0 0 10px rgba(127, 163, 107, 0.16);
+}
+
+html.theme-forest .kid-timer-finished .kid-timer-countdown {
+    color: #a2d288;
+}
+
+html.theme-dusk .kid-timer-finished {
+    box-shadow: inset 0 16px 30px rgba(255, 255, 255, 0.3), 0 22px 42px rgba(0, 0, 0, 0.18), 0 0 0 10px rgba(255, 159, 179, 0.16);
+}
+
+html.theme-dusk .kid-timer-finished .kid-timer-countdown {
+    color: #ff9fb3;
 }
 
 @keyframes kidTimerCelebrate {
@@ -1498,5 +1564,350 @@ body.page-loaded .app-shell > *:not(.display-none) {
 
     .kid-timer-inline-actions {
         flex-wrap: wrap;
+    }
+}
+
+/* ---- Favorites + Tools navigation ---- */
+
+.page-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fav-star {
+    appearance: none;
+    border: none;
+    background: none;
+    min-width: auto;
+    min-height: auto;
+    padding: 0;
+    margin: 0;
+    font-size: 1.55rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--muted);
+    transition: color 0.18s ease, transform 0.15s ease;
+    box-shadow: none;
+}
+
+.fav-star:hover {
+    color: #f0b030;
+    transform: scale(1.12);
+    filter: none;
+    box-shadow: none;
+}
+
+.fav-star[aria-pressed="true"] {
+    color: #f0b030;
+    text-shadow: 0 0 10px rgba(240, 176, 48, 0.45);
+}
+
+.fav-star-small {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.page-fav-star {
+    font-size: 1.45rem;
+}
+
+.fav-nav {
+    display: contents;
+}
+
+.fav-nav a {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    color: var(--muted);
+    background: var(--nav-bg);
+    border: 1px solid var(--nav-border);
+    border-radius: var(--nav-radius);
+    padding: 6px 12px;
+    font-size: 0.86rem;
+    transition: color 0.2s ease, transform 0.15s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.fav-nav a:hover {
+    transform: translateY(-1px);
+    color: var(--text);
+    border-color: var(--nav-hover-border);
+    background: var(--nav-hover-bg);
+}
+
+.fav-nav a.active {
+    color: var(--nav-active-text);
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    font-weight: 700;
+    box-shadow: 0 8px 18px var(--nav-active-shadow);
+}
+
+.tools-btn {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    min-width: auto;
+    min-height: auto;
+    padding: 6px 14px;
+    border: 1px solid var(--nav-border);
+    border-radius: var(--nav-radius);
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--nav-bg);
+    cursor: pointer;
+    transition: color 0.2s ease, transform 0.15s ease, border-color 0.2s ease, background 0.2s ease;
+    box-shadow: none;
+    letter-spacing: 0.01em;
+}
+
+.tools-btn:hover {
+    transform: translateY(-1px);
+    color: var(--text);
+    border-color: var(--nav-hover-border);
+    background: var(--nav-hover-bg);
+    filter: none;
+    box-shadow: none;
+}
+
+.nav-external {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border: 1px solid transparent;
+    border-radius: var(--nav-radius);
+    transition: color 0.2s ease;
+}
+
+.nav-external:hover {
+    color: var(--accent);
+}
+
+/* ---- Tool picker ---- */
+
+html.tool-picker-active,
+body.tool-picker-active {
+    overflow: hidden;
+}
+
+.tool-picker-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: grid;
+    place-items: center;
+    background: rgba(5, 10, 20, 0.7);
+    backdrop-filter: blur(6px);
+    animation: pickerFadeIn 0.18s ease both;
+    overflow: hidden;
+}
+
+.tool-picker-backdrop.tool-picker-closing {
+    animation: pickerFadeOut 0.16s ease both;
+}
+
+.tool-picker-backdrop:not(.tool-picker-open) {
+    display: none;
+}
+
+.tool-picker-open {
+    display: grid !important;
+}
+
+.tool-picker-card {
+    width: min(520px, calc(100vw - 32px));
+    max-height: min(85vh, 640px);
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--line);
+    background: linear-gradient(145deg, var(--modal-bg-1), var(--modal-bg-2));
+    box-shadow: var(--shadow-lg);
+    animation: pickerSlideIn 0.22s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+.tool-picker-closing .tool-picker-card {
+    animation: pickerSlideOut 0.16s ease both;
+}
+
+.tool-picker-search {
+    flex: 0 0 auto;
+    width: 100%;
+    color: var(--text);
+    background: var(--surface-strong);
+    border: 1px solid var(--input-border);
+    border-radius: var(--input-radius);
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 0.93rem;
+}
+
+.tool-picker-search::placeholder {
+    color: var(--muted);
+}
+
+.tool-picker-list {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+
+.tool-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    text-decoration: none;
+    color: inherit;
+}
+
+.tool-picker-row:hover,
+.tool-picker-row:focus-visible {
+    background: var(--nav-hover-bg);
+    border-color: var(--nav-hover-border);
+    outline: none;
+}
+
+.tool-picker-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tool-picker-name {
+    font-weight: 700;
+    font-size: 0.93rem;
+    color: var(--text);
+}
+
+.tool-picker-about {
+    font-size: 0.8rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tool-picker-external {
+    margin-top: 4px;
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+    color: var(--accent);
+}
+
+.tool-picker-external .tool-picker-name {
+    color: var(--accent);
+}
+
+/* ---- Animations ---- */
+
+@keyframes pickerFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes pickerFadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes pickerSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-16px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes pickerSlideOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+    }
+}
+
+/* ---- Mobile ---- */
+
+@media (max-width: 600px) {
+    .tool-picker-card {
+        width: 100vw;
+        max-width: none;
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100vh;
+        max-height: 100dvh;
+        min-height: 0;
+        border-radius: 0;
+        padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+        gap: 14px;
+        display: flex;
+        flex-direction: column;
+        grid-template-rows: none;
+        overflow: hidden;
+    }
+
+    .tool-picker-backdrop {
+        align-items: stretch;
+        place-items: stretch;
+        overflow: hidden;
+    }
+
+    .tool-picker-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        padding-bottom: 6px;
+    }
+
+    .tool-picker-row {
+        padding: 12px 14px;
+    }
+
+    .page-fav-star {
+        font-size: 1.6rem;
+    }
+
+    .fav-star-small {
+        font-size: 1.35rem;
+    }
+
+    .tools-btn {
+        font-size: 0.88rem;
+        padding: 6px 16px;
+    }
+
+    .nav-external {
+        margin-left: 0;
+    }
+
+    .top-nav {
+        gap: 6px;
     }
 }

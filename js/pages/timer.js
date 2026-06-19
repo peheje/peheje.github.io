@@ -361,7 +361,7 @@ function initTimerPage() {
   function render(now = Date.now()) {
     const idleDurationMs = getIdleDurationMs();
     let countdownText = formatDuration(idleDurationMs);
-    let statusText = "When the circle is gone, it is time to eat.";
+    let statusText = "";
     let helperText = "Pick a quick start or choose your own minutes.";
     let pillText = "Ready";
     let visualLabel = "Time left";
