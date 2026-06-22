@@ -13,12 +13,13 @@
     <div id="menu"></div>
     <main class="app-shell">
         <section class="kid-timer-panel">
-            <p id="timer-state-pill" class="notice">Ready</p>
+            <p id="timer-state-pill" class="notice"></p>
             <div class="kid-timer-visual-wrap">
                 <div id="timer-visual" class="kid-timer-visual">
                     <svg class="kid-timer-svg" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
                         <circle class="kid-timer-face" cx="50" cy="50" r="46"></circle>
                         <path id="timer-progress-shape" class="kid-timer-progress-shape"></path>
+                        <g id="timer-ticks" class="kid-timer-ticks"></g>
                     </svg>
                     <div class="kid-timer-gloss"></div>
                     <div class="kid-timer-center">
@@ -28,13 +29,14 @@
                 </div>
             </div>
             <p id="timer-status" class="result-line"></p>
-            <p id="timer-helper" class="result-line">Pick a quick start or choose your own minutes.</p>
+            <p id="timer-helper" class="result-line"></p>
         </section>
 
         <section class="actions kid-timer-presets" aria-label="Quick timer presets">
             <button id="timer-preset-5" type="button">5 min</button>
             <button id="timer-preset-10" type="button">10 min</button>
             <button id="timer-preset-15" type="button">15 min</button>
+            <button id="timer-preset-30" type="button">30 min</button>
         </section>
 
         <section class="ab">
@@ -43,7 +45,27 @@
                 <input id="timer-custom-minutes" type="number" min="1" max="180" step="1" value="10" data-stepper="true">
                 <div class="actions kid-timer-inline-actions">
                     <button id="timer-start-custom" type="button">Start</button>
+                    <button id="timer-pause-resume" type="button" class="display-none">Pause</button>
                     <button id="timer-reset" type="button" class="red display-none">Reset</button>
+                </div>
+            </div>
+
+            <div class="inline-block">
+                <label>Sound Settings</label>
+                <div class="timer-sound-row">
+                    <label for="timer-sound-select">Alarm Tone:</label>
+                    <select id="timer-sound-select">
+                        <option value="escalating">Escalating Alert</option>
+                        <option value="chime">Gentle Chime</option>
+                        <option value="beeps">Playful Beeps</option>
+                    </select>
+                </div>
+                <div class="timer-sound-row checkbox-row">
+                    <input id="timer-mute-checkbox" type="checkbox">
+                    <label for="timer-mute-checkbox">Mute Alarm Sound</label>
+                </div>
+                <div class="actions timer-sound-actions">
+                    <button id="timer-test-sound" type="button" class="btn-small">Test Tone</button>
                 </div>
             </div>
 

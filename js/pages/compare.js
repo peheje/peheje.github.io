@@ -3,17 +3,13 @@ import { mountSiteShell } from "../site.js";
 
 const newline = "\n";
 
-function area(id) {
-  return document.getElementById(id);
-}
-
-function input(id) {
+function getElement(id) {
   return document.getElementById(id);
 }
 
 function readInput(id) {
-  const ignoreCase = input("case-insensitive").checked;
-  const source = ignoreCase ? area(id).value.toLowerCase() : area(id).value;
+  const ignoreCase = getElement("case-insensitive").checked;
+  const source = ignoreCase ? getElement(id).value.toLowerCase() : getElement(id).value;
   const filtered = [...new Set(source.split(newline).filter((value) => value.trim() !== ""))];
   return {
     list: filtered,
@@ -22,8 +18,8 @@ function readInput(id) {
 }
 
 function setTextArea(id, countId, values) {
-  area(id).value = values.join(newline);
-  document.getElementById(countId).textContent = String(values.length);
+  getElement(id).value = values.join(newline);
+  getElement(countId).textContent = String(values.length);
 }
 
 function compareData() {
@@ -78,7 +74,7 @@ function randomize() {
 }
 
 function getValidSeparator() {
-  const source = area("a").value + area("b").value;
+  const source = getElement("a").value + getElement("b").value;
   return ["|", ";", ","].find((separator) => !source.includes(separator));
 }
 

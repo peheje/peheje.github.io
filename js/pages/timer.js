@@ -8,6 +8,8 @@ const navigationGuardMessage = "A timer is still active. Leave this page anyway?
 const defaultSettings = {
   customMinutes: 10,
   lastDurationMinutes: 10,
+  soundType: "escalating",
+  isMuted: false,
 };
 const defaultState = {
   phase: "idle",
@@ -57,7 +59,7 @@ function formatDuration(ms) {
 }
 
 function isTimerActive(state) {
-  return state.phase === "running";
+  return state.phase === "running" || state.phase === "paused";
 }
 
 function polarToCartesian(centerX, centerY, radius, angleDegrees) {
@@ -125,118 +127,201 @@ function createWakeLockManager() {
   return { request, release };
 }
 
-function createNotifier() {
-  let audioContext = null;
+// WAV generation helpers
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+function generateWavBlob(tones, sampleRate = 11025) {
+  let totalDuration = 0;
+  for (const tone of tones) {
+    totalDuration += tone.duration + (tone.gap || 0);
+  }
+  
+  const numSamples = Math.floor(totalDuration * sampleRate);
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
+  
+  writeString(view, 0, "RIFF");
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeString(view, 8, "WAVE");
+  writeString(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(view, 36, "data");
+  view.setUint32(40, numSamples * 2, true);
+  
+  let currentSample = 0;
+  for (const tone of tones) {
+    const toneSamples = Math.floor(tone.duration * sampleRate);
+    const omega = 2 * Math.PI * tone.frequency / sampleRate;
+    
+    for (let i = 0; i < toneSamples; i++) {
+      const t = i;
+      let sampleVal;
+      if (tone.type === "square") {
+        sampleVal = Math.sin(omega * t) >= 0 ? 1 : -1;
+      } else if (tone.type === "triangle") {
+        sampleVal = Math.abs((t * tone.frequency / sampleRate) % 1 - 0.5) * 4 - 1;
+      } else { // sine
+        sampleVal = Math.sin(omega * t);
+      }
+      
+      let volume = Math.min(tone.gain * 12, 1);
+      
+      const fadeInSamples = Math.floor(0.005 * sampleRate);
+      const fadeOutSamples = Math.floor(0.02 * sampleRate);
+      if (i < fadeInSamples) {
+        volume *= (i / fadeInSamples);
+      } else if (i > toneSamples - fadeOutSamples) {
+        volume *= ((toneSamples - i) / fadeOutSamples);
+      }
+      
+      const val = Math.floor(sampleVal * volume * 32767);
+      view.setInt16(44 + currentSample * 2, val, true);
+      currentSample++;
+    }
+    
+    const gapSamples = Math.floor((tone.gap || 0) * sampleRate);
+    for (let i = 0; i < gapSamples; i++) {
+      view.setInt16(44 + currentSample * 2, 0, true);
+      currentSample++;
+    }
+  }
+  
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function createNotifier(getSettings) {
   let alarmTimeoutId = null;
   let alarmLevel = 0;
+  let alarmAudio = null;
+  let currentAlarmUrl = null;
+  let clickAudio = null;
 
-  function ensureAudioContext() {
-    if (!audioContext) {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-
-      if (!AudioContextClass) {
-        return null;
-      }
-
-      audioContext = new AudioContextClass();
-    }
-
-    if (audioContext.state === "suspended") {
-      audioContext.resume().catch(() => {
-        // Ignore resume failures. Browsers can require more direct user interaction.
-      });
-    }
-
-    return audioContext;
+  try {
+    const blob = generateWavBlob([{ frequency: 1000, duration: 0.015, type: 'sine', gain: 0.005 }]);
+    const clickUrl = URL.createObjectURL(blob);
+    clickAudio = new Audio(clickUrl);
+  } catch {
+    console.warn("Click sound pre-generation failed:");
   }
 
-  function playTone(frequency, duration, delay = 0, gainValue = 0.05, type = "sine") {
-    const context = ensureAudioContext();
+  const escalatingConfigs = [
+    {
+      tones: [
+        { frequency: 523.25, duration: 0.16, gain: 0.045, type: "sine", gap: 0 },
+        { frequency: 659.25, duration: 0.2, gain: 0.05, type: "triangle", gap: 0 },
+        { frequency: 783.99, duration: 0.24, gain: 0.055, type: "triangle", gap: 0 },
+      ],
+    },
+    {
+      tones: [
+        { frequency: 659.25, duration: 0.18, gain: 0.08, type: "sine", gap: 0.2 },
+        { frequency: 783.99, duration: 0.18, gain: 0.08, type: "sine", gap: 0 },
+      ],
+    },
+    {
+      tones: [
+        { frequency: 783.99, duration: 0.15, gain: 0.12, type: "triangle", gap: 0.15 },
+        { frequency: 880, duration: 0.15, gain: 0.12, type: "triangle", gap: 0.15 },
+        { frequency: 783.99, duration: 0.15, gain: 0.12, type: "triangle", gap: 0 },
+      ],
+    },
+    {
+      tones: [
+        { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0.12 },
+        { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0.12 },
+        { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0.12 },
+        { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0 },
+      ],
+    },
+    {
+      tones: [
+        { frequency: 1047, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
+        { frequency: 1175, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
+        { frequency: 1047, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
+        { frequency: 1175, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
+        { frequency: 1047, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
+        { frequency: 1175, duration: 0.1, gain: 0.25, type: "square", gap: 0 },
+      ],
+    },
+    {
+      tones: [
+        { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+        { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+        { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+        { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+        { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+        { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+        { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
+        { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0 },
+      ],
+    },
+  ];
 
-    if (!context) {
-      return;
-    }
+  const chimeConfigs = [
+    {
+      tones: [
+        { frequency: 523.25, duration: 0.5, gain: 0.06, type: "sine", gap: 0.1 },
+        { frequency: 659.25, duration: 0.5, gain: 0.06, type: "sine", gap: 0.1 },
+        { frequency: 783.99, duration: 0.8, gain: 0.06, type: "sine" },
+      ],
+    },
+  ];
 
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    const startAt = context.currentTime + delay;
-    const stopAt = startAt + duration;
-
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, startAt);
-    gain.gain.setValueAtTime(0.0001, startAt);
-    gain.gain.exponentialRampToValueAtTime(gainValue, startAt + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start(startAt);
-    oscillator.stop(stopAt + 0.02);
-  }
+  const beepsConfigs = [
+    {
+      tones: [
+        { frequency: 987.77, duration: 0.08, gain: 0.05, type: "square", gap: 0.08 },
+        { frequency: 987.77, duration: 0.08, gain: 0.05, type: "square", gap: 0.08 },
+        { frequency: 1318.51, duration: 0.15, gain: 0.07, type: "square" },
+      ],
+    },
+  ];
 
   function playSequence(tones) {
-    let accumulatedDelay = 0;
-
-    for (const tone of tones) {
-      playTone(tone.frequency, tone.duration, accumulatedDelay, tone.gain, tone.type);
-      accumulatedDelay += tone.duration + (tone.gap || 0);
+    const s = getSettings();
+    if (s.isMuted) return;
+    try {
+      if (alarmAudio) {
+        alarmAudio.pause();
+      }
+      if (currentAlarmUrl) {
+        URL.revokeObjectURL(currentAlarmUrl);
+      }
+      
+      const blob = generateWavBlob(tones);
+      currentAlarmUrl = URL.createObjectURL(blob);
+      alarmAudio = new Audio(currentAlarmUrl);
+      alarmAudio.play().catch(e => console.warn("HTML5 audio playback failed:", e));
+    } catch (err) {
+      console.warn("WAV generation/playback failed:", err);
     }
   }
 
   function scheduleNextAlarm() {
-    const configs = [
-      {
-        tones: [
-          { frequency: 523.25, duration: 0.16, gain: 0.045, type: "sine", gap: 0 },
-          { frequency: 659.25, duration: 0.2, gain: 0.05, type: "triangle", gap: 0 },
-          { frequency: 783.99, duration: 0.24, gain: 0.055, type: "triangle", gap: 0 },
-        ],
-      },
-      {
-        tones: [
-          { frequency: 659.25, duration: 0.18, gain: 0.08, type: "sine", gap: 0.2 },
-          { frequency: 783.99, duration: 0.18, gain: 0.08, type: "sine", gap: 0 },
-        ],
-      },
-      {
-        tones: [
-          { frequency: 783.99, duration: 0.15, gain: 0.12, type: "triangle", gap: 0.15 },
-          { frequency: 880, duration: 0.15, gain: 0.12, type: "triangle", gap: 0.15 },
-          { frequency: 783.99, duration: 0.15, gain: 0.12, type: "triangle", gap: 0 },
-        ],
-      },
-      {
-        tones: [
-          { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0.12 },
-          { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0.12 },
-          { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0.12 },
-          { frequency: 880, duration: 0.12, gain: 0.18, type: "square", gap: 0 },
-        ],
-      },
-      {
-        tones: [
-          { frequency: 1047, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
-          { frequency: 1175, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
-          { frequency: 1047, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
-          { frequency: 1175, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
-          { frequency: 1047, duration: 0.1, gain: 0.25, type: "square", gap: 0.1 },
-          { frequency: 1175, duration: 0.1, gain: 0.25, type: "square", gap: 0 },
-        ],
-      },
-      {
-        tones: [
-          { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
-          { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
-          { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
-          { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
-          { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
-          { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
-          { frequency: 1175, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0.08 },
-          { frequency: 1319, duration: 0.08, gain: 0.35, type: "sawtooth", gap: 0 },
-        ],
-      },
-    ];
+    const s = getSettings();
+    if (s.isMuted) {
+      alarmTimeoutId = setTimeout(scheduleNextAlarm, 3000);
+      return;
+    }
 
-    const config = configs[Math.min(alarmLevel, configs.length - 1)];
+    let currentConfigs = escalatingConfigs;
+    if (s.soundType === "chime") {
+      currentConfigs = chimeConfigs;
+    } else if (s.soundType === "beeps") {
+      currentConfigs = beepsConfigs;
+    }
+
+    const config = currentConfigs[Math.min(alarmLevel, currentConfigs.length - 1)];
     playSequence(config.tones);
 
     alarmLevel += 1;
@@ -248,12 +333,22 @@ function createNotifier() {
       clearTimeout(alarmTimeoutId);
       alarmTimeoutId = null;
     }
+    if (alarmAudio) {
+      alarmAudio.pause();
+    }
     alarmLevel = 0;
   }
 
   return {
     unlock() {
-      ensureAudioContext();
+      try {
+        if (clickAudio) {
+          clickAudio.currentTime = 0;
+          clickAudio.play().catch(() => {});
+        }
+      } catch {
+        /* ignore */
+      }
     },
     done() {
       stopAlarm();
@@ -263,6 +358,26 @@ function createNotifier() {
     stop() {
       stopAlarm();
     },
+    test() {
+      stopAlarm();
+      const s = getSettings();
+      let currentConfigs = escalatingConfigs;
+      if (s.soundType === "chime") {
+        currentConfigs = chimeConfigs;
+      } else if (s.soundType === "beeps") {
+        currentConfigs = beepsConfigs;
+      }
+      playSequence(currentConfigs[0].tones);
+    },
+    playClick() {
+      if (getSettings().isMuted || !clickAudio) return;
+      try {
+        clickAudio.currentTime = 0;
+        clickAudio.play().catch(() => {});
+      } catch {
+        /* ignore */
+      }
+    }
   };
 }
 
@@ -270,10 +385,11 @@ function initTimerPage() {
   mountSiteShell();
   initNumberSteppers();
 
-  const notifier = createNotifier();
+  const notifier = createNotifier(() => settings);
   const wakeLockManager = createWakeLockManager();
   const customMinutesInput = getElement("timer-custom-minutes");
   const startCustomButton = getElement("timer-start-custom");
+  const pauseResumeButton = getElement("timer-pause-resume");
   const resetButton = getElement("timer-reset");
   const countdownElement = getElement("timer-countdown");
   const statusElement = getElement("timer-status");
@@ -283,6 +399,10 @@ function initTimerPage() {
   const visualLabelElement = getElement("timer-visual-label");
   const progressShapeElement = getElement("timer-progress-shape");
   const presetButtons = Array.from(document.querySelectorAll("[id^='timer-preset-']"));
+
+  const soundSelect = getElement("timer-sound-select");
+  const muteCheckbox = getElement("timer-mute-checkbox");
+  const testSoundButton = getElement("timer-test-sound");
 
   let settings = {
     ...defaultSettings,
@@ -298,6 +418,119 @@ function initTimerPage() {
   let lastRenderedCountdown = "";
   let lastRenderedTitle = "";
   let lastRenderedProgressPath = "";
+
+  // Set up Dial Ticks
+  const ticksGroup = getElement("timer-ticks");
+  if (ticksGroup) {
+    let ticksHtml = "";
+    for (let i = 0; i < 60; i++) {
+      const angle = i * 6; // 360 / 60 = 6 degrees per minute
+      const isMajor = i % 5 === 0;
+      const r1 = wedgeRadius;
+      const r2 = isMajor ? wedgeRadius - 3.5 : wedgeRadius - 1.8;
+      const p1 = polarToCartesian(wedgeCenter, wedgeCenter, r1, angle);
+      const p2 = polarToCartesian(wedgeCenter, wedgeCenter, r2, angle);
+      ticksHtml += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" class="${isMajor ? 'major' : 'minor'}"></line>`;
+    }
+    ticksGroup.innerHTML = ticksHtml;
+  }
+
+  // Tactile Click sound generator for dial dragging
+  function playTactileClick() {
+    notifier.playClick();
+  }
+
+  // Dial Dragging Interaction
+  let isDragging = false;
+
+  function handleDialInteraction(e) {
+    if (state.phase !== "idle") {
+      return;
+    }
+
+    const rect = visualElement.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+
+    let angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+    if (angle < 0) {
+      angle += 360;
+    }
+
+    let minutes = Math.round((angle / 360) * 60);
+    if (minutes < 1) {
+      minutes = 1;
+    }
+    if (minutes > 60) {
+      minutes = 60;
+    }
+
+    if (settings.customMinutes !== minutes) {
+      playTactileClick();
+
+      settings.customMinutes = minutes;
+      settings.lastDurationMinutes = minutes;
+      syncCustomMinutesInput();
+      persistSettings();
+
+      state.durationMs = minutes * 60000;
+      persistState();
+      render();
+    }
+  }
+
+  visualElement.addEventListener("mousedown", (e) => {
+    if (state.phase === "idle") {
+      isDragging = true;
+      handleDialInteraction(e);
+      document.body.style.userSelect = "none";
+      visualElement.classList.add("grabbing");
+    }
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (isDragging) {
+      handleDialInteraction(e);
+    }
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (isDragging) {
+      isDragging = false;
+      document.body.style.userSelect = "";
+      visualElement.classList.remove("grabbing");
+    }
+  });
+
+  visualElement.addEventListener("touchstart", (e) => {
+    if (state.phase === "idle") {
+      isDragging = true;
+      handleDialInteraction(e);
+      visualElement.classList.add("grabbing");
+    }
+  }, { passive: true });
+
+  window.addEventListener("touchmove", (e) => {
+    if (isDragging) {
+      handleDialInteraction(e);
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+    }
+  }, { passive: false });
+
+  window.addEventListener("touchend", () => {
+    if (isDragging) {
+      isDragging = false;
+      visualElement.classList.remove("grabbing");
+    }
+  });
 
   function persistSettings() {
     saveJson(settingsKey, settings);
@@ -326,6 +559,9 @@ function initTimerPage() {
   }
 
   function getRemainingMs(now = Date.now()) {
+    if (state.phase === "paused") {
+      return state.remainingMs || 0;
+    }
     if (state.phase !== "running" || !state.endsAt) {
       return 0;
     }
@@ -362,12 +598,16 @@ function initTimerPage() {
     const idleDurationMs = getIdleDurationMs();
     let countdownText = formatDuration(idleDurationMs);
     let statusText = "";
-    let helperText = "Pick a quick start or choose your own minutes.";
-    let pillText = "Ready";
+    let helperText = "";
+    let pillText = "";
     let visualLabel = "Time left";
     let progress = 1;
 
-    visualElement.classList.remove("kid-timer-running", "kid-timer-finished");
+    visualElement.classList.remove("kid-timer-running", "kid-timer-finished", "kid-timer-paused", "grabbable");
+
+    if (state.phase === "idle") {
+      visualElement.classList.add("grabbable");
+    }
 
     if (state.phase === "running") {
       const remainingMs = getRemainingMs(now);
@@ -379,6 +619,16 @@ function initTimerPage() {
       pillText = "";
       progress = remainingMs / durationMs;
       visualElement.classList.add("kid-timer-running");
+    } else if (state.phase === "paused") {
+      const remainingMs = getRemainingMs(now);
+      const durationMs = Math.max(1000, state.durationMs || idleDurationMs);
+
+      countdownText = formatDuration(remainingMs);
+      statusText = "Paused";
+      helperText = "";
+      pillText = "Paused";
+      progress = remainingMs / durationMs;
+      visualElement.classList.add("kid-timer-paused");
     } else if (state.phase === "finished") {
       countdownText = "DONE";
       statusText = "Time is up.";
@@ -409,6 +659,20 @@ function initTimerPage() {
     }
 
     resetButton.classList.toggle("display-none", state.phase === "idle");
+
+    if (state.phase === "running") {
+      startCustomButton.classList.add("display-none");
+      pauseResumeButton.classList.remove("display-none");
+      pauseResumeButton.textContent = "Pause";
+    } else if (state.phase === "paused") {
+      startCustomButton.classList.add("display-none");
+      pauseResumeButton.classList.remove("display-none");
+      pauseResumeButton.textContent = "Resume";
+    } else {
+      startCustomButton.classList.remove("display-none");
+      pauseResumeButton.classList.add("display-none");
+    }
+
     updatePresetSelection();
     updateTitle(now);
   }
@@ -522,6 +786,24 @@ function initTimerPage() {
     tick();
   }
 
+  // Populate Sound settings inputs from settings
+  soundSelect.value = settings.soundType || "escalating";
+  muteCheckbox.checked = settings.isMuted || false;
+
+  soundSelect.addEventListener("change", () => {
+    settings.soundType = soundSelect.value;
+    persistSettings();
+  });
+
+  muteCheckbox.addEventListener("change", () => {
+    settings.isMuted = muteCheckbox.checked;
+    persistSettings();
+  });
+
+  testSoundButton.addEventListener("click", () => {
+    notifier.test();
+  });
+
   syncCustomMinutesInput();
   readSettingsFromInput();
 
@@ -570,6 +852,27 @@ function initTimerPage() {
     startTimer(settings.customMinutes);
   });
 
+  pauseResumeButton.addEventListener("click", () => {
+    if (state.phase === "running") {
+      stopRenderLoop();
+      const remainingMs = getRemainingMs();
+      setState({
+        phase: "paused",
+        remainingMs: remainingMs,
+      });
+      notifier.stop();
+      wakeLockManager.release();
+    } else if (state.phase === "paused") {
+      notifier.unlock();
+      wakeLockManager.request();
+      setState({
+        phase: "running",
+        endsAt: Date.now() + state.remainingMs,
+      });
+      scheduleRenderLoop();
+    }
+  });
+
   resetButton.addEventListener("click", () => {
     resetTimer();
   });
@@ -601,6 +904,15 @@ function initTimerPage() {
     event.preventDefault();
     event.returnValue = navigationGuardMessage;
   });
+
+  // Set up global click/touchstart listener to unlock the AudioContext on first gesture
+  const handleUserGestureAudioUnlock = () => {
+    notifier.unlock();
+    document.removeEventListener("click", handleUserGestureAudioUnlock);
+    document.removeEventListener("touchstart", handleUserGestureAudioUnlock);
+  };
+  document.addEventListener("click", handleUserGestureAudioUnlock);
+  document.addEventListener("touchstart", handleUserGestureAudioUnlock);
 
   window.__kidTimerDebug = {
     getSettings() {

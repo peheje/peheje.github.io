@@ -2,10 +2,13 @@ import { mountSiteShell } from "../site.js";
 
 // Browser HEIC conversion uses heic2any, MIT licensed: https://github.com/alexcorvi/heic2any
 const heic2anyUrl = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+const heic2anyIntegrity = "sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL";
 // Metadata reading uses exifr, MIT licensed: https://github.com/MikeKovarik/exifr
 const exifrUrl = "https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js";
+const exifrIntegrity = "sha384-KrOocIA+lZcNUz2MDavnT/FuX+CbTREJihUi0bp8QUSwhE2AkGTNpv2b7yMbBkx5";
 // Optional JPEG EXIF writing uses piexifjs, MIT licensed: https://github.com/hMatoba/piexifjs
 const piexifUrl = "https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js";
+const piexifIntegrity = "sha384-pQscxfezjt6vZacoDAQEvU7OYak0dB/9o/VoBbzD8SrYGu63hWctWY25MxxIXSAX";
 
 let heic2anyLoadPromise;
 let exifrLoadPromise;
@@ -589,7 +592,7 @@ async function stripMetadataKeepFormat(file) {
   return new Blob([cleaned], { type: file.type || `image/${type}` });
 }
 
-function loadScript(url, globalName, errorMessage) {
+function loadScript(url, globalName, errorMessage, integrity) {
   if (window[globalName]) {
     return Promise.resolve(window[globalName]);
   }
@@ -597,6 +600,10 @@ function loadScript(url, globalName, errorMessage) {
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.src = url;
+    if (integrity) {
+      script.integrity = integrity;
+      script.crossOrigin = "anonymous";
+    }
     script.async = true;
     script.onload = () => {
       if (window[globalName]) {
@@ -611,17 +618,17 @@ function loadScript(url, globalName, errorMessage) {
 }
 
 function loadHeic2Any() {
-  heic2anyLoadPromise ||= loadScript(heic2anyUrl, "heic2any", "Could not load the HEIC converter library.");
+  heic2anyLoadPromise ||= loadScript(heic2anyUrl, "heic2any", "Could not load the HEIC converter library.", heic2anyIntegrity);
   return heic2anyLoadPromise;
 }
 
 function loadExifr() {
-  exifrLoadPromise ||= loadScript(exifrUrl, "exifr", "Could not load the metadata reader.");
+  exifrLoadPromise ||= loadScript(exifrUrl, "exifr", "Could not load the metadata reader.", exifrIntegrity);
   return exifrLoadPromise;
 }
 
 function loadPiexif() {
-  piexifLoadPromise ||= loadScript(piexifUrl, "piexif", "Could not load the JPEG metadata writer.");
+  piexifLoadPromise ||= loadScript(piexifUrl, "piexif", "Could not load the JPEG metadata writer.", piexifIntegrity);
   return piexifLoadPromise;
 }
 
