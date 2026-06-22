@@ -164,14 +164,15 @@ function generateWavBlob(tones, sampleRate = 11025) {
     const omega = 2 * Math.PI * tone.frequency / sampleRate;
     
     for (let i = 0; i < toneSamples; i++) {
-      const t = i;
       let sampleVal;
       if (tone.type === "square") {
-        sampleVal = Math.sin(omega * t) >= 0 ? 1 : -1;
+        sampleVal = Math.sin(omega * i) >= 0 ? 1 : -1;
       } else if (tone.type === "triangle") {
-        sampleVal = Math.abs((t * tone.frequency / sampleRate) % 1 - 0.5) * 4 - 1;
+        sampleVal = Math.abs((i * tone.frequency / sampleRate) % 1 - 0.5) * 4 - 1;
+      } else if (tone.type === "sawtooth") {
+        sampleVal = ((i * tone.frequency / sampleRate) % 1) * 2 - 1;
       } else { // sine
-        sampleVal = Math.sin(omega * t);
+        sampleVal = Math.sin(omega * i);
       }
       
       let volume = Math.min(tone.gain * 12, 1);
@@ -196,7 +197,7 @@ function generateWavBlob(tones, sampleRate = 11025) {
     }
   }
   
-  return new Blob([buffer], { type: 'audio/wav' });
+  return new Blob([buffer], { type: "audio/wav" });
 }
 
 function createNotifier(getSettings) {
@@ -207,7 +208,7 @@ function createNotifier(getSettings) {
   let clickAudio = null;
 
   try {
-    const blob = generateWavBlob([{ frequency: 1000, duration: 0.015, type: 'sine', gain: 0.005 }]);
+    const blob = generateWavBlob([{ frequency: 1000, duration: 0.015, type: "sine", gain: 0.005 }]);
     const clickUrl = URL.createObjectURL(blob);
     clickAudio = new Audio(clickUrl);
   } catch {
@@ -335,6 +336,11 @@ function createNotifier(getSettings) {
     }
     if (alarmAudio) {
       alarmAudio.pause();
+      alarmAudio = null;
+    }
+    if (currentAlarmUrl) {
+      URL.revokeObjectURL(currentAlarmUrl);
+      currentAlarmUrl = null;
     }
     alarmLevel = 0;
   }
@@ -352,7 +358,6 @@ function createNotifier(getSettings) {
     },
     done() {
       stopAlarm();
-      alarmLevel = 0;
       scheduleNextAlarm();
     },
     stop() {
@@ -435,11 +440,6 @@ function initTimerPage() {
     ticksGroup.innerHTML = ticksHtml;
   }
 
-  // Tactile Click sound generator for dial dragging
-  function playTactileClick() {
-    notifier.playClick();
-  }
-
   // Dial Dragging Interaction
   let isDragging = false;
 
@@ -472,7 +472,7 @@ function initTimerPage() {
     }
 
     if (settings.customMinutes !== minutes) {
-      playTactileClick();
+      notifier.playClick();
 
       settings.customMinutes = minutes;
       settings.lastDurationMinutes = minutes;
@@ -867,7 +867,7 @@ function initTimerPage() {
       wakeLockManager.request();
       setState({
         phase: "running",
-        endsAt: Date.now() + state.remainingMs,
+        endsAt: Date.now() + (state.remainingMs || 0),
       });
       scheduleRenderLoop();
     }
@@ -905,7 +905,7 @@ function initTimerPage() {
     event.returnValue = navigationGuardMessage;
   });
 
-  // Set up global click/touchstart listener to unlock the AudioContext on first gesture
+  // Play a click on first user gesture to unblock audio on iOS/Safari
   const handleUserGestureAudioUnlock = () => {
     notifier.unlock();
     document.removeEventListener("click", handleUserGestureAudioUnlock);
