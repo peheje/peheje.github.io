@@ -227,41 +227,7 @@ function getDailyTimeseries(timeseries, dayIndex) {
 
 // Render dynamic day selection tabs for next 7 days
 function renderDayTabs() {
-  const daySelect = document.getElementById("day-select");
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-  // Populate dropdown select
-  if (daySelect) {
-    let optionsHtml = "";
-    for (let i = 0; i < 7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      const text = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[d.getDay()]);
-      const selectedAttr = (i === activeTab) ? " selected" : "";
-      optionsHtml += `<option value="${i}"${selectedAttr}>${text}</option>`;
-    }
-    daySelect.innerHTML = optionsHtml;
-
-    if (!daySelect._listenerBound) {
-      daySelect.addEventListener("change", (e) => {
-        const val = parseInt(e.target.value, 10);
-        if (activeTab !== val) {
-          activeTab = val;
-          
-          if (dayTabsContainer) {
-            const allTabs = dayTabsContainer.querySelectorAll(".curve-tab");
-            allTabs.forEach((t, idx) => {
-              t.classList.toggle("active", idx === val);
-            });
-          }
-
-          hoverHour = null;
-          drawForecastCurves();
-        }
-      });
-      daySelect._listenerBound = true;
-    }
-  }
 
   // Populate tab buttons
   if (dayTabsContainer) {
@@ -269,7 +235,11 @@ function renderDayTabs() {
     for (let i = 0; i < 7; i++) {
       const d = new Date();
       d.setDate(d.getDate() + i);
-      const text = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[d.getDay()]);
+      
+      const dayName = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[d.getDay()]);
+      const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
+      const text = `${dayName} ${dateStr}`;
+
       const activeClass = (i === activeTab) ? " active" : "";
       tabsHtml += `<button type="button" class="curve-tab${activeClass}" data-index="${i}">${text}</button>`;
     }
@@ -285,10 +255,6 @@ function renderDayTabs() {
           buttons.forEach((t, idx) => {
             t.classList.toggle("active", idx === i);
           });
-
-          if (daySelect) {
-            daySelect.value = i;
-          }
 
           hoverHour = null;
           drawForecastCurves();
