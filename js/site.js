@@ -24,6 +24,12 @@ const sites = [
     category: "Health",
   },
   {
+    url: "/weather.html",
+    name: "Weather",
+    about: "Check local weather and track UV index curve throughout the day.",
+    category: "Health",
+  },
+  {
     url: "/memory.html",
     name: "Memory",
     about: "Memorize a number, then type it back before time runs out.",

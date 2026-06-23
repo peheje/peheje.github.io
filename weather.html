@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="shortcut icon" href="/hamster.png" type="image/png">
+    <style>
+
+        .search-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .search-row input[type="text"] {
+            flex: 1;
+        }
+
+        .suggestions-list {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: var(--surface-strong);
+            border: 1px solid var(--input-border);
+            border-radius: var(--radius-md);
+            z-index: 50;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--line);
+            color: var(--text);
+            font-size: 0.9rem;
+            transition: background-color 0.15s ease;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover {
+            background-color: var(--nav-hover-bg);
+            color: var(--accent);
+        }
+
+        .location-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+
+        .weather-summary-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+        @media (min-width: 600px) {
+            .weather-summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .graphs-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+        @media (min-width: 900px) {
+            .graphs-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .weather-summary-grid > *,
+        .graphs-grid > * {
+            min-width: 0;
+        }
+
+        .active-location {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .weather-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: nowrap;
+        }
+
+        .mobile-day-select {
+            display: inline-block !important;
+            width: auto;
+            max-width: 150px;
+            min-height: 36px;
+            padding: 4px 10px;
+            cursor: pointer;
+        }
+
+        .curve-tabs {
+            display: none !important;
+        }
+
+        @media (min-width: 600px) {
+            .mobile-day-select {
+                display: none !important;
+            }
+            .curve-tabs {
+                display: flex !important;
+            }
+        }
+
+        .uv-summary-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            justify-content: center;
+            gap: 15px;
+            padding: 24px;
+        }
+
+        .uv-hero-circle {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #1a1410;
+            font-weight: 800;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .uv-hero-val {
+            font-size: 2.2rem;
+            line-height: 1.1;
+        }
+
+        .uv-hero-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+        }
+
+        /* UV Level Colors */
+        .uv-low {
+            background: linear-gradient(135deg, #4ade80, #22c55e);
+            box-shadow: 0 0 20px rgba(74, 222, 128, 0.4);
+        }
+        .uv-moderate {
+            background: linear-gradient(135deg, #fde047, #eab308);
+            box-shadow: 0 0 20px rgba(254, 224, 71, 0.4);
+        }
+        .uv-high {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.4);
+            color: #ffffff;
+        }
+        .uv-veryhigh {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+            color: #ffffff;
+        }
+        .uv-extreme {
+            background: linear-gradient(135deg, #a855f7, #9333ea);
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+            color: #ffffff;
+        }
+
+        .uv-stats-row {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            border-top: 1px solid var(--line);
+            padding-top: 15px;
+            margin-top: 5px;
+        }
+
+        .uv-stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .uv-stat-val {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .uv-stat-lbl {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .uv-advice {
+            font-size: 0.85rem;
+            line-height: 1.4;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius-md);
+            padding: 10px 12px;
+            border-left: 3px solid var(--accent);
+            text-align: left;
+            width: 100%;
+        }
+
+        .weather-info-card {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 280px;
+        }
+
+        .weather-hero {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .weather-emoji {
+            font-size: 3.5rem;
+            line-height: 1;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+        }
+
+        .temp-display {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .temp-val {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: var(--text);
+            line-height: 1;
+        }
+
+        .temp-desc {
+            font-size: 0.95rem;
+            color: var(--muted);
+            font-weight: 500;
+            text-transform: capitalize;
+        }
+
+        .weather-details-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 15px;
+            border-top: 1px solid var(--line);
+            padding-top: 15px;
+        }
+
+        .weather-detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .weather-detail-val {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .weather-detail-lbl {
+            font-size: 0.75rem;
+            color: var(--muted);
+        }
+
+        .curve-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text);
+            margin: 0;
+        }
+
+        .curve-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--nav-bg);
+            border: 1px solid var(--nav-border);
+            border-radius: var(--btn-radius);
+            padding: 2px;
+            min-width: 0;
+        }
+
+        .curve-tab {
+            background: transparent;
+            border: none;
+            border-radius: var(--btn-radius);
+            color: var(--muted);
+            min-height: 30px;
+            min-width: 80px;
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            box-shadow: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .curve-tab:hover {
+            color: var(--text);
+            transform: none;
+            filter: none;
+        }
+
+        .curve-tab.active {
+            background: var(--accent);
+            color: var(--btn-text);
+            font-weight: 700;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 220px;
+            background: rgba(0, 0, 0, 0.12);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid var(--line);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: pan-y;
+        }
+
+        .loader {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            gap: 15px;
+            color: var(--muted);
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--line);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .error-message {
+            color: var(--danger);
+            background: var(--notice-bg);
+            border: 1px solid var(--notice-border);
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            margin: 10px 0;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="menu"></div>
+    <main class="app-shell">
+        <!-- Location Picker Card -->
+        <section class="inline-block margin-bottom-10">
+            <div class="search-container">
+                <div class="search-row">
+                    <input type="text" id="city-search" autocomplete="off" placeholder="Search city name (e.g. Oslo, London, Tokyo)..." />
+                    <button id="search-btn" class="btn-small">Search</button>
+                    <button id="location-btn" class="btn-small" title="Use current GPS location">GPS</button>
+                </div>
+                <div id="suggestions-list" class="suggestions-list"></div>
+            </div>
+            <div class="location-info">
+                <span>Selected: <span id="location-display" class="active-location">Oslo, Norge</span></span>
+                <span id="coordinates-display" style="font-family: monospace; font-size: 0.8rem;">(59.91, 10.74)</span>
+            </div>
+        </section>
+
+        <!-- Error Notification -->
+        <div id="error-bar" class="error-message"></div>
+
+        <!-- Main dashboard (Visible when loaded) -->
+        <div id="dashboard-content" style="display: none;">
+            <section class="weather-summary-grid margin-bottom-10">
+                <!-- General Weather Summary Card -->
+                <div class="inline-block weather-info-card">
+                    <h3 style="margin: 0; font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">Current Weather</h3>
+                    <div class="weather-hero">
+                        <div id="weather-emoji" class="weather-emoji">☀️</div>
+                        <div class="temp-display">
+                            <span id="temp-value" class="temp-val">--&deg;C</span>
+                            <span id="weather-desc" class="temp-desc">Clear Sky</span>
+                        </div>
+                    </div>
+
+                    <div class="weather-details-grid">
+                        <div class="weather-detail-item">
+                            <span id="wind-value" class="weather-detail-val">-- m/s</span>
+                            <span class="weather-detail-lbl">Wind Speed</span>
+                        </div>
+                        <div class="weather-detail-item">
+                            <span id="precip-value" class="weather-detail-val">-- mm</span>
+                            <span class="weather-detail-lbl">Precip (1h)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- UV Index Summary Card -->
+                <div class="inline-block uv-summary-card">
+                    <h3 style="margin: 0; font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">UV Index</h3>
+                    <div id="uv-circle" class="uv-hero-circle uv-low">
+                        <span id="uv-value" class="uv-hero-val">0.0</span>
+                        <span id="uv-label" class="uv-hero-label">Low</span>
+                    </div>
+                    
+                    <div class="uv-stats-row">
+                        <div class="uv-stat-box">
+                            <span id="uv-max" class="uv-stat-val">0.0</span>
+                            <span class="uv-stat-lbl">Max Today</span>
+                        </div>
+                        <div class="uv-stat-box">
+                            <span id="uv-max-time" class="uv-stat-val">13:00</span>
+                            <span class="uv-stat-lbl">Max Time</span>
+                        </div>
+                    </div>
+
+                    <div id="uv-advice" class="uv-advice">
+                        Low danger. Wear sunglasses on bright days. If you burn easily, use sunscreen.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Global Day Toggle Bar -->
+            <div class="actions weather-actions margin-bottom-10">
+                <span style="font-weight: 700; color: var(--text);">Daily Forecasts</span>
+                <select id="day-select" class="mobile-day-select">
+                    <!-- Populated dynamically in JS -->
+                </select>
+                <div id="day-tabs" class="curve-tabs" style="display: flex; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; min-width: 0; scrollbar-width: none;">
+                    <!-- Populated dynamically in JS -->
+                </div>
+            </div>
+
+            <!-- Side-by-side / Stacked Forecast Graphs -->
+            <section class="graphs-grid margin-bottom-10">
+                <!-- Temperature curve card -->
+                <div class="inline-block">
+                    <h4 class="curve-title" style="margin-bottom: 10px;">Temperature Curve (&deg;C)</h4>
+                    <div class="canvas-container">
+                        <canvas id="temp-canvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Rain bar card -->
+                <div class="inline-block">
+                    <h4 class="curve-title" style="margin-bottom: 10px;">Precipitation Bars (mm)</h4>
+                    <div class="canvas-container">
+                        <canvas id="rain-canvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- UV Index curve card -->
+                <div class="inline-block">
+                    <h4 class="curve-title" style="margin-bottom: 10px;">UV Index Curve</h4>
+                    <div class="canvas-container">
+                        <canvas id="uv-canvas"></canvas>
+                    </div>
+                </div>
+            </section>
+            
+            <div style="font-size: 0.8rem; color: var(--muted); text-align: center; margin-bottom: 20px;">
+                Hover or drag on any graph to synchronously inspect values across all three forecasts.
+            </div>
+        </div>
+
+        <!-- Loader -->
+        <div id="loading-spinner" class="loader">
+            <div class="spinner"></div>
+            <p>Fetching weather forecast from Yr...</p>
+        </div>
+    </main>
+
+    <script type="module" src="js/pages/weather.js"></script>
+</body>
+
+</html>
