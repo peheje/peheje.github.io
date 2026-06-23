@@ -99,31 +99,40 @@
 
         .weather-actions {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
             gap: 10px;
-            flex-wrap: nowrap;
-        }
-
-        .mobile-day-select {
-            display: inline-block !important;
-            width: auto;
-            max-width: 150px;
-            min-height: 36px;
-            padding: 4px 10px;
-            cursor: pointer;
+            align-items: stretch;
+            overflow: hidden;
+            width: 100%;
         }
 
         .curve-tabs {
-            display: none !important;
+            display: flex;
+            gap: 4px;
+            background: var(--nav-bg);
+            border: 1px solid var(--nav-border);
+            border-radius: var(--btn-radius);
+            padding: 2px;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+            width: 100%;
+        }
+
+        .curve-tabs::-webkit-scrollbar {
+            display: none;
         }
 
         @media (min-width: 600px) {
-            .mobile-day-select {
-                display: none !important;
+            .weather-actions {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                overflow: visible;
             }
-            .curve-tabs {
-                display: flex !important;
+            .weather-actions > .curve-tabs {
+                width: auto;
             }
         }
 
@@ -298,15 +307,7 @@
             margin: 0;
         }
 
-        .curve-tabs {
-            display: flex;
-            gap: 4px;
-            background: var(--nav-bg);
-            border: 1px solid var(--nav-border);
-            border-radius: var(--btn-radius);
-            padding: 2px;
-            min-width: 0;
-        }
+
 
         .curve-tab {
             background: transparent;
@@ -320,6 +321,7 @@
             font-weight: 600;
             box-shadow: none;
             cursor: pointer;
+            flex: 0 0 auto;
             transition: all 0.15s ease;
         }
 
@@ -412,7 +414,7 @@
         <div id="error-bar" class="error-message"></div>
 
         <!-- Main dashboard (Visible when loaded) -->
-        <div id="dashboard-content" style="display: none;">
+        <div id="dashboard-content" style="display: none; min-width: 0; overflow: hidden;">
             <section class="weather-summary-grid margin-bottom-10">
                 <!-- General Weather Summary Card -->
                 <div class="inline-block weather-info-card">
@@ -465,10 +467,7 @@
             <!-- Global Day Toggle Bar -->
             <div class="actions weather-actions margin-bottom-10">
                 <span style="font-weight: 700; color: var(--text);">Daily Forecasts</span>
-                <select id="day-select" class="mobile-day-select">
-                    <!-- Populated dynamically in JS -->
-                </select>
-                <div id="day-tabs" class="curve-tabs" style="display: flex; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; min-width: 0; scrollbar-width: none;">
+                <div id="day-tabs" class="curve-tabs">
                     <!-- Populated dynamically in JS -->
                 </div>
             </div>
