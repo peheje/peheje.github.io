@@ -467,16 +467,18 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     const minT = globalLimits ? globalLimits.tempMin : (temps.length ? Math.min(...temps) : 0);
     const maxT = globalLimits ? globalLimits.tempMax : (temps.length ? Math.max(...temps) : 10);
     
-    // Scale bounds directly to multiples of 5
-    minScaleY = Math.floor(minT / 5) * 5;
-    maxScaleY = Math.ceil(maxT / 5) * 5;
+    // Determine clean step size first based on raw temperature range
+    const rawRange = maxT - minT;
+    const step = rawRange > 35 ? 10 : 5;
+    
+    // Scale bounds directly to multiples of the selected step
+    minScaleY = Math.floor(minT / step) * step;
+    maxScaleY = Math.ceil(maxT / step) * step;
     if (minScaleY === maxScaleY) {
-      maxScaleY += 5;
+      maxScaleY += step;
     }
     
-    // Generate grid levels dynamically by 5 or 10 degree steps to keep labels simple
-    const range = maxScaleY - minScaleY;
-    const step = range > 25 ? 10 : 5;
+    // Generate grid levels matching the selected step size
     for (let val = minScaleY; val <= maxScaleY; val += step) {
       gridLevels.push(val);
     }
