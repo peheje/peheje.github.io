@@ -16,6 +16,13 @@ let forecastData = null;
 let activeTab = 0; // 0 for Today, 1 for Tomorrow, 2-6 for future days
 let hoverHour = null; // Currently hovered hour on the canvas (0-23)
 
+let globalLimits = {
+  uvMax: 10,
+  tempMin: 0,
+  tempMax: 10,
+  rainMax: 2.0
+};
+
 // DOM Elements
 const searchInput = document.getElementById("city-search");
 const searchBtn = document.getElementById("search-btn");
@@ -267,9 +274,47 @@ function renderDayTabs() {
   }
 }
 
+// Calculate global min/max parameters over the entire forecast timeseries
+function calculateGlobalLimits(timeseries) {
+  let maxUV = 0;
+  let minTemp = Infinity;
+  let maxTemp = -Infinity;
+  let maxRain = 0;
+
+  timeseries.forEach(item => {
+    const details = item.data.instant.details;
+    if (details) {
+      const uv = details.ultraviolet_index_clear_sky || 0;
+      if (uv > maxUV) maxUV = uv;
+
+      const temp = details.air_temperature;
+      if (temp !== undefined && temp !== null) {
+        if (temp < minTemp) minTemp = temp;
+        if (temp > maxTemp) maxTemp = temp;
+      }
+    }
+
+    const rain = item.data.next_1_hours?.details?.precipitation_amount || 0;
+    if (rain > maxRain) maxRain = rain;
+  });
+
+  if (minTemp === Infinity) minTemp = 0;
+  if (maxTemp === -Infinity) maxTemp = 10;
+
+  globalLimits = {
+    uvMax: maxUV,
+    tempMin: minTemp,
+    tempMax: maxTemp,
+    rainMax: maxRain
+  };
+}
+
 // Update widgets UI with the current hourly forecast
 function updateDashboardUI(data) {
   const timeseries = data.properties.timeseries;
+  
+  // Calculate global limits across all days
+  calculateGlobalLimits(timeseries);
   
   // Find current hour forecast
   const now = new Date();
@@ -411,15 +456,18 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
   let gridLevels = [];
 
   if (paramType === "uv") {
-    const maxVal = Math.max(...dayPoints.map(p => p.uv), 0);
+    const maxVal = globalLimits ? globalLimits.uvMax : Math.max(...dayPoints.map(p => p.uv), 0);
     maxScaleY = Math.max(10, Math.ceil(maxVal + 1));
     gridLevels = [0, 3, 6, 8, 11].filter(v => v <= maxScaleY);
+    if (!gridLevels.includes(Math.floor(maxScaleY))) {
+      gridLevels.push(Math.floor(maxScaleY));
+    }
   } else if (paramType === "temp") {
     const temps = dayPoints.map(p => p.temp).filter(t => t !== null);
-    const minTemp = temps.length ? Math.min(...temps) : 0;
-    const maxTemp = temps.length ? Math.max(...temps) : 10;
-    minScaleY = Math.floor(minTemp - 2);
-    maxScaleY = Math.ceil(maxTemp + 2);
+    const minT = globalLimits ? globalLimits.tempMin : (temps.length ? Math.min(...temps) : 0);
+    const maxT = globalLimits ? globalLimits.tempMax : (temps.length ? Math.max(...temps) : 10);
+    minScaleY = Math.floor(minT - 2);
+    maxScaleY = Math.ceil(maxT + 2);
     const range = maxScaleY - minScaleY;
     const adjMax = range < 5 ? minScaleY + 5 : maxScaleY;
     maxScaleY = adjMax;
@@ -429,7 +477,7 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
       gridLevels.push(Math.round((minScaleY + i * step) * 10) / 10);
     }
   } else if (paramType === "rain") {
-    const maxVal = Math.max(...dayPoints.map(p => p.rain), 0);
+    const maxVal = globalLimits ? globalLimits.rainMax : Math.max(...dayPoints.map(p => p.rain), 0);
     maxScaleY = Math.max(2.0, Math.ceil(maxVal + 0.5));
     const step = maxScaleY / 4;
     for (let i = 0; i <= 4; i++) {
