@@ -471,16 +471,11 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     minScaleY = Math.floor((minT - 2) / 5) * 5;
     maxScaleY = Math.ceil((maxT + 2) / 5) * 5;
     
-    // Ensure the range is a multiple of 20 to make Y-axis step intervals multiples of 5
-    let range = maxScaleY - minScaleY;
-    while (range % 20 !== 0) {
-      maxScaleY += 5;
-      range = maxScaleY - minScaleY;
-    }
-
-    const step = range / 4;
-    for (let i = 0; i <= 4; i++) {
-      gridLevels.push(minScaleY + i * step);
+    // Generate grid levels dynamically by 5 or 10 degree steps to keep labels simple
+    const range = maxScaleY - minScaleY;
+    const step = range > 25 ? 10 : 5;
+    for (let val = minScaleY; val <= maxScaleY; val += step) {
+      gridLevels.push(val);
     }
   } else if (paramType === "rain") {
     const maxVal = globalLimits ? globalLimits.rainMax : Math.max(...dayPoints.map(p => p.rain), 0);
