@@ -61,24 +61,6 @@
     --notice-border: rgba(196, 90, 48, 0.4);
     --pulse-glow: rgba(232, 160, 69, 0);
     --pulse-glow-mid: rgba(232, 160, 69, 0.65);
-
-    /* UV Index themed colors - Default Warm Fable theme */
-    --uv-low-1: #4ade80;
-    --uv-low-2: #22c55e;
-    --uv-mod-1: #fde047;
-    --uv-mod-2: #eab308;
-    --uv-high-1: #f97316;
-    --uv-high-2: #ea580c;
-    --uv-veryhigh-1: #ef4444;
-    --uv-veryhigh-2: #dc2626;
-    --uv-extreme-1: #a855f7;
-    --uv-extreme-2: #9333ea;
-
-    --uv-low-text: var(--btn-text);
-    --uv-mod-text: var(--btn-text);
-    --uv-high-text: #ffffff;
-    --uv-veryhigh-text: #ffffff;
-    --uv-extreme-text: #ffffff;
 }
 
 html.theme-blue,
@@ -142,24 +124,6 @@ body.theme-blue {
     --notice-border: rgba(255, 138, 60, 0.35);
     --pulse-glow: rgba(56, 212, 255, 0);
     --pulse-glow-mid: rgba(56, 212, 255, 0.65);
-
-    /* UV Index themed colors - Blue Theme */
-    --uv-low-1: #56f3bc;
-    --uv-low-2: #2dd4bf;
-    --uv-mod-1: #38d4ff;
-    --uv-mod-2: #0ea5e9;
-    --uv-high-1: #6366f1;
-    --uv-high-2: #4338ca;
-    --uv-veryhigh-1: #a855f7;
-    --uv-veryhigh-2: #7c3aed;
-    --uv-extreme-1: #ff6b8b;
-    --uv-extreme-2: #e11d48;
-
-    --uv-low-text: #071423;
-    --uv-mod-text: #071423;
-    --uv-high-text: #ffffff;
-    --uv-veryhigh-text: #ffffff;
-    --uv-extreme-text: #ffffff;
 }
 
 html.theme-paper,
@@ -223,24 +187,6 @@ body.theme-paper {
     --notice-border: rgba(181, 137, 0, 0.28);
     --pulse-glow: rgba(203, 178, 74, 0);
     --pulse-glow-mid: rgba(203, 178, 74, 0.45);
-
-    /* UV Index themed colors - Paper Theme */
-    --uv-low-1: #a3e635;
-    --uv-low-2: #22c55e;
-    --uv-mod-1: #fde047;
-    --uv-mod-2: #cbb24a;
-    --uv-high-1: #f97316;
-    --uv-high-2: #cc6e53;
-    --uv-veryhigh-1: #ef4444;
-    --uv-veryhigh-2: #dc2626;
-    --uv-extreme-1: #a855f7;
-    --uv-extreme-2: #9333ea;
-
-    --uv-low-text: #394046;
-    --uv-mod-text: #394046;
-    --uv-high-text: #ffffff;
-    --uv-veryhigh-text: #ffffff;
-    --uv-extreme-text: #ffffff;
 }
 
 html.theme-forest,
@@ -304,24 +250,6 @@ body.theme-forest {
     --notice-border: rgba(199, 169, 107, 0.3);
     --pulse-glow: rgba(127, 163, 107, 0);
     --pulse-glow-mid: rgba(127, 163, 107, 0.58);
-
-    /* UV Index themed colors - Forest Theme */
-    --uv-low-1: #a3e635;
-    --uv-low-2: #65a30d;
-    --uv-mod-1: #fef08a;
-    --uv-mod-2: #c7a96b;
-    --uv-high-1: #f59e0b;
-    --uv-high-2: #d97706;
-    --uv-veryhigh-1: #fca5a5;
-    --uv-veryhigh-2: #cf7461;
-    --uv-extreme-1: #c084fc;
-    --uv-extreme-2: #7c3aed;
-
-    --uv-low-text: #1a2117;
-    --uv-mod-text: #1a2117;
-    --uv-high-text: #1a2117;
-    --uv-veryhigh-text: #ffffff;
-    --uv-extreme-text: #ffffff;
 }
 
 html.theme-dusk,
@@ -385,24 +313,6 @@ body.theme-dusk {
     --notice-border: rgba(255, 159, 179, 0.3);
     --pulse-glow: rgba(199, 140, 255, 0);
     --pulse-glow-mid: rgba(199, 140, 255, 0.62);
-
-    /* UV Index themed colors - Dusk Theme */
-    --uv-low-1: #e9d5ff;
-    --uv-low-2: #c78cff;
-    --uv-mod-1: #fbcfe8;
-    --uv-mod-2: #ff9fb3;
-    --uv-high-1: #fca5a5;
-    --uv-high-2: #ff7895;
-    --uv-veryhigh-1: #c084fc;
-    --uv-veryhigh-2: #7c3aed;
-    --uv-extreme-1: #f472b6;
-    --uv-extreme-2: #db2777;
-
-    --uv-low-text: #1a1228;
-    --uv-mod-text: #1a1228;
-    --uv-high-text: #1a1228;
-    --uv-veryhigh-text: #ffffff;
-    --uv-extreme-text: #ffffff;
 }
 
 *,

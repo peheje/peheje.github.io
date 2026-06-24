@@ -154,10 +154,17 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: var(--btn-text);
+            background: var(--bg-soft);
+            border: 6px solid var(--uv-color);
+            color: var(--text) !important;
             font-weight: 800;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-color) 30%, transparent),
+                        inset 0 4px 10px rgba(0, 0, 0, 0.15);
             transition: all 0.3s ease;
+        }
+
+        .uv-hero-circle span {
+            color: inherit !important;
         }
 
         .uv-hero-val {
@@ -173,47 +180,37 @@
         }
 
         /* UV Level Colors */
-        .uv-low {
-            background: linear-gradient(135deg, var(--uv-low-1), var(--uv-low-2));
-            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-low-2) 40%, transparent);
-            color: var(--uv-low-text) !important;
+        .uv-hero-circle.uv-low {
+            --uv-color: #22c55e;
         }
-        .uv-moderate {
-            background: linear-gradient(135deg, var(--uv-mod-1), var(--uv-mod-2));
-            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-mod-2) 40%, transparent);
-            color: var(--uv-mod-text) !important;
+        .uv-hero-circle.uv-moderate {
+            --uv-color: #eab308;
         }
-        .uv-high {
-            background: linear-gradient(135deg, var(--uv-high-1), var(--uv-high-2));
-            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-high-2) 40%, transparent);
-            color: var(--uv-high-text) !important;
+        .uv-hero-circle.uv-high {
+            --uv-color: #ea580c;
         }
-        .uv-veryhigh {
-            background: linear-gradient(135deg, var(--uv-veryhigh-1), var(--uv-veryhigh-2));
-            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-veryhigh-2) 40%, transparent);
-            color: var(--uv-veryhigh-text) !important;
+        .uv-hero-circle.uv-veryhigh {
+            --uv-color: #dc2626;
         }
-        .uv-extreme {
-            background: linear-gradient(135deg, var(--uv-extreme-1), var(--uv-extreme-2));
-            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-extreme-2) 40%, transparent);
-            color: var(--uv-extreme-text) !important;
+        .uv-hero-circle.uv-extreme {
+            --uv-color: #9333ea;
         }
 
         /* UV Advice Border Theming */
         .uv-advice.uv-low {
-            border-left-color: var(--uv-low-2);
+            border-left-color: #22c55e;
         }
         .uv-advice.uv-moderate {
-            border-left-color: var(--uv-mod-2);
+            border-left-color: #eab308;
         }
         .uv-advice.uv-high {
-            border-left-color: var(--uv-high-2);
+            border-left-color: #ea580c;
         }
         .uv-advice.uv-veryhigh {
-            border-left-color: var(--uv-veryhigh-2);
+            border-left-color: #dc2626;
         }
         .uv-advice.uv-extreme {
-            border-left-color: var(--uv-extreme-2);
+            border-left-color: #9333ea;
         }
 
         .uv-stats-row {
