@@ -467,9 +467,12 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     const minT = globalLimits ? globalLimits.tempMin : (temps.length ? Math.min(...temps) : 0);
     const maxT = globalLimits ? globalLimits.tempMax : (temps.length ? Math.max(...temps) : 10);
     
-    // Scale bounds to multiples of 5
-    minScaleY = Math.floor((minT - 2) / 5) * 5;
-    maxScaleY = Math.ceil((maxT + 2) / 5) * 5;
+    // Scale bounds directly to multiples of 5
+    minScaleY = Math.floor(minT / 5) * 5;
+    maxScaleY = Math.ceil(maxT / 5) * 5;
+    if (minScaleY === maxScaleY) {
+      maxScaleY += 5;
+    }
     
     // Generate grid levels dynamically by 5 or 10 degree steps to keep labels simple
     const range = maxScaleY - minScaleY;
