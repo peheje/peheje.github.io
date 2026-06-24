@@ -351,8 +351,9 @@ function updateDashboardUI(data) {
     uvLabelEl.textContent = uvLevel.label;
     
     uvCircle.className = "uv-hero-circle " + uvLevel.class;
+    uvAdviceEl.className = "uv-advice " + uvLevel.class;
     uvAdviceEl.textContent = uvLevel.advice;
-    uvAdviceEl.style.borderLeftColor = uvLevel.color;
+    uvAdviceEl.style.borderLeftColor = "";
 
     const weatherEmoji = document.getElementById("weather-emoji");
     const tempValue = document.getElementById("temp-value");

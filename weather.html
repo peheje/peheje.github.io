@@ -154,7 +154,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: #1a1410;
+            color: var(--btn-text);
             font-weight: 800;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
             transition: all 0.3s ease;
@@ -174,27 +174,46 @@
 
         /* UV Level Colors */
         .uv-low {
-            background: linear-gradient(135deg, #4ade80, #22c55e);
-            box-shadow: 0 0 20px rgba(74, 222, 128, 0.4);
+            background: linear-gradient(135deg, var(--uv-low-1), var(--uv-low-2));
+            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-low-2) 40%, transparent);
+            color: var(--uv-low-text) !important;
         }
         .uv-moderate {
-            background: linear-gradient(135deg, #fde047, #eab308);
-            box-shadow: 0 0 20px rgba(254, 224, 71, 0.4);
+            background: linear-gradient(135deg, var(--uv-mod-1), var(--uv-mod-2));
+            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-mod-2) 40%, transparent);
+            color: var(--uv-mod-text) !important;
         }
         .uv-high {
-            background: linear-gradient(135deg, #f97316, #ea580c);
-            box-shadow: 0 0 20px rgba(249, 115, 22, 0.4);
-            color: #ffffff;
+            background: linear-gradient(135deg, var(--uv-high-1), var(--uv-high-2));
+            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-high-2) 40%, transparent);
+            color: var(--uv-high-text) !important;
         }
         .uv-veryhigh {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
-            color: #ffffff;
+            background: linear-gradient(135deg, var(--uv-veryhigh-1), var(--uv-veryhigh-2));
+            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-veryhigh-2) 40%, transparent);
+            color: var(--uv-veryhigh-text) !important;
         }
         .uv-extreme {
-            background: linear-gradient(135deg, #a855f7, #9333ea);
-            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
-            color: #ffffff;
+            background: linear-gradient(135deg, var(--uv-extreme-1), var(--uv-extreme-2));
+            box-shadow: 0 0 20px color-mix(in srgb, var(--uv-extreme-2) 40%, transparent);
+            color: var(--uv-extreme-text) !important;
+        }
+
+        /* UV Advice Border Theming */
+        .uv-advice.uv-low {
+            border-left-color: var(--uv-low-2);
+        }
+        .uv-advice.uv-moderate {
+            border-left-color: var(--uv-mod-2);
+        }
+        .uv-advice.uv-high {
+            border-left-color: var(--uv-high-2);
+        }
+        .uv-advice.uv-veryhigh {
+            border-left-color: var(--uv-veryhigh-2);
+        }
+        .uv-advice.uv-extreme {
+            border-left-color: var(--uv-extreme-2);
         }
 
         .uv-stats-row {
