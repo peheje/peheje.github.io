@@ -368,14 +368,12 @@ body::before {
     top: -140px;
     right: -90px;
     background: var(--glow-1);
-    animation: driftA 16s ease-in-out infinite alternate;
 }
 
 body::after {
     bottom: -170px;
     left: -90px;
     background: var(--glow-2);
-    animation: driftB 19s ease-in-out infinite alternate;
 }
 
 #menu,
