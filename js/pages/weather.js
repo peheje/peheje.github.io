@@ -37,8 +37,8 @@ const rainCanvas = document.getElementById("rain-canvas");
 const UV_LEVELS = [
   { max: 2.9, label: "Low", class: "uv-low", color: "#22c55e", advice: "Low danger. Safe to be outdoors. Wear sunglasses on bright days. If you burn easily, use sunscreen." },
   { max: 5.9, label: "Moderate", class: "uv-moderate", color: "#eab308", advice: "Moderate risk. Seek shade near midday. Wear protective clothing, sunglasses, and use SPF 30+ sunscreen." },
-  { max: 7.9, label: "High", class: "uv-high", color: "#ea580c", advice: "High risk. Reduce time in the sun between 10 a.m. and 4 p.m. Wear protective clothing, a wide-brimmed hat, sunglasses, and SPF 30+ sunscreen." },
-  { max: 10.9, label: "Very High", class: "uv-veryhigh", color: "#dc2626", advice: "Very high risk. Minimize sun exposure between 10 a.m. and 4 p.m. Wear protective clothing, a wide-brimmed hat, sunglasses, and SPF 30+ sunscreen." },
+  { max: 7.9, label: "High", class: "uv-high", color: "#ea580c", advice: "High risk. Reduce time in the sun between 10:00 and 16:00. Wear protective clothing, a wide-brimmed hat, sunglasses, and SPF 30+ sunscreen." },
+  { max: 10.9, label: "Very High", class: "uv-veryhigh", color: "#dc2626", advice: "Very high risk. Minimize sun exposure between 10:00 and 16:00. Wear protective clothing, a wide-brimmed hat, sunglasses, and SPF 30+ sunscreen." },
   { max: Infinity, label: "Extreme", class: "uv-extreme", color: "#9333ea", advice: "Extreme risk. Avoid sun exposure. Wear protective clothing, a wide-brimmed hat, sunglasses, and SPF 30+ sunscreen. Reapply every 2 hours." }
 ];
 
