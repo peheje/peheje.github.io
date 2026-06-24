@@ -466,15 +466,21 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     const temps = dayPoints.map(p => p.temp).filter(t => t !== null);
     const minT = globalLimits ? globalLimits.tempMin : (temps.length ? Math.min(...temps) : 0);
     const maxT = globalLimits ? globalLimits.tempMax : (temps.length ? Math.max(...temps) : 10);
-    minScaleY = Math.floor(minT - 2);
-    maxScaleY = Math.ceil(maxT + 2);
-    const range = maxScaleY - minScaleY;
-    const adjMax = range < 5 ? minScaleY + 5 : maxScaleY;
-    maxScaleY = adjMax;
+    
+    // Scale bounds to multiples of 5
+    minScaleY = Math.floor((minT - 2) / 5) * 5;
+    maxScaleY = Math.ceil((maxT + 2) / 5) * 5;
+    
+    // Ensure the range is a multiple of 20 to make Y-axis step intervals multiples of 5
+    let range = maxScaleY - minScaleY;
+    while (range % 20 !== 0) {
+      maxScaleY += 5;
+      range = maxScaleY - minScaleY;
+    }
 
-    const step = (maxScaleY - minScaleY) / 4;
+    const step = range / 4;
     for (let i = 0; i <= 4; i++) {
-      gridLevels.push(Math.round((minScaleY + i * step) * 10) / 10);
+      gridLevels.push(minScaleY + i * step);
     }
   } else if (paramType === "rain") {
     const maxVal = globalLimits ? globalLimits.rainMax : Math.max(...dayPoints.map(p => p.rain), 0);
