@@ -349,59 +349,9 @@ function updateDashboardUI(data) {
   drawForecastCurves();
 }
 
-// Redraw Debugger variables
-let totalDraws = 0;
-let drawsSinceReset = 0;
-let lastResetTime = Date.now();
-
-function initDrawDebugger() {
-  const div = document.createElement("div");
-  div.id = "draw-debugger";
-  div.style.position = "fixed";
-  div.style.bottom = "15px";
-  div.style.right = "15px";
-  div.style.background = "rgba(15, 23, 42, 0.9)";
-  div.style.color = "#38d4ff";
-  div.style.fontFamily = "Consolas, monospace";
-  div.style.fontSize = "11px";
-  div.style.padding = "8px 12px";
-  div.style.borderRadius = "8px";
-  div.style.zIndex = "99999";
-  div.style.border = "1px solid rgba(56, 212, 255, 0.3)";
-  div.style.boxShadow = "0 4px 12px rgba(0,0,0,0.5)";
-  div.style.pointerEvents = "none"; // Don't block hover/clicks
-  div.innerHTML = `
-    <div style="font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;">Render Debugger</div>
-    <div>Total Redraws: <span id="dbg-total-draws" style="font-weight:bold;color:#fff;">0</span></div>
-    <div>Redraws/sec: <span id="dbg-draws-sec" style="font-weight:bold;color:#34d399;">0</span></div>
-  `;
-  document.body.appendChild(div);
-
-  setInterval(() => {
-    const elapsed = (Date.now() - lastResetTime) / 1000;
-    const rate = Math.round(drawsSinceReset / (elapsed || 1));
-    const elRate = document.getElementById("dbg-draws-sec");
-    if (elRate) elRate.textContent = rate;
-    
-    drawsSinceReset = 0;
-    lastResetTime = Date.now();
-  }, 1000);
-}
-
-function recordDraw() {
-  totalDraws++;
-  drawsSinceReset++;
-  const elTotal = document.getElementById("dbg-total-draws");
-  if (elTotal) {
-    elTotal.textContent = totalDraws;
-  }
-}
-
 // Draw all three forecast curves simultaneously
 function drawForecastCurves() {
   if (!forecastData) return;
-
-  recordDraw();
 
   const timeseries = forecastData.properties.timeseries;
   const { data: dayPoints, found } = getDailyTimeseries(timeseries, activeTab);
@@ -897,9 +847,6 @@ function setupTabs() {
 function initWeatherPage() {
   // Mount the site layout shell
   mountSiteShell();
-
-  // Initialize visual debugger
-  initDrawDebugger();
 
   // Load last stored location if any
   loadStoredLocation();
