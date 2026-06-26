@@ -252,6 +252,16 @@ function getDailyTimeseries(timeseries, dayIndex) {
   return { data: hoursData, found: hasData };
 }
 
+// Helper to get formatted day name and date
+function getDayNameAndDate(i) {
+  const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const d = new Date();
+  d.setDate(d.getDate() + i);
+  const dayName = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[d.getDay()]);
+  const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
+  return `${dayName} ${dateStr}`;
+}
+
 // Helper to update all prev-day and next-day buttons enabled state
 function updateHeaderArrows() {
   const prevBtns = document.querySelectorAll(".prev-day");
@@ -265,10 +275,34 @@ function updateHeaderArrows() {
   });
 }
 
+// Helper to update all graph header date labels
+function updateHeaderDates() {
+  const dateSpan = getDayNameAndDate(activeTab);
+  const dateLabels = document.querySelectorAll(".graph-date");
+  dateLabels.forEach(el => {
+    el.textContent = ` (${dateSpan})`;
+  });
+}
+
+// Helper to trigger CSS slide transitions on canvases
+function triggerGraphAnimation(direction) {
+  const canvases = document.querySelectorAll(".canvas-container canvas");
+  const animClass = direction === "next" ? "animate-slide-right" : "animate-slide-left";
+  
+  canvases.forEach(canvas => {
+    if (!canvas) return;
+    canvas.classList.remove("animate-slide-right", "animate-slide-left");
+    // force reflow to restart animation
+    void canvas.offsetWidth;
+    canvas.classList.add(animClass);
+  });
+}
+
 // Helper to transition active forecast day
 function changeDay(newIndex) {
   if (newIndex < 0 || newIndex > 6) return;
   if (activeTab !== newIndex) {
+    const direction = newIndex > activeTab ? "next" : "prev";
     activeTab = newIndex;
     
     // Update the tabs active class
@@ -281,6 +315,12 @@ function changeDay(newIndex) {
 
     // Sync header navigation arrows
     updateHeaderArrows();
+
+    // Sync header navigation dates
+    updateHeaderDates();
+
+    // Trigger visual transitions
+    triggerGraphAnimation(direction);
 
     hoverHour = null;
     drawForecastCurves();
@@ -444,6 +484,9 @@ function updateDashboardUI(data) {
 
   // Sync header navigation arrows
   updateHeaderArrows();
+
+  // Sync header navigation dates
+  updateHeaderDates();
 }
 
 // Draw all forecast curves simultaneously
@@ -1031,18 +1074,25 @@ function setupHeaderNavigation() {
       });
     }
 
-    // Touch swipe gesture handling on header
+    // Touch swipe gesture handling on header (ignoring the arrow buttons)
     let touchStartX = 0;
     let touchEndX = 0;
 
     header.addEventListener("touchstart", (e) => {
+      if (e.target.closest(".nav-arrow")) {
+        touchStartX = 0; // invalidate
+        return;
+      }
       touchStartX = e.changedTouches[0].screenX;
     }, { passive: true });
 
     header.addEventListener("touchend", (e) => {
+      if (touchStartX === 0 || e.target.closest(".nav-arrow")) {
+        return;
+      }
       touchEndX = e.changedTouches[0].screenX;
       
-      const threshold = 40; // minimum swipe distance in pixels
+      const threshold = 60; // minimum swipe distance in pixels
       if (touchEndX < touchStartX - threshold) {
         // Swiped left -> Next Day
         changeDay(activeTab + 1);

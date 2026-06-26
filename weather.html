@@ -414,14 +414,16 @@
             border: none;
             color: var(--muted);
             cursor: pointer;
-            padding: 4px 8px;
-            font-size: 1.25rem;
+            padding: 6px 12px;
+            font-size: 1rem;
             font-weight: 700;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: color 0.15s ease, opacity 0.15s ease;
             box-shadow: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .nav-arrow:hover:not(:disabled) {
@@ -429,8 +431,35 @@
         }
 
         .nav-arrow:disabled {
-            opacity: 0.25;
+            opacity: 0.2;
             cursor: not-allowed;
+        }
+
+        .graph-date {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--muted);
+            margin-left: 6px;
+            display: inline-block;
+            vertical-align: middle;
+            opacity: 0.85;
+        }
+
+        @keyframes slideInRight {
+            from { opacity: 0.5; transform: translateX(16px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideInLeft {
+            from { opacity: 0.5; transform: translateX(-16px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .animate-slide-right {
+            animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .animate-slide-left {
+            animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
         .error-message {
@@ -538,7 +567,7 @@
                 <div class="inline-block">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Temperature Curve (&deg;C)</h4>
+                        <h4 class="curve-title">Temperature Curve (&deg;C)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
@@ -550,7 +579,7 @@
                 <div class="inline-block">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Precipitation Bars (mm)</h4>
+                        <h4 class="curve-title">Precipitation Bars (mm)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
@@ -562,7 +591,7 @@
                 <div class="inline-block">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">UV Index Curve</h4>
+                        <h4 class="curve-title">UV Index Curve<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
@@ -574,7 +603,7 @@
                 <div class="inline-block">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Wind Speed & Direction (m/s)</h4>
+                        <h4 class="curve-title">Wind Speed & Direction (m/s)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
