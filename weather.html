@@ -141,14 +141,17 @@
             }
         }
 
-        .uv-summary-card {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            justify-content: center;
-            gap: 15px;
-            padding: 24px;
+        .uv-circle-small {
+            width: 70px !important;
+            height: 70px !important;
+            border-width: 4px !important;
+            box-shadow: 0 0 12px color-mix(in srgb, var(--uv-color) 25%, transparent),
+                        inset 0 2px 6px rgba(0, 0, 0, 0.12) !important;
+            margin: 0 !important;
+        }
+
+        .uv-circle-small .uv-hero-val {
+            font-size: 1.6rem !important;
         }
 
         .uv-hero-circle {
@@ -535,25 +538,30 @@
                 </div>
 
                 <!-- UV Index Summary Card -->
-                <div class="inline-block uv-summary-card">
+                <div class="inline-block weather-info-card">
                     <h3 style="margin: 0; font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">UV Index</h3>
-                    <div id="uv-circle" class="uv-hero-circle uv-low">
-                        <span id="uv-value" class="uv-hero-val">0.0</span>
-                        <span id="uv-label" class="uv-hero-label">Low</span>
+                    <div class="weather-hero">
+                        <div id="uv-circle" class="uv-hero-circle uv-circle-small uv-low">
+                            <span id="uv-value" class="uv-hero-val">0.0</span>
+                        </div>
+                        <div class="temp-display">
+                            <span id="uv-label" class="temp-val">Low</span>
+                            <span class="temp-desc">Current UV</span>
+                        </div>
                     </div>
                     
-                    <div class="uv-stats-row">
-                        <div class="uv-stat-box">
-                            <span id="uv-max" class="uv-stat-val">0.0</span>
-                            <span class="uv-stat-lbl">Max Today</span>
+                    <div class="weather-details-grid">
+                        <div class="weather-detail-item">
+                            <span id="uv-max" class="weather-detail-val">0.0</span>
+                            <span class="weather-detail-lbl">Max Today</span>
                         </div>
-                        <div class="uv-stat-box">
-                            <span id="uv-max-time" class="uv-stat-val">13:00</span>
-                            <span class="uv-stat-lbl">Max Time</span>
+                        <div class="weather-detail-item">
+                            <span id="uv-max-time" class="weather-detail-val">13:00</span>
+                            <span class="weather-detail-lbl">Max Time</span>
                         </div>
                     </div>
 
-                    <div id="uv-advice" class="uv-advice">
+                    <div id="uv-advice" class="uv-advice" style="margin-top: 10px;">
                         Low danger. Wear sunglasses on bright days. If you burn easily, use sunscreen.
                     </div>
                 </div>

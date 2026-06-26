@@ -463,7 +463,7 @@ function updateDashboardUI(data) {
     uvValueEl.textContent = uvVal.toFixed(1);
     uvLabelEl.textContent = uvLevel.label;
     
-    uvCircle.className = "uv-hero-circle " + uvLevel.class;
+    uvCircle.className = "uv-hero-circle uv-circle-small " + uvLevel.class;
     uvAdviceEl.className = "uv-advice " + uvLevel.class;
     uvAdviceEl.textContent = uvLevel.advice;
     uvAdviceEl.style.borderLeftColor = "";
