@@ -495,16 +495,7 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Drag and drop & minimized widgets */
-        .graph-card {
-            transition: transform 0.2s ease, opacity 0.2s ease;
-            position: relative;
-        }
-        .graph-card.dragging {
-            opacity: 0.5;
-            transform: scale(0.98);
-            border: 1px dashed var(--accent);
-        }
+        /* Minimized state and context menu styles */
         .graph-card.minimized .canvas-container {
             display: none;
         }
@@ -512,41 +503,45 @@
             padding-bottom: 10px;
         }
         .graph-header {
-            cursor: grab;
+            user-select: none;
+            touch-action: pan-y;
         }
-        .graph-header:active {
-            cursor: grabbing;
-        }
-        .graph-header button,
-        .graph-header .curve-title span {
-            cursor: pointer;
-        }
-        .header-left-actions, .header-right-actions {
+        .weather-context-menu {
+            position: fixed;
+            z-index: 10000;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
+            padding: 4px;
             display: flex;
-            align-items: center;
-            flex: 0 0 64px;
+            flex-direction: column;
+            width: 120px;
+            animation: fadeIn 0.15s ease-out;
         }
-        .header-left-actions {
-            justify-content: flex-start;
-        }
-        .header-right-actions {
-            justify-content: flex-end;
-            gap: 4px;
-        }
-        .toggle-btn {
+        .weather-context-menu button {
             background: transparent;
             border: none;
-            color: var(--muted);
+            color: var(--text);
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 0.9rem;
             cursor: pointer;
-            padding: 6px;
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.15s ease;
+            border-radius: var(--radius-sm);
+            transition: background 0.15s ease, color 0.15s ease;
         }
-        .toggle-btn:hover {
+        .weather-context-menu button:hover {
+            background: var(--line);
             color: var(--accent);
+        }
+        .weather-context-menu button:disabled {
+            color: var(--muted);
+            cursor: not-allowed;
+            background: transparent;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
     </style>
 </head>
@@ -640,16 +635,11 @@
             <!-- Side-by-side / Stacked Forecast Graphs -->
             <section class="graphs-grid margin-bottom-10">
                 <!-- Temperature curve card -->
-                <div class="inline-block graph-card" draggable="true" data-key="temp">
+                <div class="inline-block graph-card" data-key="temp">
                     <div class="graph-header">
-                        <div class="header-left-actions">
-                            <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        </div>
+                        <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
                         <h4 class="curve-title">Temperature Curve (&deg;C)<span class="graph-date"></span></h4>
-                        <div class="header-right-actions">
-                            <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
-                            <button class="toggle-btn" aria-label="Minimize Card">&#9650;</button>
-                        </div>
+                        <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
                         <canvas id="temp-canvas"></canvas>
@@ -657,16 +647,11 @@
                 </div>
 
                 <!-- Rain bar card -->
-                <div class="inline-block graph-card" draggable="true" data-key="precip">
+                <div class="inline-block graph-card" data-key="precip">
                     <div class="graph-header">
-                        <div class="header-left-actions">
-                            <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        </div>
+                        <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
                         <h4 class="curve-title">Precipitation Bars (mm)<span class="graph-date"></span></h4>
-                        <div class="header-right-actions">
-                            <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
-                            <button class="toggle-btn" aria-label="Minimize Card">&#9650;</button>
-                        </div>
+                        <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
                         <canvas id="rain-canvas"></canvas>
@@ -674,16 +659,11 @@
                 </div>
 
                 <!-- UV Index curve card -->
-                <div class="inline-block graph-card" draggable="true" data-key="uv">
+                <div class="inline-block graph-card" data-key="uv">
                     <div class="graph-header">
-                        <div class="header-left-actions">
-                            <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        </div>
+                        <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
                         <h4 class="curve-title">UV Index Curve<span class="graph-date"></span></h4>
-                        <div class="header-right-actions">
-                            <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
-                            <button class="toggle-btn" aria-label="Minimize Card">&#9650;</button>
-                        </div>
+                        <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
                         <canvas id="uv-canvas"></canvas>
@@ -691,16 +671,11 @@
                 </div>
 
                 <!-- Wind Speed & Direction card -->
-                <div class="inline-block graph-card" draggable="true" data-key="wind">
+                <div class="inline-block graph-card" data-key="wind">
                     <div class="graph-header">
-                        <div class="header-left-actions">
-                            <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        </div>
+                        <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
                         <h4 class="curve-title">Wind Speed & Direction (m/s)<span class="graph-date"></span></h4>
-                        <div class="header-right-actions">
-                            <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
-                            <button class="toggle-btn" aria-label="Minimize Card">&#9650;</button>
-                        </div>
+                        <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
                         <canvas id="wind-canvas"></canvas>

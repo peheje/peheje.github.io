@@ -1205,11 +1205,6 @@ function restoreMinimizedStates() {
         const key = card.getAttribute("data-key");
         if (states[key]) {
           card.classList.add("minimized");
-          const toggleBtn = card.querySelector(".toggle-btn");
-          if (toggleBtn) {
-            toggleBtn.innerHTML = "&#9660;"; // Caret down
-            toggleBtn.setAttribute("aria-label", "Expand Card");
-          }
         }
       });
     } catch (e) {
@@ -1218,61 +1213,161 @@ function restoreMinimizedStates() {
   }
 }
 
-// Setup click event handlers for minimize/expand buttons
-function setupMinimizeButtons() {
-  document.querySelectorAll(".graphs-grid .graph-card").forEach(card => {
-    const toggleBtn = card.querySelector(".toggle-btn");
-    if (!toggleBtn) return;
-    
-    toggleBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const isMinimized = card.classList.toggle("minimized");
-      toggleBtn.innerHTML = isMinimized ? "&#9660;" : "&#9650;";
-      toggleBtn.setAttribute("aria-label", isMinimized ? "Expand Card" : "Minimize Card");
-      saveMinimizedStates();
-      // Redraw canvases to adjust to visibility changes
-      drawForecastCurves();
+// Setup context menu (right click & long press) on graph headers
+function setupHeaderContextMenu() {
+  const cards = document.querySelectorAll(".graphs-grid .graph-card");
+  
+  cards.forEach(card => {
+    const header = card.querySelector(".graph-header");
+    if (!header) return;
+
+    let touchTimer = null;
+    let didTriggerLongPress = false;
+
+    const handleTrigger = (x, y) => {
+      showContextMenu(x, y, card);
+    };
+
+    // Right-click for desktop
+    header.addEventListener("contextmenu", (e) => {
+      const isButton = e.target.closest("button");
+      if (isButton) return;
+      e.preventDefault();
+      handleTrigger(e.clientX, e.clientY);
+    });
+
+    // Long-press for mobile
+    header.addEventListener("touchstart", (e) => {
+      const isButton = e.target.closest("button");
+      if (isButton) return;
+      
+      didTriggerLongPress = false;
+      clearTimeout(touchTimer);
+      
+      const touch = e.touches[0];
+      const clientX = touch.clientX;
+      const clientY = touch.clientY;
+
+      touchTimer = setTimeout(() => {
+        didTriggerLongPress = true;
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+        handleTrigger(clientX, clientY);
+      }, 600); // 600ms threshold
+    }, { passive: true });
+
+    header.addEventListener("touchend", () => {
+      clearTimeout(touchTimer);
+    });
+
+    header.addEventListener("touchmove", () => {
+      clearTimeout(touchTimer);
+    });
+
+    header.addEventListener("touchcancel", () => {
+      clearTimeout(touchTimer);
     });
   });
 }
 
-// Setup HTML5 Drag and Drop event handlers for graph cards
-function setupDragAndDrop() {
-  const cards = document.querySelectorAll(".graphs-grid .graph-card");
-  cards.forEach(card => {
-    card.addEventListener("dragstart", (e) => {
-      // Allow drag only if started on the header and not on any buttons inside it
-      const isHeader = e.target.closest(".graph-header");
-      const isButton = e.target.closest("button");
-      if (!isHeader || isButton) {
-        e.preventDefault();
-        return;
-      }
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", card.getAttribute("data-key"));
-      card.classList.add("dragging");
-    });
+// Show the floating context menu at x, y coordinates
+function showContextMenu(x, y, card) {
+  // Remove existing menu if any
+  const existing = document.querySelector(".weather-context-menu");
+  if (existing) {
+    existing.remove();
+  }
 
-    card.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      const draggingCard = document.querySelector(".graph-card.dragging");
-      if (!draggingCard || draggingCard === card) return;
+  const key = card.getAttribute("data-key");
+  const parent = card.parentNode;
+  const cardsArray = Array.from(parent.querySelectorAll(".graph-card"));
+  const index = cardsArray.indexOf(card);
 
-      const rect = card.getBoundingClientRect();
-      const width = rect.width || 1;
-      const height = rect.height || 1;
-      const isAfter = (e.clientY - rect.top) / height > 0.5 || (e.clientX - rect.left) / width > 0.5;
-      const parent = card.parentNode;
-      
-      parent.insertBefore(draggingCard, isAfter ? card.nextSibling : card);
-    });
+  const menu = document.createElement("div");
+  menu.className = "weather-context-menu";
 
-    card.addEventListener("dragend", () => {
-      card.classList.remove("dragging");
+  // Move Up Button
+  const btnUp = document.createElement("button");
+  btnUp.textContent = "Up";
+  if (index === 0) {
+    btnUp.disabled = true;
+  } else {
+    btnUp.addEventListener("click", () => {
+      const prev = cardsArray[index - 1];
+      parent.insertBefore(card, prev);
       saveLayoutOrder();
       drawForecastCurves();
+      menu.remove();
     });
+  }
+  menu.appendChild(btnUp);
+
+  // Move Down Button
+  const btnDown = document.createElement("button");
+  btnDown.textContent = "Down";
+  if (index === cardsArray.length - 1) {
+    btnDown.disabled = true;
+  } else {
+    btnDown.addEventListener("click", () => {
+      const next = cardsArray[index + 1];
+      parent.insertBefore(card, next.nextSibling);
+      saveLayoutOrder();
+      drawForecastCurves();
+      menu.remove();
+    });
+  }
+  menu.appendChild(btnDown);
+
+  // Hide/Show Button
+  const isMinimized = card.classList.contains("minimized");
+  const btnToggle = document.createElement("button");
+  btnToggle.textContent = isMinimized ? "Show" : "Hide";
+  btnToggle.addEventListener("click", () => {
+    card.classList.toggle("minimized");
+    saveMinimizedStates();
+    drawForecastCurves();
+    menu.remove();
   });
+  menu.appendChild(btnToggle);
+
+  // Position the menu
+  const menuWidth = 120;
+  const menuHeight = 110;
+  let left = x;
+  let top = y;
+
+  if (left + menuWidth > window.innerWidth) {
+    left = window.innerWidth - menuWidth - 10;
+  }
+  if (left < 10) {
+    left = 10;
+  }
+  if (top + menuHeight > window.innerHeight) {
+    top = window.innerHeight - menuHeight - 10;
+  }
+  if (top < 10) {
+    top = 10;
+  }
+
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+
+  document.body.appendChild(menu);
+
+  // Close menu on click outside
+  const closeMenu = (e) => {
+    if (!menu.contains(e.target)) {
+      menu.remove();
+      document.removeEventListener("click", closeMenu);
+      document.removeEventListener("contextmenu", closeMenu);
+    }
+  };
+
+  setTimeout(() => {
+    document.addEventListener("click", closeMenu);
+    document.addEventListener("contextmenu", closeMenu);
+  }, 0);
 }
 
 // Initialize Page
@@ -1283,8 +1378,7 @@ function initWeatherPage() {
   // Restore layout order & minimized states
   restoreLayoutOrder();
   restoreMinimizedStates();
-  setupMinimizeButtons();
-  setupDragAndDrop();
+  setupHeaderContextMenu();
 
   // Load last stored location if any
   loadStoredLocation();
