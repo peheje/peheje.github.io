@@ -435,6 +435,12 @@
             cursor: not-allowed;
         }
 
+        @media (pointer: coarse), (max-width: 768px) {
+            .nav-arrow {
+                display: none !important;
+            }
+        }
+
         .graph-date {
             font-size: 0.75rem;
             font-weight: 600;
@@ -613,7 +619,7 @@
             </section>
             
             <div style="font-size: 0.8rem; color: var(--muted); text-align: center; margin-bottom: 20px;">
-                Hover or drag on any graph to synchronously inspect values across all four forecasts.
+                Swipe graph titles (or use chevrons) to change forecast days. Drag on graphs to synchronously inspect timelines.
             </div>
         </div>
 
