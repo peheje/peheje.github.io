@@ -161,6 +161,31 @@ async function fetchWeather(lat, lon) {
 
   const data = await response.json();
 
+  // Merge timeseries from old cache if available to preserve history of today's past hours
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      const oldTimeseries = parsed.data?.properties?.timeseries || [];
+      const newTimeseries = data.properties?.timeseries || [];
+
+      const timeMap = new Map();
+      oldTimeseries.forEach(item => {
+        timeMap.set(item.time, item);
+      });
+      newTimeseries.forEach(item => {
+        timeMap.set(item.time, item);
+      });
+
+      const mergedList = Array.from(timeMap.values()).sort((a, b) => new Date(a.time) - new Date(b.time));
+
+      // Keep only entries from the last 30 hours to prevent cache bloat
+      const minTime = Date.now() - 30 * 60 * 60 * 1000;
+      data.properties.timeseries = mergedList.filter(item => new Date(item.time).getTime() >= minTime);
+    } catch (err) {
+      console.warn("Error merging cached forecast timeseries:", err);
+    }
+  }
+
   // Save to cache
   const cacheData = {
     timestamp: Date.now(),
