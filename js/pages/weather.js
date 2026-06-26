@@ -252,6 +252,41 @@ function getDailyTimeseries(timeseries, dayIndex) {
   return { data: hoursData, found: hasData };
 }
 
+// Helper to update all prev-day and next-day buttons enabled state
+function updateHeaderArrows() {
+  const prevBtns = document.querySelectorAll(".prev-day");
+  const nextBtns = document.querySelectorAll(".next-day");
+  
+  prevBtns.forEach(btn => {
+    btn.disabled = (activeTab === 0);
+  });
+  nextBtns.forEach(btn => {
+    btn.disabled = (activeTab === 6);
+  });
+}
+
+// Helper to transition active forecast day
+function changeDay(newIndex) {
+  if (newIndex < 0 || newIndex > 6) return;
+  if (activeTab !== newIndex) {
+    activeTab = newIndex;
+    
+    // Update the tabs active class
+    if (dayTabsContainer) {
+      const buttons = dayTabsContainer.querySelectorAll(".curve-tab");
+      buttons.forEach((btn, idx) => {
+        btn.classList.toggle("active", idx === activeTab);
+      });
+    }
+
+    // Sync header navigation arrows
+    updateHeaderArrows();
+
+    hoverHour = null;
+    drawForecastCurves();
+  }
+}
+
 // Render dynamic day selection tabs for next 7 days
 function renderDayTabs() {
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -276,16 +311,7 @@ function renderDayTabs() {
     buttons.forEach(btn => {
       btn.addEventListener("click", () => {
         const i = parseInt(btn.getAttribute("data-index"), 10);
-        if (activeTab !== i) {
-          activeTab = i;
-          
-          buttons.forEach((t, idx) => {
-            t.classList.toggle("active", idx === i);
-          });
-
-          hoverHour = null;
-          drawForecastCurves();
-        }
+        changeDay(i);
       });
     });
   }
@@ -415,6 +441,9 @@ function updateDashboardUI(data) {
 
   // Draw forecast canvases
   drawForecastCurves();
+
+  // Sync header navigation arrows
+  updateHeaderArrows();
 }
 
 // Draw all forecast curves simultaneously
@@ -981,6 +1010,52 @@ function setupTabs() {
   // Tabs are dynamically handled inside renderDayTabs
 }
 
+// Setup Graph Headers and swipe navigation
+function setupHeaderNavigation() {
+  const headers = document.querySelectorAll(".graph-header");
+  headers.forEach(header => {
+    const prevBtn = header.querySelector(".prev-day");
+    const nextBtn = header.querySelector(".next-day");
+
+    if (prevBtn) {
+      prevBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        changeDay(activeTab - 1);
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        changeDay(activeTab + 1);
+      });
+    }
+
+    // Touch swipe gesture handling on header
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    header.addEventListener("touchstart", (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    header.addEventListener("touchend", (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      
+      const threshold = 40; // minimum swipe distance in pixels
+      if (touchEndX < touchStartX - threshold) {
+        // Swiped left -> Next Day
+        changeDay(activeTab + 1);
+      } else if (touchEndX > touchStartX + threshold) {
+        // Swiped right -> Previous Day
+        changeDay(activeTab - 1);
+      }
+    }, { passive: true });
+  });
+
+  updateHeaderArrows();
+}
+
 // Initialize Page
 function initWeatherPage() {
   // Mount the site layout shell
@@ -994,6 +1069,9 @@ function initWeatherPage() {
 
   // Setup tab switches
   setupTabs();
+
+  // Setup header chevron click and swipe day navigation
+  setupHeaderNavigation();
 
   // GPS Click handler
   locationBtn.addEventListener("click", getGPSLocation);

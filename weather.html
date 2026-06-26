@@ -394,6 +394,45 @@
             animation: spin 1s linear infinite;
         }
 
+        .graph-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            user-select: none;
+            touch-action: pan-y;
+        }
+
+        .graph-header .curve-title {
+            margin: 0 !important;
+            flex: 1;
+            text-align: center;
+        }
+
+        .nav-arrow {
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s ease, opacity 0.15s ease;
+            box-shadow: none;
+        }
+
+        .nav-arrow:hover:not(:disabled) {
+            color: var(--accent);
+        }
+
+        .nav-arrow:disabled {
+            opacity: 0.25;
+            cursor: not-allowed;
+        }
+
         .error-message {
             color: var(--danger);
             background: var(--notice-bg);
@@ -497,7 +536,11 @@
             <section class="graphs-grid margin-bottom-10">
                 <!-- Temperature curve card -->
                 <div class="inline-block">
-                    <h4 class="curve-title" style="margin-bottom: 10px;">Temperature Curve (&deg;C)</h4>
+                    <div class="graph-header">
+                        <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
+                        <h4 class="curve-title">Temperature Curve (&deg;C)</h4>
+                        <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
+                    </div>
                     <div class="canvas-container">
                         <canvas id="temp-canvas"></canvas>
                     </div>
@@ -505,7 +548,11 @@
 
                 <!-- Rain bar card -->
                 <div class="inline-block">
-                    <h4 class="curve-title" style="margin-bottom: 10px;">Precipitation Bars (mm)</h4>
+                    <div class="graph-header">
+                        <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
+                        <h4 class="curve-title">Precipitation Bars (mm)</h4>
+                        <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
+                    </div>
                     <div class="canvas-container">
                         <canvas id="rain-canvas"></canvas>
                     </div>
@@ -513,7 +560,11 @@
 
                 <!-- UV Index curve card -->
                 <div class="inline-block">
-                    <h4 class="curve-title" style="margin-bottom: 10px;">UV Index Curve</h4>
+                    <div class="graph-header">
+                        <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
+                        <h4 class="curve-title">UV Index Curve</h4>
+                        <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
+                    </div>
                     <div class="canvas-container">
                         <canvas id="uv-canvas"></canvas>
                     </div>
@@ -521,7 +572,11 @@
 
                 <!-- Wind Speed & Direction card -->
                 <div class="inline-block">
-                    <h4 class="curve-title" style="margin-bottom: 10px;">Wind Speed & Direction (m/s)</h4>
+                    <div class="graph-header">
+                        <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
+                        <h4 class="curve-title">Wind Speed & Direction (m/s)</h4>
+                        <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
+                    </div>
                     <div class="canvas-container">
                         <canvas id="wind-canvas"></canvas>
                     </div>
