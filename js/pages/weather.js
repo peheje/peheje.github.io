@@ -1257,8 +1257,11 @@ function setupHeaderContextMenu() {
       }, 600); // 600ms threshold
     }, { passive: true });
 
-    header.addEventListener("touchend", () => {
+    header.addEventListener("touchend", (e) => {
       clearTimeout(touchTimer);
+      if (didTriggerLongPress) {
+        e.preventDefault();
+      }
     });
 
     header.addEventListener("touchmove", () => {
@@ -1289,7 +1292,7 @@ function showContextMenu(x, y, card) {
 
   // Move Up Button
   const btnUp = document.createElement("button");
-  btnUp.textContent = "Up";
+  btnUp.textContent = "↑ Up";
   if (index === 0) {
     btnUp.disabled = true;
   } else {
@@ -1305,7 +1308,7 @@ function showContextMenu(x, y, card) {
 
   // Move Down Button
   const btnDown = document.createElement("button");
-  btnDown.textContent = "Down";
+  btnDown.textContent = "↓ Down";
   if (index === cardsArray.length - 1) {
     btnDown.disabled = true;
   } else {
@@ -1331,11 +1334,15 @@ function showContextMenu(x, y, card) {
   });
   menu.appendChild(btnToggle);
 
-  // Position the menu
+  // Position the menu relative to the header to lock its placement
+  const header = card.querySelector(".graph-header");
+  const rect = header ? header.getBoundingClientRect() : { left: x, top: y, width: 0, height: 0, bottom: y };
+  
   const menuWidth = 120;
   const menuHeight = 110;
-  let left = x;
-  let top = y;
+  
+  let left = rect.left + rect.width / 2 - menuWidth / 2;
+  let top = rect.bottom + 5;
 
   if (left + menuWidth > window.innerWidth) {
     left = window.innerWidth - menuWidth - 10;
@@ -1344,7 +1351,7 @@ function showContextMenu(x, y, card) {
     left = 10;
   }
   if (top + menuHeight > window.innerHeight) {
-    top = window.innerHeight - menuHeight - 10;
+    top = rect.top - menuHeight - 5;
   }
   if (top < 10) {
     top = 10;
