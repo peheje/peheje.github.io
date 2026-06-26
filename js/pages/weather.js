@@ -547,6 +547,7 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
 
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
   const newWidth = Math.floor(rect.width * dpr);
   const newHeight = Math.floor(rect.height * dpr);
 
@@ -1148,10 +1149,142 @@ function setupHeaderNavigation() {
   updateHeaderArrows();
 }
 
+// Save current graph cards layout order to LocalStorage
+function saveLayoutOrder() {
+  const cards = Array.from(document.querySelectorAll(".graphs-grid .graph-card"));
+  const order = cards.map(c => c.getAttribute("data-key"));
+  localStorage.setItem("weather_graphs_order", JSON.stringify(order));
+}
+
+// Restore saved graph cards layout order from LocalStorage
+function restoreLayoutOrder() {
+  const stored = localStorage.getItem("weather_graphs_order");
+  if (stored) {
+    try {
+      const order = JSON.parse(stored);
+      const container = document.querySelector(".graphs-grid");
+      if (!container) return;
+      const cards = Array.from(container.querySelectorAll(".graph-card"));
+      const cardMap = new Map(cards.map(c => [c.getAttribute("data-key"), c]));
+      
+      order.forEach(key => {
+        const card = cardMap.get(key);
+        if (card) {
+          container.appendChild(card);
+        }
+      });
+      // Append any remaining cards that weren't in the saved order list
+      cards.forEach(card => {
+        if (!order.includes(card.getAttribute("data-key"))) {
+          container.appendChild(card);
+        }
+      });
+    } catch (e) {
+      console.warn("Failed to restore layout order:", e);
+    }
+  }
+}
+
+// Save minimized states of graph cards to LocalStorage
+function saveMinimizedStates() {
+  const states = {};
+  document.querySelectorAll(".graphs-grid .graph-card").forEach(card => {
+    const key = card.getAttribute("data-key");
+    states[key] = card.classList.contains("minimized");
+  });
+  localStorage.setItem("weather_graphs_minimized", JSON.stringify(states));
+}
+
+// Restore minimized states of graph cards from LocalStorage
+function restoreMinimizedStates() {
+  const stored = localStorage.getItem("weather_graphs_minimized");
+  if (stored) {
+    try {
+      const states = JSON.parse(stored);
+      document.querySelectorAll(".graphs-grid .graph-card").forEach(card => {
+        const key = card.getAttribute("data-key");
+        if (states[key]) {
+          card.classList.add("minimized");
+          const toggleBtn = card.querySelector(".toggle-btn");
+          if (toggleBtn) {
+            toggleBtn.innerHTML = "&#9660;"; // Caret down
+            toggleBtn.setAttribute("aria-label", "Expand Card");
+          }
+        }
+      });
+    } catch (e) {
+      console.warn("Failed to restore minimized states:", e);
+    }
+  }
+}
+
+// Setup click event handlers for minimize/expand buttons
+function setupMinimizeButtons() {
+  document.querySelectorAll(".graphs-grid .graph-card").forEach(card => {
+    const toggleBtn = card.querySelector(".toggle-btn");
+    if (!toggleBtn) return;
+    
+    toggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isMinimized = card.classList.toggle("minimized");
+      toggleBtn.innerHTML = isMinimized ? "&#9660;" : "&#9650;";
+      toggleBtn.setAttribute("aria-label", isMinimized ? "Expand Card" : "Minimize Card");
+      saveMinimizedStates();
+      // Redraw canvases to adjust to visibility changes
+      drawForecastCurves();
+    });
+  });
+}
+
+// Setup HTML5 Drag and Drop event handlers for graph cards
+function setupDragAndDrop() {
+  const cards = document.querySelectorAll(".graphs-grid .graph-card");
+  cards.forEach(card => {
+    card.addEventListener("dragstart", (e) => {
+      // Allow drag only if started on the header and not on any buttons inside it
+      const isHeader = e.target.closest(".graph-header");
+      const isButton = e.target.closest("button");
+      if (!isHeader || isButton) {
+        e.preventDefault();
+        return;
+      }
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", card.getAttribute("data-key"));
+      card.classList.add("dragging");
+    });
+
+    card.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      const draggingCard = document.querySelector(".graph-card.dragging");
+      if (!draggingCard || draggingCard === card) return;
+
+      const rect = card.getBoundingClientRect();
+      const width = rect.width || 1;
+      const height = rect.height || 1;
+      const isAfter = (e.clientY - rect.top) / height > 0.5 || (e.clientX - rect.left) / width > 0.5;
+      const parent = card.parentNode;
+      
+      parent.insertBefore(draggingCard, isAfter ? card.nextSibling : card);
+    });
+
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      saveLayoutOrder();
+      drawForecastCurves();
+    });
+  });
+}
+
 // Initialize Page
 function initWeatherPage() {
   // Mount the site layout shell
   mountSiteShell();
+
+  // Restore layout order & minimized states
+  restoreLayoutOrder();
+  restoreMinimizedStates();
+  setupMinimizeButtons();
+  setupDragAndDrop();
 
   // Load last stored location if any
   loadStoredLocation();
