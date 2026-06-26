@@ -39,6 +39,7 @@ const dayTabsContainer = document.getElementById("day-tabs");
 const uvCanvas = document.getElementById("uv-canvas");
 const tempCanvas = document.getElementById("temp-canvas");
 const rainCanvas = document.getElementById("rain-canvas");
+const windCanvas = document.getElementById("wind-canvas");
 
 // WHO UV Levels config
 const UV_LEVELS = [
@@ -74,6 +75,12 @@ function getWeatherInfo(symbolCode) {
   if (!symbolCode) return { emoji: "☀️", desc: "Clear Sky" };
   const cleanCode = symbolCode.split("_")[0];
   return WEATHER_SYMBOLS[cleanCode] || { emoji: "⛅", desc: cleanCode.replace(/([A-Z])/g, ' $1') };
+}
+
+function getWindDirectionLabel(deg) {
+  const directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  const val = Math.floor((deg / 22.5) + 0.5);
+  return directions[val % 16];
 }
 
 // Helper to format local YYYY-MM-DD
@@ -176,7 +183,9 @@ function getDailyTimeseries(timeseries, dayIndex) {
     uv: 0,
     temp: null,
     symbol: null,
-    rain: 0
+    rain: 0,
+    windSpeed: 0,
+    windDir: 0
   }));
 
   let hasData = false;
@@ -191,6 +200,8 @@ function getDailyTimeseries(timeseries, dayIndex) {
       hoursData[hr].temp = details.air_temperature;
       hoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || null;
       hoursData[hr].rain = item.data.next_1_hours?.details?.precipitation_amount || 0;
+      hoursData[hr].windSpeed = details.wind_speed || 0;
+      hoursData[hr].windDir = details.wind_from_direction || 0;
       hasData = true;
     }
   });
@@ -206,7 +217,9 @@ function getDailyTimeseries(timeseries, dayIndex) {
       uv: 0,
       temp: null,
       symbol: null,
-      rain: 0
+      rain: 0,
+      windSpeed: 0,
+      windDir: 0
     }));
 
     timeseries.forEach(item => {
@@ -218,6 +231,8 @@ function getDailyTimeseries(timeseries, dayIndex) {
         tomorrowHoursData[hr].temp = details.air_temperature;
         tomorrowHoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || null;
         tomorrowHoursData[hr].rain = item.data.next_1_hours?.details?.precipitation_amount || 0;
+        tomorrowHoursData[hr].windSpeed = details.wind_speed || 0;
+        tomorrowHoursData[hr].windDir = details.wind_from_direction || 0;
       }
     });
 
@@ -228,6 +243,8 @@ function getDailyTimeseries(timeseries, dayIndex) {
         h.temp = tomorrowHoursData[h.hour].temp;
         h.symbol = tomorrowHoursData[h.hour].symbol;
         h.rain = tomorrowHoursData[h.hour].rain;
+        h.windSpeed = tomorrowHoursData[h.hour].windSpeed;
+        h.windDir = tomorrowHoursData[h.hour].windDir;
       }
     });
   }
@@ -280,6 +297,7 @@ function calculateGlobalLimits(timeseries) {
   let minTemp = Infinity;
   let maxTemp = -Infinity;
   let maxRain = 0;
+  let maxWind = 0;
 
   timeseries.forEach(item => {
     const details = item.data.instant.details;
@@ -292,6 +310,9 @@ function calculateGlobalLimits(timeseries) {
         if (temp < minTemp) minTemp = temp;
         if (temp > maxTemp) maxTemp = temp;
       }
+
+      const wind = details.wind_speed || 0;
+      if (wind > maxWind) maxWind = wind;
     }
 
     const rain = item.data.next_1_hours?.details?.precipitation_amount || 0;
@@ -305,7 +326,8 @@ function calculateGlobalLimits(timeseries) {
     uvMax: maxUV,
     tempMin: minTemp,
     tempMax: maxTemp,
-    rainMax: maxRain
+    rainMax: maxRain,
+    windMax: maxWind
   };
 }
 
@@ -395,7 +417,7 @@ function updateDashboardUI(data) {
   drawForecastCurves();
 }
 
-// Draw all three forecast curves simultaneously
+// Draw all forecast curves simultaneously
 function drawForecastCurves() {
   if (!forecastData) return;
 
@@ -406,6 +428,7 @@ function drawForecastCurves() {
   drawSingleCurve(uvCanvas, "uv", dayPoints);
   drawSingleCurve(tempCanvas, "temp", dayPoints);
   drawSingleCurve(rainCanvas, "rain", dayPoints);
+  drawSingleCurve(windCanvas, "wind", dayPoints);
 }
 
 // Canvas rendering helper for a single curve parameters
@@ -490,6 +513,15 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     for (let i = 0; i <= 4; i++) {
       gridLevels.push(Math.round((i * step) * 10) / 10);
     }
+  } else if (paramType === "wind") {
+    const maxVal = globalLimits ? globalLimits.windMax : Math.max(...dayPoints.map(p => p.windSpeed), 0);
+    minScaleY = 0;
+    maxScaleY = Math.max(5, Math.ceil(maxVal / 5) * 5);
+    const range = maxScaleY - minScaleY;
+    const step = range > 15 ? 5 : 2.5;
+    for (let val = minScaleY; val <= maxScaleY; val += step) {
+      gridLevels.push(val);
+    }
   }
 
   // Coordinate converter helpers
@@ -541,6 +573,7 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     if (paramType === "uv") val = p.uv;
     else if (paramType === "temp") val = p.temp;
     else if (paramType === "rain") val = p.rain;
+    else if (paramType === "wind") val = p.windSpeed;
 
     return {
       x: getX(p.hour),
@@ -549,6 +582,8 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
       uv: p.uv,
       temp: p.temp,
       rain: p.rain,
+      windSpeed: p.windSpeed,
+      windDir: p.windDir,
       hour: p.hour,
       symbol: p.symbol
     };
@@ -588,6 +623,9 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     if (paramType === "uv") {
       fillGrad.addColorStop(0, "rgba(232, 160, 69, 0.35)");
       fillGrad.addColorStop(1, "rgba(232, 160, 69, 0.0)");
+    } else if (paramType === "wind") {
+      fillGrad.addColorStop(0, "rgba(0, 245, 212, 0.25)");
+      fillGrad.addColorStop(1, "rgba(0, 245, 212, 0.0)");
     } else { // temp
       fillGrad.addColorStop(0, "rgba(212, 90, 90, 0.3)"); // Reddish tint
       fillGrad.addColorStop(1, "rgba(212, 90, 90, 0.0)");
@@ -617,6 +655,9 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     if (paramType === "uv") {
       lineGrad.addColorStop(0, accentColor);
       lineGrad.addColorStop(1, accent2Color);
+    } else if (paramType === "wind") {
+      lineGrad.addColorStop(0, "#00f5d4");
+      lineGrad.addColorStop(1, "#00bbf9");
     } else { // temp
       lineGrad.addColorStop(0, "#38d4ff"); // Cool blue on left (night)
       lineGrad.addColorStop(0.5, accentColor); // Warm midday
@@ -641,6 +682,43 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
     ctx.stroke();
     ctx.restore();
+
+    // 4b. Draw wind direction arrows at 3-hour intervals
+    if (paramType === "wind") {
+      ctx.save();
+      ctx.fillStyle = textColor;
+      ctx.strokeStyle = textColor;
+      ctx.lineWidth = 1.5;
+      
+      points.forEach(p => {
+        if (p.hour % 3 === 0) {
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          
+          ctx.beginPath();
+          ctx.arc(0, 0, 2, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          const rad = (p.windDir + 90) * Math.PI / 180;
+          ctx.rotate(rad);
+          
+          const shaftLength = 12;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(shaftLength, 0);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(shaftLength - 4, -3);
+          ctx.lineTo(shaftLength, 0);
+          ctx.lineTo(shaftLength - 4, 3);
+          ctx.stroke();
+          
+          ctx.restore();
+        }
+      });
+      ctx.restore();
+    }
   }
 
   // 5. Current hour vertical line indicator
@@ -692,7 +770,7 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
 
       // Hover highlighted dot
       ctx.save();
-      ctx.fillStyle = paramType === "rain" ? "#38d4ff" : (paramType === "temp" ? "#ff6b8b" : accentColor);
+      ctx.fillStyle = paramType === "rain" ? "#38d4ff" : (paramType === "temp" ? "#ff6b8b" : (paramType === "wind" ? "#00f5d4" : accentColor));
       ctx.strokeStyle = textColor;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -722,6 +800,11 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
         boxColor = "#38d4ff";
         tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
         tooltipLines.push(`Rain: ${hp.rain !== null ? hp.rain.toFixed(1) : "0.0"} mm`);
+      } else if (paramType === "wind") {
+        boxColor = "#00f5d4";
+        tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
+        tooltipLines.push(`Wind: ${hp.windSpeed.toFixed(1)} m/s`);
+        tooltipLines.push(`Direction: ${getWindDirectionLabel(hp.windDir)} (${hp.windDir}\u00B0)`);
       }
 
       ctx.font = "bold 11px sans-serif";
@@ -948,7 +1031,7 @@ function initWeatherPage() {
   window.addEventListener("resize", drawForecastCurves);
 
   // Bind synced mouse/touch event listeners across all canvases
-  [uvCanvas, tempCanvas, rainCanvas].forEach(canvas => {
+  [uvCanvas, tempCanvas, rainCanvas, windCanvas].forEach(canvas => {
     if (!canvas) return;
     canvas.addEventListener("mousemove", handleCanvasHover);
     canvas.addEventListener("mouseleave", handleCanvasLeave);

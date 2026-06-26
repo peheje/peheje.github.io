@@ -81,9 +81,14 @@
             grid-template-columns: 1fr;
             gap: 14px;
         }
-        @media (min-width: 900px) {
+        @media (min-width: 768px) {
             .graphs-grid {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (min-width: 1200px) {
+            .graphs-grid {
+                grid-template-columns: repeat(4, 1fr);
             }
         }
 
@@ -513,10 +518,18 @@
                         <canvas id="uv-canvas"></canvas>
                     </div>
                 </div>
+
+                <!-- Wind Speed & Direction card -->
+                <div class="inline-block">
+                    <h4 class="curve-title" style="margin-bottom: 10px;">Wind Speed & Direction (m/s)</h4>
+                    <div class="canvas-container">
+                        <canvas id="wind-canvas"></canvas>
+                    </div>
+                </div>
             </section>
             
             <div style="font-size: 0.8rem; color: var(--muted); text-align: center; margin-bottom: 20px;">
-                Hover or drag on any graph to synchronously inspect values across all three forecasts.
+                Hover or drag on any graph to synchronously inspect values across all four forecasts.
             </div>
         </div>
 
