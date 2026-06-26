@@ -1223,16 +1223,33 @@ function setupHeaderContextMenu() {
 
     let touchTimer = null;
     let didTriggerLongPress = false;
+    let touchStartX = 0;
+    let touchStartY = 0;
 
     const handleTrigger = (x, y) => {
       showContextMenu(x, y, card);
     };
 
-    // Right-click for desktop
+    // Reset long press flag on desktop mousedown
+    header.addEventListener("mousedown", () => {
+      didTriggerLongPress = false;
+    });
+
+    // Right-click for desktop (and some mobile native long-press)
     header.addEventListener("contextmenu", (e) => {
       const isButton = e.target.closest("button");
       if (isButton) return;
       e.preventDefault();
+      
+      const isTouch = (touchTimer !== null);
+      clearTimeout(touchTimer); // Prevent the custom touch timer from firing if native contextmenu fired first
+      touchTimer = null;
+
+      if (didTriggerLongPress) return; // Prevent double trigger
+      
+      if (isTouch) {
+        didTriggerLongPress = true;
+      }
       handleTrigger(e.clientX, e.clientY);
     });
 
@@ -1245,31 +1262,45 @@ function setupHeaderContextMenu() {
       clearTimeout(touchTimer);
       
       const touch = e.touches[0];
-      const clientX = touch.clientX;
-      const clientY = touch.clientY;
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
 
       touchTimer = setTimeout(() => {
+        if (didTriggerLongPress) return;
         didTriggerLongPress = true;
         if (navigator.vibrate) {
-          navigator.vibrate(50);
+          try { navigator.vibrate(50); } catch(err) {}
         }
-        handleTrigger(clientX, clientY);
+        handleTrigger(touchStartX, touchStartY);
       }, 600); // 600ms threshold
     }, { passive: true });
 
     header.addEventListener("touchend", (e) => {
       clearTimeout(touchTimer);
+      touchTimer = null;
       if (didTriggerLongPress) {
-        e.preventDefault();
+        if (e.cancelable !== false) {
+          e.preventDefault();
+        }
+        didTriggerLongPress = false;
       }
     });
 
-    header.addEventListener("touchmove", () => {
-      clearTimeout(touchTimer);
+    header.addEventListener("touchmove", (e) => {
+      if (didTriggerLongPress) return;
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - touchStartX);
+      const dy = Math.abs(touch.clientY - touchStartY);
+      // Cancel timer if finger moves significantly
+      if (dx > 15 || dy > 15) {
+        clearTimeout(touchTimer);
+        touchTimer = null;
+      }
     });
 
     header.addEventListener("touchcancel", () => {
       clearTimeout(touchTimer);
+      touchTimer = null;
     });
   });
 }
@@ -1362,16 +1393,18 @@ function showContextMenu(x, y, card) {
 
   document.body.appendChild(menu);
 
-  // Close menu on click outside
+  // Close menu on click or touch outside
   const closeMenu = (e) => {
     if (!menu.contains(e.target)) {
       menu.remove();
+      document.removeEventListener("pointerdown", closeMenu);
       document.removeEventListener("click", closeMenu);
       document.removeEventListener("contextmenu", closeMenu);
     }
   };
 
   setTimeout(() => {
+    document.addEventListener("pointerdown", closeMenu);
     document.addEventListener("click", closeMenu);
     document.addEventListener("contextmenu", closeMenu);
   }, 0);
