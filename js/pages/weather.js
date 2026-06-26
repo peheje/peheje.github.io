@@ -145,6 +145,7 @@ async function fetchWeather(lat, lon) {
       const parsed = JSON.parse(cached);
       const age = Date.now() - parsed.timestamp;
       if (age < CACHE_EXPIRY_MS) {
+        parsed.data.lastUpdated = parsed.timestamp;
         return parsed.data;
       }
     } catch (err) {
@@ -193,6 +194,7 @@ async function fetchWeather(lat, lon) {
   };
   localStorage.setItem(cacheKey, JSON.stringify(cacheData));
 
+  data.lastUpdated = cacheData.timestamp;
   return data;
 }
 
@@ -512,6 +514,17 @@ function updateDashboardUI(data) {
 
   // Sync header navigation dates
   updateHeaderDates();
+
+  // Update last-updated timestamp
+  if (data.lastUpdated) {
+    const lastUpdatedEl = document.getElementById("last-updated");
+    if (lastUpdatedEl) {
+      const date = new Date(data.lastUpdated);
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      lastUpdatedEl.textContent = `Updated: ${hours}:${minutes}`;
+    }
+  }
 }
 
 // Draw all forecast curves simultaneously
@@ -976,9 +989,11 @@ function handleCanvasLeave() {
 }
 
 // Fetch forecast and refresh page
-async function loadWeatherData(lat, lon, name) {
+async function loadWeatherData(lat, lon, name, silent = false) {
   showError("");
-  setLoaderState(true);
+  if (!silent) {
+    setLoaderState(true);
+  }
   try {
     forecastData = await fetchWeather(lat, lon);
     
@@ -988,7 +1003,9 @@ async function loadWeatherData(lat, lon, name) {
     locationDisplay.textContent = name;
     coordinatesDisplay.textContent = `(${lat.toFixed(2)}, ${lon.toFixed(2)})`;
 
-    setLoaderState(false);
+    if (!silent) {
+      setLoaderState(false);
+    }
     updateDashboardUI(forecastData);
   } catch (err) {
     console.error(err);
@@ -1199,6 +1216,26 @@ function initWeatherPage() {
     drawForecastCurves();
   });
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+
+  // Periodically check if forecast is stale (every 5 minutes)
+  setInterval(() => {
+    if (document.visibilityState === "visible" && forecastData && forecastData.lastUpdated) {
+      const age = Date.now() - forecastData.lastUpdated;
+      if (age >= CACHE_EXPIRY_MS) {
+        loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true);
+      }
+    }
+  }, 5 * 60 * 1000);
+
+  // Refresh when user returns to the tab
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && forecastData && forecastData.lastUpdated) {
+      const age = Date.now() - forecastData.lastUpdated;
+      if (age >= CACHE_EXPIRY_MS) {
+        loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true);
+      }
+    }
+  });
 }
 
 // Initialize!
