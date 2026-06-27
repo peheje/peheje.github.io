@@ -13,6 +13,7 @@ const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 
 let currentLoc = { ...DEFAULT_LOC };
 let forecastData = null;
+let tideData = null;
 let activeTab = 0; // 0 for Today, 1 for Tomorrow, 2-6 for future days
 let hoverHour = null; // Currently hovered hour on the canvas (0-23)
 
@@ -40,6 +41,7 @@ const uvCanvas = document.getElementById("uv-canvas");
 const tempCanvas = document.getElementById("temp-canvas");
 const rainCanvas = document.getElementById("rain-canvas");
 const windCanvas = document.getElementById("wind-canvas");
+const tideCanvas = document.getElementById("tide-canvas");
 
 // WHO UV Levels config
 const UV_LEVELS = [
@@ -198,6 +200,38 @@ async function fetchWeather(lat, lon) {
   return data;
 }
 
+// Fetch tide data from Open-Meteo Marine API with local caching
+async function fetchTideData(lat, lon) {
+  const cacheKey = `${CACHE_PREFIX}tide_${lat.toFixed(3)}_${lon.toFixed(3)}`;
+  const cached = localStorage.getItem(cacheKey);
+
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      const age = Date.now() - parsed.timestamp;
+      if (age < CACHE_EXPIRY_MS) {
+        return parsed.data;
+      }
+    } catch (err) {
+      console.warn("Cached tide parsing error:", err);
+    }
+  }
+
+  const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=sea_level_height_msl`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Open-Meteo Marine API returned status ${response.status}`);
+  }
+
+  const data = await response.json();
+  const cacheData = {
+    timestamp: Date.now(),
+    data: data
+  };
+  localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+  return data;
+}
+
 // Get the weather timeseries data grouped for Today, Tomorrow, or future days
 function getDailyTimeseries(timeseries, dayIndex) {
   const targetDate = new Date();
@@ -274,6 +308,42 @@ function getDailyTimeseries(timeseries, dayIndex) {
         h.windDir = tomorrowHoursData[h.hour].windDir;
       }
     });
+  }
+
+  return { data: hoursData, found: hasData };
+}
+
+// Extract tide points for the target forecast day
+function getDailyTideSeries(tideData, dayIndex) {
+  if (!tideData || !tideData.hourly) {
+    return { data: null, found: false };
+  }
+
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + dayIndex);
+  const targetStr = getLocalDateString(targetDate);
+
+  const hoursData = Array.from({ length: 24 }, (_, i) => ({
+    hour: i,
+    value: null
+  }));
+
+  let hasData = false;
+  const times = tideData.hourly.time;
+  const values = tideData.hourly.sea_level_height_msl;
+
+  for (let i = 0; i < times.length; i++) {
+    // Append 'Z' to parse Open-Meteo GMT time as UTC, converting to browser local time
+    const itemDate = new Date(times[i] + 'Z');
+    const dateStr = getLocalDateString(itemDate);
+    if (dateStr === targetStr) {
+      const hr = itemDate.getHours();
+      const val = values[i];
+      if (val !== null && val !== undefined) {
+        hoursData[hr].value = val * 100; // convert meters to centimeters
+        hasData = true;
+      }
+    }
   }
 
   return { data: hoursData, found: hasData };
@@ -539,10 +609,13 @@ function drawForecastCurves() {
   drawSingleCurve(tempCanvas, "temp", dayPoints);
   drawSingleCurve(rainCanvas, "rain", dayPoints);
   drawSingleCurve(windCanvas, "wind", dayPoints);
+
+  const { data: tidePoints, found: tideFound } = getDailyTideSeries(tideData, activeTab);
+  drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
 }
 
 // Canvas rendering helper for a single curve parameters
-function drawSingleCurve(canvas, paramType, dayPoints) {
+function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   if (!canvas) return;
 
   const dpr = window.devicePixelRatio || 1;
@@ -575,6 +648,18 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
   const accent2Color = computedStyle.getPropertyValue("--accent-2").trim() || "#d4763a";
 
   ctx.clearRect(0, 0, W, H);
+
+  if (!dataFound || !dayPoints) {
+    ctx.save();
+    ctx.fillStyle = mutedColor;
+    ctx.font = "12px sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.fillText("Tide data is only available for coastal locations", W / 2, H / 2 - 10);
+    ctx.fillText(`No tide data for ${currentLoc.name}`, W / 2, H / 2 + 10);
+    ctx.restore();
+    return;
+  }
 
   // Margins
   const paddingL = 38;
@@ -633,6 +718,20 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     for (let val = minScaleY; val <= maxScaleY; val += step) {
       gridLevels.push(val);
     }
+  } else if (paramType === "tide") {
+    const tides = dayPoints.map(p => p.value).filter(v => v !== null);
+    const minTide = tides.length ? Math.min(...tides) : -100;
+    const maxTide = tides.length ? Math.max(...tides) : 100;
+    const range = maxTide - minTide;
+    const step = range > 150 ? 50 : 25;
+    minScaleY = Math.floor(minTide / step) * step;
+    maxScaleY = Math.ceil(maxTide / step) * step;
+    if (minScaleY === maxScaleY) {
+      maxScaleY += step;
+    }
+    for (let val = minScaleY; val <= maxScaleY; val += step) {
+      gridLevels.push(val);
+    }
   }
 
   // Coordinate converter helpers
@@ -679,12 +778,13 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
   ctx.restore();
 
   // Build coordinate points, filtering out entries that do not have forecast data (like past hours, or missing intermediate hours on later days)
-  const points = dayPoints.filter(p => p.temp !== null).map(p => {
+  const points = dayPoints.filter(p => (paramType === "tide" ? p.value !== null : p.temp !== null)).map(p => {
     let val = 0;
     if (paramType === "uv") val = p.uv;
     else if (paramType === "temp") val = p.temp;
     else if (paramType === "rain") val = p.rain;
     else if (paramType === "wind") val = p.windSpeed;
+    else if (paramType === "tide") val = p.value;
 
     return {
       x: getX(p.hour),
@@ -696,7 +796,8 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
       windSpeed: p.windSpeed,
       windDir: p.windDir,
       hour: p.hour,
-      symbol: p.symbol
+      symbol: p.symbol,
+      tideValue: p.value
     };
   });
 
@@ -737,6 +838,9 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     } else if (paramType === "wind") {
       fillGrad.addColorStop(0, "rgba(0, 245, 212, 0.25)");
       fillGrad.addColorStop(1, "rgba(0, 245, 212, 0.0)");
+    } else if (paramType === "tide") {
+      fillGrad.addColorStop(0, "rgba(0, 180, 216, 0.25)");
+      fillGrad.addColorStop(1, "rgba(0, 180, 216, 0.0)");
     } else { // temp
       fillGrad.addColorStop(0, "rgba(212, 90, 90, 0.3)"); // Reddish tint
       fillGrad.addColorStop(1, "rgba(212, 90, 90, 0.0)");
@@ -769,6 +873,9 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
     } else if (paramType === "wind") {
       lineGrad.addColorStop(0, "#00f5d4");
       lineGrad.addColorStop(1, "#00bbf9");
+    } else if (paramType === "tide") {
+      lineGrad.addColorStop(0, "#0077b6");
+      lineGrad.addColorStop(1, "#00f5d4");
     } else { // temp
       lineGrad.addColorStop(0, "#38d4ff"); // Cool blue on left (night)
       lineGrad.addColorStop(0.5, accentColor); // Warm midday
@@ -916,6 +1023,10 @@ function drawSingleCurve(canvas, paramType, dayPoints) {
         tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
         tooltipLines.push(`Wind: ${hp.windSpeed.toFixed(1)} m/s`);
         tooltipLines.push(`Direction: ${getWindDirectionLabel(hp.windDir)} (${hp.windDir}\u00B0)`);
+      } else if (paramType === "tide") {
+        boxColor = "#00b4d8";
+        tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
+        tooltipLines.push(`Tide Level: ${hp.tideValue !== null ? hp.tideValue.toFixed(1) : "--"} cm`);
       }
 
       ctx.font = "bold 11px sans-serif";
@@ -1008,6 +1119,19 @@ async function loadWeatherData(lat, lon, name, silent = false) {
       setLoaderState(false);
     }
     updateDashboardUI(forecastData);
+
+    // Fetch tide data independently in the background
+    tideData = null;
+    fetchTideData(lat, lon).then(data => {
+      tideData = data;
+      const { data: tidePoints, found: tideFound } = getDailyTideSeries(tideData, activeTab);
+      drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
+    }).catch(err => {
+      console.warn("Failed to load tide data in background:", err);
+      tideData = null;
+      drawSingleCurve(tideCanvas, "tide", null, false);
+    });
+
   } catch (err) {
     console.error(err);
     showError(`Error loading weather forecast: ${err.message}. Please check connection.`);
@@ -1468,7 +1592,7 @@ function initWeatherPage() {
   window.addEventListener("resize", drawForecastCurves);
 
   // Bind synced mouse/touch event listeners across all canvases
-  [uvCanvas, tempCanvas, rainCanvas, windCanvas].forEach(canvas => {
+  [uvCanvas, tempCanvas, rainCanvas, windCanvas, tideCanvas].forEach(canvas => {
     if (!canvas) return;
     canvas.addEventListener("mousemove", handleCanvasHover);
     canvas.addEventListener("mouseleave", handleCanvasLeave);
