@@ -245,6 +245,9 @@ function getDailyTimeseries(timeseries, dayIndex) {
     temp: null,
     symbol: null,
     rain: 0,
+    rainMax: 0,
+    rainMin: 0,
+    rainProb: null,
     windSpeed: 0,
     windDir: 0
   }));
@@ -259,8 +262,14 @@ function getDailyTimeseries(timeseries, dayIndex) {
       const details = item.data.instant.details;
       hoursData[hr].uv = details.ultraviolet_index_clear_sky || 0;
       hoursData[hr].temp = details.air_temperature;
-      hoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || null;
-      hoursData[hr].rain = item.data.next_1_hours?.details?.precipitation_amount || 0;
+      hoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || item.data.next_6_hours?.summary?.symbol_code || null;
+      
+      const rainDetails = item.data.next_1_hours?.details || item.data.next_6_hours?.details;
+      hoursData[hr].rain = rainDetails?.precipitation_amount || 0;
+      hoursData[hr].rainMax = rainDetails?.precipitation_amount_max || rainDetails?.precipitation_amount || 0;
+      hoursData[hr].rainMin = rainDetails?.precipitation_amount_min || rainDetails?.precipitation_amount || 0;
+      hoursData[hr].rainProb = rainDetails?.probability_of_precipitation !== undefined ? rainDetails.probability_of_precipitation : null;
+
       hoursData[hr].windSpeed = details.wind_speed || 0;
       hoursData[hr].windDir = details.wind_from_direction || 0;
       hasData = true;
@@ -279,6 +288,9 @@ function getDailyTimeseries(timeseries, dayIndex) {
       temp: null,
       symbol: null,
       rain: 0,
+      rainMax: 0,
+      rainMin: 0,
+      rainProb: null,
       windSpeed: 0,
       windDir: 0
     }));
@@ -290,8 +302,14 @@ function getDailyTimeseries(timeseries, dayIndex) {
         const details = item.data.instant.details;
         tomorrowHoursData[hr].uv = details.ultraviolet_index_clear_sky || 0;
         tomorrowHoursData[hr].temp = details.air_temperature;
-        tomorrowHoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || null;
-        tomorrowHoursData[hr].rain = item.data.next_1_hours?.details?.precipitation_amount || 0;
+        tomorrowHoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || item.data.next_6_hours?.summary?.symbol_code || null;
+        
+        const rainDetails = item.data.next_1_hours?.details || item.data.next_6_hours?.details;
+        tomorrowHoursData[hr].rain = rainDetails?.precipitation_amount || 0;
+        tomorrowHoursData[hr].rainMax = rainDetails?.precipitation_amount_max || rainDetails?.precipitation_amount || 0;
+        tomorrowHoursData[hr].rainMin = rainDetails?.precipitation_amount_min || rainDetails?.precipitation_amount || 0;
+        tomorrowHoursData[hr].rainProb = rainDetails?.probability_of_precipitation !== undefined ? rainDetails.probability_of_precipitation : null;
+
         tomorrowHoursData[hr].windSpeed = details.wind_speed || 0;
         tomorrowHoursData[hr].windDir = details.wind_from_direction || 0;
       }
@@ -304,6 +322,9 @@ function getDailyTimeseries(timeseries, dayIndex) {
         h.temp = tomorrowHoursData[h.hour].temp;
         h.symbol = tomorrowHoursData[h.hour].symbol;
         h.rain = tomorrowHoursData[h.hour].rain;
+        h.rainMax = tomorrowHoursData[h.hour].rainMax;
+        h.rainMin = tomorrowHoursData[h.hour].rainMin;
+        h.rainProb = tomorrowHoursData[h.hour].rainProb;
         h.windSpeed = tomorrowHoursData[h.hour].windSpeed;
         h.windDir = tomorrowHoursData[h.hour].windDir;
       }
@@ -478,7 +499,8 @@ function calculateGlobalLimits(timeseries) {
       if (wind > maxWind) maxWind = wind;
     }
 
-    const rain = item.data.next_1_hours?.details?.precipitation_amount || 0;
+    const rainDetails = item.data.next_1_hours?.details || item.data.next_6_hours?.details;
+    const rain = rainDetails?.precipitation_amount_max || rainDetails?.precipitation_amount || 0;
     if (rain > maxRain) maxRain = rain;
   });
 
@@ -793,6 +815,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       uv: p.uv,
       temp: p.temp,
       rain: p.rain,
+      rainMax: p.rainMax,
+      rainMin: p.rainMin,
+      rainProb: p.rainProb,
       windSpeed: p.windSpeed,
       windDir: p.windDir,
       hour: p.hour,
@@ -824,6 +849,37 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       if (barH > 0.5) {
         ctx.fillRect(p.x - barW / 2, y1, barW, barH);
         ctx.strokeRect(p.x - barW / 2, y1, barW, barH);
+      }
+
+      // Draw uncertainty error bars (whiskers) if rainMax is greater than rain
+      if (p.rainMax !== undefined && p.rainMax > p.rain) {
+        const yMax = getY(p.rainMax);
+        const yMin = getY(p.rainMin || 0);
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(56, 178, 255, 0.6)"; // semi-transparent blue for uncertainty
+        ctx.lineWidth = 1.5;
+        
+        // Vertical line
+        ctx.beginPath();
+        ctx.moveTo(p.x, yMin);
+        ctx.lineTo(p.x, yMax);
+        ctx.stroke();
+
+        // Top horizontal cap
+        ctx.beginPath();
+        ctx.moveTo(p.x - 3, yMax);
+        ctx.lineTo(p.x + 3, yMax);
+        ctx.stroke();
+
+        // Bottom horizontal cap (only if not at baseline)
+        if (yMin < y0 - 1) {
+          ctx.beginPath();
+          ctx.moveTo(p.x - 3, yMin);
+          ctx.lineTo(p.x + 3, yMin);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
     });
     ctx.restore();
@@ -1018,6 +1074,12 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         boxColor = "#38d4ff";
         tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
         tooltipLines.push(`Rain: ${hp.rain !== null ? hp.rain.toFixed(1) : "0.0"} mm`);
+        if (hp.rainProb !== null && hp.rainProb !== undefined) {
+          tooltipLines.push(`Chance: ${hp.rainProb}%`);
+        }
+        if (hp.rainMax !== null && hp.rainMax > hp.rain) {
+          tooltipLines.push(`Max likely: ${hp.rainMax.toFixed(1)} mm`);
+        }
       } else if (paramType === "wind") {
         boxColor = "#00f5d4";
         tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
