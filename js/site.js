@@ -179,7 +179,7 @@ function getActiveTheme() {
 }
 
 function getSavedTheme() {
-  return localStorage.getItem("theme") || "";
+  return localStorage.getItem("theme") || "paper";
 }
 
 function setSavedTheme(theme) {
