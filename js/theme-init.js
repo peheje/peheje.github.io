@@ -1,7 +1,7 @@
-const savedTheme = localStorage.getItem("theme");
+const savedTheme = localStorage.getItem("theme") || "paper";
 const themeClasses = {
+  warm: "theme-warm",
   blue: "theme-blue",
-  paper: "theme-paper",
   forest: "theme-forest",
   dusk: "theme-dusk",
 };
