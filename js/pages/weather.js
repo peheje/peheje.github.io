@@ -42,6 +42,7 @@ const tempCanvas = document.getElementById("temp-canvas");
 const rainCanvas = document.getElementById("rain-canvas");
 const windCanvas = document.getElementById("wind-canvas");
 const tideCanvas = document.getElementById("tide-canvas");
+const cloudsCanvas = document.getElementById("clouds-canvas");
 
 // WHO UV Levels config
 const UV_LEVELS = [
@@ -248,6 +249,10 @@ function getDailyTimeseries(timeseries, dayIndex) {
     rainMax: 0,
     rainMin: 0,
     rainProb: null,
+    clouds: 0,
+    cloudsLow: 0,
+    cloudsMid: 0,
+    cloudsHigh: 0,
     windSpeed: 0,
     windDir: 0
   }));
@@ -270,6 +275,11 @@ function getDailyTimeseries(timeseries, dayIndex) {
       hoursData[hr].rainMin = rainDetails?.precipitation_amount_min || rainDetails?.precipitation_amount || 0;
       hoursData[hr].rainProb = rainDetails?.probability_of_precipitation !== undefined ? rainDetails.probability_of_precipitation : null;
 
+      hoursData[hr].clouds = details.cloud_area_fraction !== undefined ? details.cloud_area_fraction : 0;
+      hoursData[hr].cloudsLow = details.cloud_area_fraction_low !== undefined ? details.cloud_area_fraction_low : 0;
+      hoursData[hr].cloudsMid = details.cloud_area_fraction_medium !== undefined ? details.cloud_area_fraction_medium : 0;
+      hoursData[hr].cloudsHigh = details.cloud_area_fraction_high !== undefined ? details.cloud_area_fraction_high : 0;
+
       hoursData[hr].windSpeed = details.wind_speed || 0;
       hoursData[hr].windDir = details.wind_from_direction || 0;
       hasData = true;
@@ -291,6 +301,10 @@ function getDailyTimeseries(timeseries, dayIndex) {
       rainMax: 0,
       rainMin: 0,
       rainProb: null,
+      clouds: 0,
+      cloudsLow: 0,
+      cloudsMid: 0,
+      cloudsHigh: 0,
       windSpeed: 0,
       windDir: 0
     }));
@@ -310,6 +324,11 @@ function getDailyTimeseries(timeseries, dayIndex) {
         tomorrowHoursData[hr].rainMin = rainDetails?.precipitation_amount_min || rainDetails?.precipitation_amount || 0;
         tomorrowHoursData[hr].rainProb = rainDetails?.probability_of_precipitation !== undefined ? rainDetails.probability_of_precipitation : null;
 
+        tomorrowHoursData[hr].clouds = details.cloud_area_fraction !== undefined ? details.cloud_area_fraction : 0;
+        tomorrowHoursData[hr].cloudsLow = details.cloud_area_fraction_low !== undefined ? details.cloud_area_fraction_low : 0;
+        tomorrowHoursData[hr].cloudsMid = details.cloud_area_fraction_medium !== undefined ? details.cloud_area_fraction_medium : 0;
+        tomorrowHoursData[hr].cloudsHigh = details.cloud_area_fraction_high !== undefined ? details.cloud_area_fraction_high : 0;
+
         tomorrowHoursData[hr].windSpeed = details.wind_speed || 0;
         tomorrowHoursData[hr].windDir = details.wind_from_direction || 0;
       }
@@ -325,6 +344,10 @@ function getDailyTimeseries(timeseries, dayIndex) {
         h.rainMax = tomorrowHoursData[h.hour].rainMax;
         h.rainMin = tomorrowHoursData[h.hour].rainMin;
         h.rainProb = tomorrowHoursData[h.hour].rainProb;
+        h.clouds = tomorrowHoursData[h.hour].clouds;
+        h.cloudsLow = tomorrowHoursData[h.hour].cloudsLow;
+        h.cloudsMid = tomorrowHoursData[h.hour].cloudsMid;
+        h.cloudsHigh = tomorrowHoursData[h.hour].cloudsHigh;
         h.windSpeed = tomorrowHoursData[h.hour].windSpeed;
         h.windDir = tomorrowHoursData[h.hour].windDir;
       }
@@ -634,6 +657,7 @@ function drawForecastCurves() {
 
   const { data: tidePoints, found: tideFound } = getDailyTideSeries(tideData, activeTab);
   drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
+  drawSingleCurve(cloudsCanvas, "clouds", dayPoints);
 }
 
 // Canvas rendering helper for a single curve parameters
@@ -754,6 +778,10 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     for (let val = minScaleY; val <= maxScaleY; val += step) {
       gridLevels.push(val);
     }
+  } else if (paramType === "clouds") {
+    minScaleY = 0;
+    maxScaleY = 100;
+    gridLevels = [0, 25, 50, 75, 100];
   }
 
   // Coordinate converter helpers
@@ -807,6 +835,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     else if (paramType === "rain") val = p.rain;
     else if (paramType === "wind") val = p.windSpeed;
     else if (paramType === "tide") val = p.value;
+    else if (paramType === "clouds") val = p.clouds;
 
     return {
       x: getX(p.hour),
@@ -818,6 +847,10 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       rainMax: p.rainMax,
       rainMin: p.rainMin,
       rainProb: p.rainProb,
+      clouds: p.clouds,
+      cloudsLow: p.cloudsLow,
+      cloudsMid: p.cloudsMid,
+      cloudsHigh: p.cloudsHigh,
       windSpeed: p.windSpeed,
       windDir: p.windDir,
       hour: p.hour,
@@ -897,6 +930,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     } else if (paramType === "tide") {
       fillGrad.addColorStop(0, "rgba(0, 180, 216, 0.25)");
       fillGrad.addColorStop(1, "rgba(0, 180, 216, 0.0)");
+    } else if (paramType === "clouds") {
+      fillGrad.addColorStop(0, "rgba(96, 165, 250, 0.25)");
+      fillGrad.addColorStop(1, "rgba(96, 165, 250, 0.0)");
     } else { // temp
       fillGrad.addColorStop(0, "rgba(212, 90, 90, 0.3)"); // Reddish tint
       fillGrad.addColorStop(1, "rgba(212, 90, 90, 0.0)");
@@ -932,6 +968,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     } else if (paramType === "tide") {
       lineGrad.addColorStop(0, "#0077b6");
       lineGrad.addColorStop(1, "#00f5d4");
+    } else if (paramType === "clouds") {
+      lineGrad.addColorStop(0, "#60a5fa");
+      lineGrad.addColorStop(1, "#94a3b8");
     } else { // temp
       lineGrad.addColorStop(0, "#38d4ff"); // Cool blue on left (night)
       lineGrad.addColorStop(0.5, accentColor); // Warm midday
@@ -1089,6 +1128,13 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         boxColor = "#00b4d8";
         tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
         tooltipLines.push(`Tide Level: ${hp.tideValue !== null ? hp.tideValue.toFixed(1) : "--"} cm`);
+      } else if (paramType === "clouds") {
+        boxColor = "#38b2ff";
+        tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
+        tooltipLines.push(`Total Cloud Cover: ${hp.clouds.toFixed(0)}%`);
+        tooltipLines.push(`Low Clouds: ${hp.cloudsLow.toFixed(0)}%`);
+        tooltipLines.push(`Mid Clouds: ${hp.cloudsMid.toFixed(0)}%`);
+        tooltipLines.push(`High Clouds: ${hp.cloudsHigh.toFixed(0)}%`);
       }
 
       ctx.font = "bold 11px sans-serif";
@@ -1654,7 +1700,7 @@ function initWeatherPage() {
   window.addEventListener("resize", drawForecastCurves);
 
   // Bind synced mouse/touch event listeners across all canvases
-  [uvCanvas, tempCanvas, rainCanvas, windCanvas, tideCanvas].forEach(canvas => {
+  [uvCanvas, tempCanvas, rainCanvas, windCanvas, tideCanvas, cloudsCanvas].forEach(canvas => {
     if (!canvas) return;
     canvas.addEventListener("mousemove", handleCanvasHover);
     canvas.addEventListener("mouseleave", handleCanvasLeave);
