@@ -1256,6 +1256,8 @@ async function performSearch() {
 
   if (query === "/reset") {
     localStorage.clear();
+    document.documentElement.className = "";
+    document.body.className = "";
     location.reload();
     return;
   }
@@ -1653,8 +1655,11 @@ function initWeatherPage() {
   // Hidden developer reset command via URL parameter
   if (new URLSearchParams(window.location.search).has("reset")) {
     localStorage.clear();
-    window.location.href = window.location.pathname;
-    return;
+    document.documentElement.className = "";
+    document.body.className = "";
+    const url = new URL(window.location.href);
+    url.searchParams.delete("reset");
+    window.history.replaceState({}, "", url.pathname + url.search);
   }
 
   // Mount the site layout shell
