@@ -705,6 +705,18 @@
                         <canvas id="tide-canvas"></canvas>
                     </div>
                 </div>
+
+                <!-- Live Radar card -->
+                <div class="inline-block graph-card" data-key="radar">
+                    <div class="graph-header">
+                        <button class="nav-arrow prev-day" aria-label="Previous Day" style="visibility: hidden;">&lsaquo;</button>
+                        <h4 class="curve-title">Live Weather Radar</h4>
+                        <button class="nav-arrow next-day" aria-label="Next Day" style="visibility: hidden;">&rsaquo;</button>
+                    </div>
+                    <div class="canvas-container" style="height: 300px; overflow: hidden; position: relative;">
+                        <iframe id="radar-iframe" src="" style="width: 100%; height: 100%; border: none; background: var(--bg-soft);" allowfullscreen></iframe>
+                    </div>
+                </div>
             </section>
             
             <div style="font-size: 0.8rem; color: var(--muted); text-align: center; margin-bottom: 20px;">
