@@ -1254,6 +1254,12 @@ async function performSearch() {
   const query = searchInput.value.trim();
   if (!query) return;
 
+  if (query === "/reset") {
+    localStorage.clear();
+    location.reload();
+    return;
+  }
+
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`;
     const response = await fetch(url);
@@ -1644,6 +1650,13 @@ function showContextMenu(x, y, card) {
 
 // Initialize Page
 function initWeatherPage() {
+  // Hidden developer reset command via URL parameter
+  if (new URLSearchParams(window.location.search).has("reset")) {
+    localStorage.clear();
+    window.location.href = window.location.pathname;
+    return;
+  }
+
   // Mount the site layout shell
   mountSiteShell();
 
