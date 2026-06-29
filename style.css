@@ -379,7 +379,7 @@ body::after {
 
 #menu,
 .app-shell {
-    width: min(900px, 100%);
+    width: min(1400px, 100%);
     margin: 0 auto;
 }
 
@@ -1972,6 +1972,10 @@ body.tool-picker-active {
 /* ---- Mobile ---- */
 
 @media (max-width: 600px) {
+    body {
+        padding: 16px 6px 32px;
+    }
+
     .tool-picker-card {
         width: 100vw;
         max-width: none;

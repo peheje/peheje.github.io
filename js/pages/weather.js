@@ -1760,62 +1760,6 @@ function initWeatherPage() {
       }
     }
   });
-
-  setupLayoutDebugger();
-}
-
-function setupLayoutDebugger() {
-  if (!new URLSearchParams(window.location.search).has("debug")) return;
-
-  const debugBox = document.createElement("div");
-  debugBox.id = "layout-debug-box";
-  debugBox.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 999999;
-    background: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(8px);
-    color: #38bdf8;
-    border: 1px solid #0284c7;
-    border-radius: 8px;
-    padding: 12px 16px;
-    font-family: monospace;
-    font-size: 12px;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-    pointer-events: none;
-    line-height: 1.6;
-  `;
-  document.body.appendChild(debugBox);
-
-  function updateMeasurements() {
-    const card = document.querySelector("[data-key='temp']");
-    if (!card) {
-      debugBox.textContent = "Waiting for graphs grid...";
-      return;
-    }
-    const rect = card.getBoundingClientRect();
-    const screenWidth = window.innerWidth;
-    const leftMargin = Math.round(rect.left);
-    const rightMargin = Math.round(screenWidth - rect.right);
-    const graphWidth = Math.round(rect.width);
-
-    debugBox.innerHTML = `
-      <div style="font-weight: bold; border-bottom: 1px solid #334155; margin-bottom: 6px; padding-bottom: 4px; color: #f8fafc;">LAYOUT METRICS</div>
-      <div>Viewport Width: \${screenWidth}px</div>
-      <div>Graph Card Width: \${graphWidth}px</div>
-      <div>Margin Left: \${leftMargin}px</div>
-      <div>Margin Right: \${rightMargin}px</div>
-    `;
-  }
-
-  window.addEventListener("resize", updateMeasurements);
-  
-  function loop() {
-    updateMeasurements();
-    requestAnimationFrame(loop);
-  }
-  loop();
 }
 
 // Initialize!
