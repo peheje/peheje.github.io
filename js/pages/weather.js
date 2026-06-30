@@ -1612,12 +1612,32 @@ function showContextMenu(x, y, card) {
   });
   menu.appendChild(btnToggle);
 
+  // Source Attribution (Unclickable Button)
+  const CARD_SOURCES = {
+    temp: "MET Norway",
+    precip: "MET Norway",
+    clouds: "MET Norway",
+    uv: "MET Norway",
+    wind: "MET Norway",
+    tide: "Open-Meteo",
+    radar: "Windy"
+  };
+  const sourceName = CARD_SOURCES[key] || "Unknown";
+  const btnSource = document.createElement("button");
+  btnSource.textContent = `Source: ${sourceName}`;
+  btnSource.disabled = true;
+  btnSource.style.borderTop = "1px solid var(--line)";
+  btnSource.style.paddingTop = "8px";
+  btnSource.style.marginTop = "4px";
+  btnSource.style.fontWeight = "600";
+  menu.appendChild(btnSource);
+
   // Position the menu relative to the header to lock its placement
   const header = card.querySelector(".graph-header");
   const rect = header ? header.getBoundingClientRect() : { left: x, top: y, width: 0, height: 0, bottom: y };
   
   const menuWidth = 120;
-  const menuHeight = 110;
+  const menuHeight = 145;
   
   let left = rect.left + rect.width / 2 - menuWidth / 2;
   let top = rect.bottom + 5;
@@ -1676,7 +1696,6 @@ function initWeatherPage() {
   restoreLayoutOrder();
   restoreMinimizedStates();
   setupHeaderContextMenu();
-  setupHeaderAttributions();
 
   // Load last stored location if any
   loadStoredLocation();
@@ -1759,55 +1778,6 @@ function initWeatherPage() {
       if (age >= CACHE_EXPIRY_MS) {
         loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true);
       }
-    }
-  });
-}
-
-// Dynamically setup card header data source attribution tooltips
-function setupHeaderAttributions() {
-  const CARD_SOURCES = {
-    temp: { name: "MET Norway", url: "https://api.met.no/" },
-    precip: { name: "MET Norway", url: "https://api.met.no/" },
-    clouds: { name: "MET Norway", url: "https://api.met.no/" },
-    uv: { name: "MET Norway", url: "https://api.met.no/" },
-    wind: { name: "MET Norway", url: "https://api.met.no/" },
-    tide: { name: "Open-Meteo", url: "https://open-meteo.com/" },
-    radar: { name: "Windy", url: "https://windy.com" }
-  };
-
-  document.querySelectorAll(".graphs-grid .graph-card").forEach(card => {
-    const key = card.getAttribute("data-key");
-    const source = CARD_SOURCES[key];
-    if (!source) return;
-
-    const header = card.querySelector(".graph-header");
-    if (!header) return;
-
-    // Create tooltip container
-    const tooltipContainer = document.createElement("div");
-    tooltipContainer.className = "graph-info-tooltip";
-
-    // Info icon
-    const infoIcon = document.createElement("span");
-    infoIcon.className = "info-icon";
-    infoIcon.setAttribute("tabindex", "0");
-    infoIcon.setAttribute("aria-label", `Data source information for ${key}`);
-    infoIcon.innerHTML = "ⓘ";
-
-    // Tooltip text box
-    const tooltipText = document.createElement("div");
-    tooltipText.className = "tooltip-text";
-    tooltipText.innerHTML = `Source: <a href="${source.url}" target="_blank" rel="noopener">${source.name}</a>`;
-
-    tooltipContainer.appendChild(infoIcon);
-    tooltipContainer.appendChild(tooltipText);
-
-    // Insert next to title (append as a child of h4.curve-title so it stays centered with it)
-    const title = header.querySelector(".curve-title");
-    if (title) {
-      title.appendChild(tooltipContainer);
-    } else {
-      header.appendChild(tooltipContainer);
     }
   });
 }
