@@ -352,11 +352,10 @@
             transition: all 0.15s ease;
         }
 
-        .curve-tab:hover {
-            color: var(--text);
-            transform: none;
-            filter: none;
-            box-shadow: none !important;
+        @media (hover: hover) {
+            .curve-tab:hover {
+                color: var(--text);
+            }
         }
 
         .curve-tab.active {
