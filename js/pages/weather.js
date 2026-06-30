@@ -469,9 +469,6 @@ function changeDay(newIndex) {
 
     hoverHour = null;
     drawForecastCurves();
-    if (typeof window.updateCarouselDiagnostics === "function") {
-      setTimeout(window.updateCarouselDiagnostics, 450);
-    }
   }
 }
 
@@ -1703,7 +1700,6 @@ function initWeatherPage() {
   restoreLayoutOrder();
   restoreMinimizedStates();
   setupHeaderContextMenu();
-  setupCarouselDebugger();
 
   // Load last stored location if any
   loadStoredLocation();
@@ -1788,132 +1784,6 @@ function initWeatherPage() {
       }
     }
   });
-}
-
-// Carousel Diagnostics Debugger for user debugging
-function setupCarouselDebugger() {
-  const container = document.createElement("div");
-  container.id = "carousel-debug-box";
-  container.style.cssText = `
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 999999;
-    background: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(8px);
-    color: #e2e8f0;
-    border-top: 2px solid #3b82f6;
-    padding: 12px;
-    font-family: monospace;
-    font-size: 11px;
-    max-height: 250px;
-    overflow-y: auto;
-    box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.5);
-  `;
-
-  const header = document.createElement("div");
-  header.style.cssText = `
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #475569;
-    padding-bottom: 6px;
-    margin-bottom: 6px;
-  `;
-
-  const title = document.createElement("span");
-  title.textContent = "CAROUSEL DEBUGGER";
-  title.style.fontWeight = "bold";
-  title.style.color = "#60a5fa";
-
-  const copyBtn = document.createElement("button");
-  copyBtn.textContent = "Copy Debug Info";
-  copyBtn.style.cssText = `
-    background: #2563eb;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 4px 8px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 10px;
-  `;
-
-  const pre = document.createElement("pre");
-  pre.id = "carousel-debug-data";
-  pre.style.cssText = `
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-all;
-  `;
-
-  header.appendChild(title);
-  header.appendChild(copyBtn);
-  container.appendChild(header);
-  container.appendChild(pre);
-  document.body.appendChild(container);
-
-  function updateDiagnostics() {
-    const data = {
-      userAgent: navigator.userAgent,
-      activeTab: activeTab,
-      container: null,
-      tabs: []
-    };
-
-    if (dayTabsContainer) {
-      data.container = {
-        scrollLeft: dayTabsContainer.scrollLeft,
-        scrollWidth: dayTabsContainer.scrollWidth,
-        clientWidth: dayTabsContainer.clientWidth
-      };
-
-      const buttons = dayTabsContainer.querySelectorAll(".curve-tab");
-      buttons.forEach((btn, idx) => {
-        const computed = window.getComputedStyle(btn);
-        data.tabs.push({
-          index: idx,
-          text: btn.textContent.trim(),
-          classes: Array.from(btn.classList),
-          outline: computed.outline,
-          outlineWidth: computed.outlineWidth,
-          outlineStyle: computed.outlineStyle,
-          outlineColor: computed.outlineColor,
-          boxShadow: computed.boxShadow,
-          backgroundColor: computed.backgroundColor,
-          border: computed.border
-        });
-      });
-    }
-
-    const json = JSON.stringify(data, null, 2);
-    pre.textContent = json;
-
-    copyBtn.onclick = () => {
-      navigator.clipboard.writeText(json)
-        .then(() => {
-          copyBtn.textContent = "Copied!";
-          setTimeout(() => { copyBtn.textContent = "Copy Debug Info"; }, 1500);
-        })
-        .catch(err => {
-          alert("Failed to copy: " + err);
-        });
-    };
-  }
-
-  window.updateCarouselDiagnostics = updateDiagnostics;
-
-  window.addEventListener("resize", updateDiagnostics);
-  if (dayTabsContainer) {
-    dayTabsContainer.addEventListener("scroll", updateDiagnostics);
-    dayTabsContainer.addEventListener("click", () => {
-      setTimeout(updateDiagnostics, 100);
-    });
-  }
-
-  // Initial diagnostics populate
-  setTimeout(updateDiagnostics, 500);
 }
 
 // Initialize!

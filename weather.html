@@ -356,16 +356,19 @@
             color: var(--text);
             transform: none;
             filter: none;
+            box-shadow: none !important;
         }
 
         .curve-tab.active {
             background: var(--accent);
             color: var(--btn-text);
             font-weight: 700;
+            box-shadow: none !important;
         }
 
         .curve-tab:focus,
-        .curve-tab:focus-visible {
+        .curve-tab:focus-visible,
+        .curve-tab:active {
             outline: none !important;
             box-shadow: none !important;
         }
