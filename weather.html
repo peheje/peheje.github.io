@@ -538,6 +538,68 @@
             from { opacity: 0; transform: scale(0.95); }
             to { opacity: 1; transform: scale(1); }
         }
+
+        /* Tooltip Styles */
+        .graph-info-tooltip {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            margin-left: 6px;
+            cursor: help;
+            vertical-align: middle;
+        }
+        .info-icon {
+            font-size: 0.85rem;
+            color: var(--muted);
+            opacity: 0.65;
+            transition: opacity 0.2s, color 0.2s;
+            display: inline-block;
+            line-height: 1;
+        }
+        .info-icon:hover,
+        .info-icon:focus {
+            opacity: 1;
+            color: var(--accent);
+        }
+        .tooltip-text {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%) translateY(-4px);
+            background: var(--surface-strong);
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-sm);
+            padding: 6px 10px;
+            font-size: 0.75rem;
+            font-weight: normal;
+            font-family: var(--font-body);
+            white-space: nowrap;
+            box-shadow: var(--shadow-md);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+            z-index: 100;
+        }
+        /* Caret pointing up */
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px;
+            border-style: solid;
+            border-color: transparent transparent var(--surface-strong) transparent;
+        }
+        .graph-info-tooltip:hover .tooltip-text,
+        .graph-info-tooltip:focus-within .tooltip-text {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
     </style>
 </head>
 
