@@ -352,36 +352,21 @@
             transition: all 0.15s ease;
         }
 
-        /* Suppress global button hover effects (shadows, shift, saturation) on day tabs */
-        .curve-tab:hover,
-        .curve-tab:focus,
-        .curve-tab:focus-visible,
-        .curve-tab:active {
-            transform: none !important;
-            filter: none !important;
-            box-shadow: none !important;
-            outline: none !important;
-        }
-
         .curve-tab.active {
             background: var(--accent);
             color: var(--btn-text);
             font-weight: 700;
-            box-shadow: none !important;
         }
 
-        /* Prevent unselected tabs from displaying focus/active colors and fonts */
-        .curve-tab:not(.active):focus,
-        .curve-tab:not(.active):focus-visible,
-        .curve-tab:not(.active):active {
-            color: var(--muted) !important;
-            font-weight: 600 !important;
-            background: transparent !important;
+        .curve-tab:focus,
+        .curve-tab:focus-visible,
+        .curve-tab:active {
+            outline: none;
         }
 
         @media (hover: hover) {
             .curve-tab:not(.active):hover {
-                color: var(--text) !important;
+                color: var(--text);
             }
         }
 

@@ -731,13 +731,13 @@ button {
     pointer-events: none;
 }
 
-button:hover,
+button:not(.curve-tab):hover,
 .button-link:hover {
     transform: translateY(-1px);
     filter: saturate(1.07);
 }
 
-button:active,
+button:not(.curve-tab):active,
 .button-link:active {
     transform: translateY(1px);
 }
@@ -755,7 +755,7 @@ button.red {
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
 }
 
-button:hover,
+button:not(.curve-tab):hover,
 .button-link:hover,
 .btn-small:hover,
 .number-step-btn:hover {
@@ -766,7 +766,7 @@ input:focus-visible,
 textarea:focus-visible,
 input[type="checkbox"]:focus-visible,
 input[type="radio"]:focus-visible,
-button:focus-visible {
+button:not(.curve-tab):focus-visible {
     outline: 2px solid var(--focus-outline);
     outline-offset: 2px;
 }
