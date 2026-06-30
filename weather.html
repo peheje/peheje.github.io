@@ -352,10 +352,15 @@
             transition: all 0.15s ease;
         }
 
-        @media (hover: hover) {
-            .curve-tab:not(.active):hover {
-                color: var(--text) !important;
-            }
+        /* Suppress global button hover effects (shadows, shift, saturation) on day tabs */
+        .curve-tab:hover,
+        .curve-tab:focus,
+        .curve-tab:focus-visible,
+        .curve-tab:active {
+            transform: none !important;
+            filter: none !important;
+            box-shadow: none !important;
+            outline: none !important;
         }
 
         .curve-tab.active {
@@ -365,14 +370,19 @@
             box-shadow: none !important;
         }
 
+        /* Prevent unselected tabs from displaying focus/active colors and fonts */
         .curve-tab:not(.active):focus,
         .curve-tab:not(.active):focus-visible,
         .curve-tab:not(.active):active {
-            outline: none !important;
-            box-shadow: none !important;
             color: var(--muted) !important;
             font-weight: 600 !important;
             background: transparent !important;
+        }
+
+        @media (hover: hover) {
+            .curve-tab:not(.active):hover {
+                color: var(--text) !important;
+            }
         }
 
         .canvas-container {
