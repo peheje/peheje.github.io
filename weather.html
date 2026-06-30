@@ -353,8 +353,8 @@
         }
 
         @media (hover: hover) {
-            .curve-tab:hover {
-                color: var(--text);
+            .curve-tab:not(.active):hover {
+                color: var(--text) !important;
             }
         }
 
@@ -365,11 +365,14 @@
             box-shadow: none !important;
         }
 
-        .curve-tab:focus,
-        .curve-tab:focus-visible,
-        .curve-tab:active {
+        .curve-tab:not(.active):focus,
+        .curve-tab:not(.active):focus-visible,
+        .curve-tab:not(.active):active {
             outline: none !important;
             box-shadow: none !important;
+            color: var(--muted) !important;
+            font-weight: 600 !important;
+            background: transparent !important;
         }
 
         .canvas-container {
