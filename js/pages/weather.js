@@ -446,11 +446,15 @@ function changeDay(newIndex) {
     const direction = newIndex > activeTab ? "next" : "prev";
     activeTab = newIndex;
     
-    // Update the tabs active class
+    // Update the tabs active class and scroll it into view
     if (dayTabsContainer) {
       const buttons = dayTabsContainer.querySelectorAll(".curve-tab");
       buttons.forEach((btn, idx) => {
-        btn.classList.toggle("active", idx === activeTab);
+        const isActive = idx === activeTab;
+        btn.classList.toggle("active", isActive);
+        if (isActive) {
+          btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+        }
       });
     }
 
