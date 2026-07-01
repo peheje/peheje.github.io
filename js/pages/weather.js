@@ -16,6 +16,7 @@ let forecastData = null;
 let tideData = null;
 let activeTab = 0; // 0 for Today, 1 for Tomorrow, 2-6 for future days
 let hoverHour = null; // Currently hovered hour on the canvas (0-23)
+let savedRadarSrc = "";
 
 let globalLimits = {
   uvMax: 10,
@@ -1264,7 +1265,14 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false) {
     const radarIframe = document.getElementById("radar-iframe");
     const isHappyDOM = window.happyDOM || (navigator && navigator.userAgent && /happy-dom|happydom/i.test(navigator.userAgent));
     if (radarIframe && !isHappyDOM) {
-      radarIframe.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&zoom=8&level=surface&overlay=radar&menu=&message=&marker=true&calendar=now&pressure=&type=map&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
+      const srcUrl = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&zoom=8&level=surface&overlay=radar&menu=&message=&marker=true&calendar=now&pressure=&type=map&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
+      if (document.visibilityState === "hidden") {
+        savedRadarSrc = srcUrl;
+        radarIframe.src = "";
+      } else {
+        radarIframe.src = srcUrl;
+        savedRadarSrc = "";
+      }
     }
 
     if (!silent) {
@@ -1824,12 +1832,29 @@ function initWeatherPage() {
     }
   }, 5 * 60 * 1000);
 
-  // Refresh when user returns to the tab
+  // Manage resources and refresh when user returns to the tab
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && forecastData && forecastData.lastUpdated) {
-      const age = Date.now() - forecastData.lastUpdated;
-      if (age >= CACHE_EXPIRY_MS) {
-        loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true, currentLoc.isGps);
+    const radarIframe = document.getElementById("radar-iframe");
+    const isHappyDOM = window.happyDOM || (navigator && navigator.userAgent && /happy-dom|happydom/i.test(navigator.userAgent));
+
+    if (document.visibilityState === "hidden") {
+      // Unload Windy iframe in background to eliminate WebGL/animation battery drain
+      if (radarIframe && !isHappyDOM && radarIframe.src) {
+        savedRadarSrc = radarIframe.src;
+        radarIframe.src = "";
+      }
+    } else if (document.visibilityState === "visible") {
+      // Restore radar animations in foreground
+      if (radarIframe && !isHappyDOM && savedRadarSrc) {
+        radarIframe.src = savedRadarSrc;
+        savedRadarSrc = "";
+      }
+
+      if (forecastData && forecastData.lastUpdated) {
+        const age = Date.now() - forecastData.lastUpdated;
+        if (age >= CACHE_EXPIRY_MS) {
+          loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true, currentLoc.isGps);
+        }
       }
     }
   });
