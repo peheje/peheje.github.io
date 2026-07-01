@@ -1264,7 +1264,7 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false) {
     const radarIframe = document.getElementById("radar-iframe");
     const isHappyDOM = window.happyDOM || (navigator && navigator.userAgent && navigator.userAgent.includes("HappyDOM"));
     if (radarIframe && !isHappyDOM) {
-      radarIframe.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&zoom=6&level=surface&overlay=radar&menu=&message=&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
+      radarIframe.src = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&zoom=8&level=surface&overlay=radar&menu=&message=&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
     }
 
     if (!silent) {
