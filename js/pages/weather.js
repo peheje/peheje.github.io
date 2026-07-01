@@ -454,7 +454,13 @@ function changeDay(newIndex) {
         const isActive = idx === activeTab;
         btn.classList.toggle("active", isActive);
         if (isActive) {
-          btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+          const containerWidth = dayTabsContainer.clientWidth;
+          const btnLeft = btn.offsetLeft;
+          const btnWidth = btn.clientWidth;
+          dayTabsContainer.scrollTo({
+            left: btnLeft - (containerWidth / 2) + (btnWidth / 2),
+            behavior: "smooth"
+          });
         }
       });
     }
