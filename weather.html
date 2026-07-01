@@ -97,6 +97,23 @@
             font-weight: 600;
         }
 
+        .gps-badge {
+            display: none;
+            align-items: center;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #ffffff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+            vertical-align: middle;
+            line-height: 1;
+        }
+
         .weather-actions {
             display: flex;
             flex-direction: column;
@@ -561,7 +578,7 @@
                 <div id="suggestions-list" class="suggestions-list"></div>
             </div>
             <div class="location-info">
-                <span>Selected: <span id="location-display" class="active-location">Oslo, Norge</span> <span id="coordinates-display" style="font-family: monospace; font-size: 0.8rem;">(59.91, 10.74)</span></span>
+                <span>Selected: <span id="location-display" class="active-location">Oslo, Norge</span><span id="gps-badge" class="gps-badge">GPS</span> <span id="coordinates-display" style="font-family: monospace; font-size: 0.8rem;">(59.91, 10.74)</span></span>
                 <span id="last-updated" style="font-size: 0.8rem; opacity: 0.7;">Updated: --:--</span>
             </div>
         </section>

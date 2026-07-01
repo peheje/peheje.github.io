@@ -30,6 +30,7 @@ const searchBtn = document.getElementById("search-btn");
 const locationBtn = document.getElementById("location-btn");
 const suggestionsList = document.getElementById("suggestions-list");
 const locationDisplay = document.getElementById("location-display");
+const gpsBadge = document.getElementById("gps-badge");
 const coordinatesDisplay = document.getElementById("coordinates-display");
 const errorBar = document.getElementById("error-bar");
 const dashboardContent = document.getElementById("dashboard-content");
@@ -1213,7 +1214,7 @@ function handleCanvasLeave() {
 }
 
 // Fetch forecast and refresh page
-async function loadWeatherData(lat, lon, name, silent = false) {
+async function loadWeatherData(lat, lon, name, silent = false, isGps = false) {
   showError("");
   if (!silent) {
     setLoaderState(true);
@@ -1221,10 +1222,13 @@ async function loadWeatherData(lat, lon, name, silent = false) {
   try {
     forecastData = await fetchWeather(lat, lon);
     
-    currentLoc = { lat, lon, name };
+    currentLoc = { lat, lon, name, isGps };
     saveLocation(currentLoc);
 
     locationDisplay.textContent = name;
+    if (gpsBadge) {
+      gpsBadge.style.display = isGps ? "inline-flex" : "none";
+    }
     coordinatesDisplay.textContent = `(${lat.toFixed(2)}, ${lon.toFixed(2)})`;
 
     // Update live weather radar map iframe (bypass in Happy DOM testing to prevent network errors)
@@ -1324,10 +1328,26 @@ function getGPSLocation() {
 
   showError("");
   navigator.geolocation.getCurrentPosition(
-    position => {
+    async position => {
       const lat = position.coords.latitude;
       const lon = position.coords.longitude;
-      loadWeatherData(lat, lon, "Your GPS Location");
+      
+      let locName = "GPS Location";
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`);
+        if (response.ok) {
+          const data = await response.json();
+          const addr = data.address || {};
+          const city = addr.city || addr.town || addr.village || addr.suburb || addr.municipality || addr.county || addr.state;
+          if (city) {
+            locName = city;
+          }
+        }
+      } catch (err) {
+        console.warn("Reverse geocoding failed", err);
+      }
+      
+      loadWeatherData(lat, lon, locName, false, true);
     },
     err => {
       console.warn("GPS Location error", err);
@@ -1336,7 +1356,7 @@ function getGPSLocation() {
       else if (err.code === 2) errMsg = "Position unavailable.";
       showError(errMsg + " Using default location.");
       
-      loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name);
+      loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, false, currentLoc.isGps);
     },
     { timeout: 8000 }
   );
@@ -1705,7 +1725,7 @@ function initWeatherPage() {
   loadStoredLocation();
 
   // Initial data load
-  loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name);
+  loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, false, currentLoc.isGps);
 
   // Setup tab switches
   setupTabs();
@@ -1770,7 +1790,7 @@ function initWeatherPage() {
     if (document.visibilityState === "visible" && forecastData && forecastData.lastUpdated) {
       const age = Date.now() - forecastData.lastUpdated;
       if (age >= CACHE_EXPIRY_MS) {
-        loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true);
+        loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true, currentLoc.isGps);
       }
     }
   }, 5 * 60 * 1000);
@@ -1780,7 +1800,7 @@ function initWeatherPage() {
     if (document.visibilityState === "visible" && forecastData && forecastData.lastUpdated) {
       const age = Date.now() - forecastData.lastUpdated;
       if (age >= CACHE_EXPIRY_MS) {
-        loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true);
+        loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true, currentLoc.isGps);
       }
     }
   });
