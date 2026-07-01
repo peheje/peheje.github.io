@@ -761,17 +761,40 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     }
   } else if (paramType === "rain") {
     const maxVal = globalLimits ? globalLimits.rainMax : Math.max(...dayPoints.map(p => p.rain), 0);
-    maxScaleY = Math.max(2.0, Math.ceil(maxVal + 0.5));
-    const step = maxScaleY / 4;
-    for (let i = 0; i <= 4; i++) {
-      gridLevels.push(Math.round((i * step) * 10) / 10);
+    let step = 0.5;
+    if (maxVal > 20) {
+      step = 10;
+      maxScaleY = Math.ceil(maxVal / 10) * 10;
+    } else if (maxVal > 10) {
+      step = 5;
+      maxScaleY = 20;
+    } else if (maxVal > 5) {
+      step = 2;
+      maxScaleY = 10;
+    } else if (maxVal > 2) {
+      step = 1;
+      maxScaleY = 5;
+    } else {
+      step = 0.5;
+      maxScaleY = 2.0;
+    }
+    for (let val = 0; val <= maxScaleY; val += step) {
+      gridLevels.push(val);
     }
   } else if (paramType === "wind") {
     const maxVal = globalLimits ? globalLimits.windMax : Math.max(...dayPoints.map(p => p.windSpeed), 0);
     minScaleY = 0;
-    maxScaleY = Math.max(5, Math.ceil(maxVal / 5) * 5);
-    const range = maxScaleY - minScaleY;
-    const step = range > 15 ? 5 : 2.5;
+    let step = 2;
+    if (maxVal > 20) {
+      step = 5;
+      maxScaleY = Math.ceil(maxVal / 5) * 5;
+    } else if (maxVal > 10) {
+      step = 4;
+      maxScaleY = Math.ceil(maxVal / 4) * 4;
+    } else {
+      step = 2;
+      maxScaleY = Math.max(4, Math.ceil(maxVal / 2) * 2);
+    }
     for (let val = minScaleY; val <= maxScaleY; val += step) {
       gridLevels.push(val);
     }
