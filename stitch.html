@@ -23,23 +23,23 @@
                 <label>Stitch Direction:</label>
                 <label class="choice-row">
                     <input type="radio" name="stitch-direction" value="vertical" checked>
-                    Vertical (Top to Bottom)
+                    Vertical
                 </label>
                 <label class="choice-row">
                     <input type="radio" name="stitch-direction" value="horizontal">
-                    Horizontal (Left to Right)
+                    Horizontal
                 </label>
             </div>
 
             <div class="inline-block">
-                <label>File Sorting Order:</label>
+                <label>Camera Movement / Shooting Order:</label>
                 <label class="choice-row">
                     <input type="radio" name="stitch-order" value="newest" checked>
-                    Newest on Top / Left (Chronological)
+                    <span id="order-label-1">From Bottom to Top</span>
                 </label>
                 <label class="choice-row">
                     <input type="radio" name="stitch-order" value="oldest">
-                    Oldest on Top / Left (Reverse Chronological)
+                    <span id="order-label-2">From Top to Bottom</span>
                 </label>
             </div>
 
@@ -75,11 +75,11 @@
             </div>
         </section>
 
-        <section class="inline-block" style="width: 100%; margin-top: 24px;">
-            <label for="debug-log">Debug Console Logs</label>
+        <details id="debug-section" style="width: 100%; margin-top: 24px;">
+            <summary style="cursor: pointer; font-weight: bold; margin-bottom: 8px; font-size: 14px; color: var(--text-color, #333);">Debug Console Logs</summary>
             <textarea id="debug-log" readonly style="width: 100%; height: 160px; font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.02); color: var(--text-color, #333); border: 1px solid var(--border-color, #ccc); border-radius: var(--border-radius, 4px); padding: 8px; box-sizing: border-box; resize: vertical;" placeholder="Debug logs will appear here during stitching..."></textarea>
             <button id="copy-log-btn" type="button" class="notice" style="margin-top: 8px; padding: 6px 12px;">Copy Logs</button>
-        </section>
+        </details>
     </main>
 
     <script type="module" src="js/pages/stitch.js"></script>

@@ -6,6 +6,7 @@ mountSiteShell();
 const heic2anyUrl = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
 let heic2anyLoadPromise = null;
 let selectedFilesList = [];
+const heicCache = new Map();
 
 // Helper to get element by ID
 function getElement(id) {
@@ -63,6 +64,11 @@ function loadHeic2Any() {
 
 // Convert HEIC file to standard JPEG blob using heic2any
 async function convertHeicToJpeg(file) {
+    const cacheKey = `${file.name}_${file.size}`;
+    if (heicCache.has(cacheKey)) {
+        logDebug(`Using cached JPEG conversion for: ${file.name}`);
+        return heicCache.get(cacheKey);
+    }
     await loadHeic2Any();
     setStatus(`Converting HEIC to JPEG: ${file.name}...`);
     const resultBlob = await window.heic2any({
@@ -72,7 +78,9 @@ async function convertHeicToJpeg(file) {
     });
     const blob = Array.isArray(resultBlob) ? resultBlob[0] : resultBlob;
     logDebug(`HEIC conversion finished for ${file.name}. Size: ${(blob.size/1024).toFixed(1)} KB`);
-    return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+    const jpegFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+    heicCache.set(cacheKey, jpegFile);
+    return jpegFile;
 }
 
 // Main stitching trigger function spawning background worker
@@ -246,6 +254,7 @@ function copyDebugLogs() {
 // Reset UI
 function clearAll() {
     selectedFilesList = [];
+    heicCache.clear();
     getElement("stitch-files").value = "";
     getElement("preview-section").style.display = "none";
     const downloadBtn = getElement("download-btn");
@@ -260,6 +269,22 @@ function clearAll() {
     updateFileList();
 }
 
+// Dynamically update camera movement labels based on stitch direction
+function updateOrderLabels() {
+    const direction = document.querySelector('input[name="stitch-direction"]:checked').value;
+    const label1 = getElement("order-label-1");
+    const label2 = getElement("order-label-2");
+    if (!label1 || !label2) return;
+
+    if (direction === "horizontal") {
+        label1.textContent = "From Right to Left";
+        label2.textContent = "From Left to Right";
+    } else {
+        label1.textContent = "From Bottom to Top";
+        label2.textContent = "From Top to Bottom";
+    }
+}
+
 // Bind Events
 function initEvents() {
     const fileInput = getElement("stitch-files");
@@ -267,6 +292,7 @@ function initEvents() {
     const stitchBtn = getElement("stitch-btn");
     const clearBtn = getElement("clear-btn");
     const copyLogBtn = getElement("copy-log-btn");
+    const dirRadios = document.getElementsByName("stitch-direction");
 
     fileInput.addEventListener("change", (e) => {
         selectedFilesList = Array.from(e.target.files || []);
@@ -292,8 +318,23 @@ function initEvents() {
     stitchBtn.addEventListener("click", processStitch);
     clearBtn.addEventListener("click", clearAll);
     copyLogBtn.addEventListener("click", copyDebugLogs);
+
+    dirRadios.forEach((radio) => {
+        radio.addEventListener("change", updateOrderLabels);
+    });
+}
+
+// Hide debug console on production host (only display on localhost)
+function initDebugVisibility() {
+    const debugSection = getElement("debug-section");
+    if (debugSection) {
+        const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        debugSection.style.display = isLocalhost ? "block" : "none";
+    }
 }
 
 // Run setup
 initEvents();
+updateOrderLabels();
 updateFileList();
+initDebugVisibility();
