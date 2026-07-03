@@ -80,7 +80,7 @@ const sites = [
   {
     url: "/stitch.html",
     name: "Stitch",
-    about: "Stitch multiple images vertically with smart keypoint alignment and seam blending.",
+    about: "Stitch multiple images vertically or horizontally with smart template alignment and seam blending.",
     category: "Images",
   },
   {
