@@ -78,6 +78,12 @@ const sites = [
     category: "Images",
   },
   {
+    url: "/stitch.html",
+    name: "Stitch",
+    about: "Stitch multiple images vertically with smart keypoint alignment and seam blending.",
+    category: "Images",
+  },
+  {
     url: "https://twitter.com/peheje",
     name: "Contact",
     about: "",
