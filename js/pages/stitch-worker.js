@@ -158,6 +158,26 @@ function bitmapToCanvas(bitmap) {
     return canvas;
 }
 
+// Rotate canvas 90 degrees clockwise
+function rotateCanvas90CW(canvas) {
+    const rotated = new OffscreenCanvas(canvas.height, canvas.width);
+    const ctx = rotated.getContext("2d");
+    ctx.translate(canvas.height, 0);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(canvas, 0, 0);
+    return rotated;
+}
+
+// Rotate canvas 90 degrees counter-clockwise
+function rotateCanvas90CCW(canvas) {
+    const rotated = new OffscreenCanvas(canvas.height, canvas.width);
+    const ctx = rotated.getContext("2d");
+    ctx.translate(0, canvas.width);
+    ctx.rotate(-Math.PI / 2);
+    ctx.drawImage(canvas, 0, 0);
+    return rotated;
+}
+
 // Perform layout, blending, and cropping on OffscreenCanvas
 function stitchImages(canvases, X, Y, canvasW, canvasH) {
     const canvas = new OffscreenCanvas(canvasW, canvasH);
@@ -243,10 +263,17 @@ self.onmessage = async function (e) {
 
     try {
         const bitmaps = data.bitmaps;
+        const direction = data.direction;
 
         postStatus("Converting image bitmaps in background...");
-        const canvases = bitmaps.map(bitmapToCanvas);
+        let canvases = bitmaps.map(bitmapToCanvas);
         postLog(`Converted ${canvases.length} bitmaps to OffscreenCanvas.`);
+
+        if (direction === "horizontal") {
+            postStatus("Rotating images for horizontal alignment...");
+            canvases = canvases.map(rotateCanvas90CW);
+            postLog("Images rotated 90 degrees clockwise.");
+        }
 
         postStatus("Initializing OpenCV WebAssembly on background thread...");
         const { cv } = await initOpenCV();
@@ -288,7 +315,13 @@ self.onmessage = async function (e) {
         postLog(`Output canvas size: ${canvasW}x${canvasH}`);
 
         postStatus("Blending and stitching seams on background thread...");
-        const stitchedCanvas = stitchImages(canvases, normX, normY, canvasW, canvasH);
+        let stitchedCanvas = stitchImages(canvases, normX, normY, canvasW, canvasH);
+
+        if (direction === "horizontal") {
+            postStatus("Rotating stitched panorama back...");
+            stitchedCanvas = rotateCanvas90CCW(stitchedCanvas);
+            postLog("Stitched panorama rotated 90 degrees counter-clockwise.");
+        }
 
         postStatus("Encoding output panorama to JPEG...");
         const blob = await stitchedCanvas.convertToBlob({

@@ -90,10 +90,14 @@ async function processStitch() {
 
     logDebug("Starting smart panorama stitch in Web Worker...");
     try {
-        const method = "template";
+        const direction = document.querySelector('input[name="stitch-direction"]:checked').value;
+        const order = document.querySelector('input[name="stitch-order"]:checked').value;
+        logDebug(`Stitching direction: ${direction}, sorting order: ${order}`);
 
-        // Sort files alphabetically descending (newest timestamp first, corresponding to Top to Bottom)
-        const sortedFiles = [...selectedFilesList].sort((a, b) => b.name.localeCompare(a.name));
+        // Sort files alphabetically based on order setting
+        const sortedFiles = [...selectedFilesList].sort((a, b) => {
+            return order === "newest" ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name);
+        });
 
         setStatus("Processing files...");
         const bitmaps = [];
@@ -144,6 +148,7 @@ async function processStitch() {
                     getElement("preview-dimensions").textContent = `Dimensions: ${data.width} x ${data.height}`;
                     
                     const downloadBtn = getElement("download-btn");
+                    downloadBtn.setAttribute("download", direction === "horizontal" ? "panorama_horizontal.jpg" : "panorama_vertical.jpg");
                     if (downloadBtn.href && downloadBtn.href.startsWith("blob:")) {
                         URL.revokeObjectURL(downloadBtn.href);
                     }
@@ -169,7 +174,7 @@ async function processStitch() {
         worker.postMessage({
             action: "stitch",
             bitmaps: bitmaps,
-            method: method
+            direction: direction
         }, bitmaps);
 
     } catch (err) {
