@@ -1,3 +1,4 @@
+// Local utility sites and configurations
 const sites = [
   {
     url: "/compare.html",
