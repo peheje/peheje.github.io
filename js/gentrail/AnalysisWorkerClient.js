@@ -1,0 +1,63 @@
+export class AnalysisWorkerClient {
+  constructor() {
+    this.worker = new Worker(
+      "js/gentrail/analysis-worker.js",
+      { type: "module" },
+    );
+    this.nextId = 1;
+    this.pending = new Map();
+
+    this.worker.onmessage = (event) => {
+      if (event.data.type === "worker-log") {
+        const { level, text } = event.data;
+        if (level === "ERROR") console.error(text);
+        else if (level === "WARN") console.warn(text);
+        else console.log(text);
+        return;
+      }
+
+      const pending = this.pending.get(event.data.id);
+      if (!pending) return;
+      this.pending.delete(event.data.id);
+      if (event.data.ok) pending.resolve(event.data.result);
+      else pending.reject(new Error(event.data.error));
+    };
+    
+    this.worker.onerror = (event) => {
+      this.rejectAll(new Error(event.message || "Analysis worker failed"));
+    };
+  }
+
+  analyzeRoutes(request) {
+    return this.send({
+      type: "analyze-routes",
+      ...request,
+    });
+  }
+
+  scoreRoutes(request) {
+    return this.send({ type: "score-routes", ...request });
+  }
+
+  terminate(reason = "Generation cancelled") {
+    this.worker.terminate();
+    this.rejectAll(new DOMException(reason, "AbortError"));
+  }
+
+  send(request) {
+    const id = this.nextId;
+    this.nextId += 1;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, {
+        resolve,
+        reject,
+      });
+      this.worker.postMessage({ id, request });
+    });
+  }
+
+  rejectAll(error) {
+    for (const pending of this.pending.values()) pending.reject(error);
+    this.pending.clear();
+  }
+}

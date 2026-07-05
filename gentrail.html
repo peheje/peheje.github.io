@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/gentrail.css">
+    <link href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/hamster.png" type="image/png">
+</head>
+<body>
+    <div id="menu"></div>
+    <main class="app-shell">
+        <div class="gentrail-app">
+            <aside class="sidebar">
+                <div class="control-section">
+                    <div class="section-heading">
+                        <span>01 / Route</span>
+                        <h2>Build a loop</h2>
+                    </div>
+                    <label class="field" style="margin-bottom: 12px; display: none;">
+                        <span>OpenRouteService API Key <a href="https://account.heigit.org/manage/key" target="_blank" rel="noopener noreferrer" style="color: var(--accent); font-weight: 500; font-size: 10px; text-decoration: underline; margin-left: 6px;">(Get Key)</a></span>
+                        <input type="password" id="ors-api-key" placeholder="Enter key (saves locally)" style="width:100%; height:40px; border:1px solid var(--line); border-radius:9px; padding: 0 10px; font-size:12px; background: var(--bg-card); color: var(--text);" />
+                    </label>
+                    <div class="start-readout" id="start-readout">
+                        <span class="start-readout__dot"></span>
+                        <div>
+                            <strong id="start-status">No trailhead yet</strong>
+                            <small id="start-coords">Click the map to choose a start</small>
+                        </div>
+                    </div>
+                    <div class="field-grid">
+                        <label class="field">
+                            <span>Target distance</span>
+                            <div class="number-input">
+                                <input type="number" id="target-distance" min="1" max="40" step="0.5" value="3" style="color: var(--text);" />
+                                <span>km</span>
+                            </div>
+                        </label>
+                        <label class="field">
+                            <span>Route options</span>
+                            <select id="candidate-count" style="background: var(--bg-card); color: var(--text); border: 1px solid var(--line);">
+                                <option value="3" selected>3 loops</option>
+                                <option value="4">4 loops</option>
+                                <option value="5">5 loops</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <div class="section-heading">
+                        <span>02 / Character</span>
+                        <h2>Tune the terrain</h2>
+                    </div>
+                    <div class="preferences">
+                        <div class="preference">
+                            <div class="preference__heading">
+                                <span>Forest</span>
+                                <output id="val-forest">7</output>
+                            </div>
+                            <div class="preference__description">Favor woods and reserves</div>
+                            <input type="range" id="pref-forest" min="0" max="10" value="7" />
+                        </div>
+                        <div class="preference">
+                            <div class="preference__heading">
+                                <span>Trails & gravel</span>
+                                <output id="val-trail">8</output>
+                            </div>
+                            <div class="preference__description">Favor paths and unpaved surfaces</div>
+                            <input type="range" id="pref-trail" min="0" max="10" value="8" />
+                        </div>
+                        <div class="preference">
+                            <div class="preference__heading">
+                                <span>Water</span>
+                                <output id="val-water">5</output>
+                            </div>
+                            <div class="preference__description">Favor lakes, coast, streams, beaches</div>
+                            <input type="range" id="pref-water" min="0" max="10" value="5" />
+                        </div>
+                        <div class="preference">
+                            <div class="preference__heading">
+                                <span>Avoid roads</span>
+                                <output id="val-avoidRoads">8</output>
+                            </div>
+                            <div class="preference__description">Penalize primary and secondary roads</div>
+                            <input type="range" id="pref-avoidRoads" min="0" max="10" value="8" />
+                        </div>
+                        <div class="preference">
+                            <div class="preference__heading">
+                                <span>Avoid highways</span>
+                                <output id="val-avoidHighways">10</output>
+                            </div>
+                            <div class="preference__description">Keep away from motorway and trunk roads</div>
+                            <input type="range" id="pref-avoidHighways" min="0" max="10" value="10" />
+                        </div>
+                        <div class="preference">
+                            <div class="preference__heading">
+                                <span>Avoid repetitions</span>
+                                <output id="val-avoidRepetitions">9</output>
+                            </div>
+                            <div class="preference__description">Penalize out-and-back sections and dead-end spurs</div>
+                            <input type="range" id="pref-avoidRepetitions" min="0" max="10" value="9" />
+                        </div>
+                        <div class="preference">
+                            <div class="preference__heading">
+                                <span>Elevation</span>
+                                <output id="val-elevation">3</output>
+                            </div>
+                            <div class="preference__description">Reward ascent when provider data exists</div>
+                            <input type="range" id="pref-elevation" min="0" max="10" value="3" />
+                        </div>
+                    </div>
+                    <button class="generate-button" id="btn-generate" disabled>
+                        <span id="btn-text">Generate hikes</span>
+                        <span aria-hidden="true" id="btn-arrow">→</span>
+                    </button>
+                    <div class="progress display-none" id="progress-container">
+                        <span></span>
+                        <p id="progress-status"></p>
+                    </div>
+                    <div class="error-message display-none" id="error-message"></div>
+                </div>
+
+                <div class="results-section display-none" id="results-section">
+                    <div class="section-heading">
+                        <span>03 / Results</span>
+                        <h2>Best loops</h2>
+                    </div>
+                    <div class="info-message display-none" id="info-message"></div>
+                    <div class="route-list" id="route-list"></div>
+                    
+                    <details class="debug-panel" id="debug-panel" style="margin-top: 15px;">
+                        <summary>Generation Debug</summary>
+                        <pre id="debug-content" style="background: var(--bg-card); color: var(--text);"></pre>
+                    </details>
+                </div>
+
+                <details class="debug-panel" id="console-debug-panel" style="margin-top: 15px; display: none;">
+                    <summary>Console Logs</summary>
+                    <textarea id="debug-log" readonly style="width: 100%; height: 160px; font-family: monospace; font-size: 11px; background: var(--bg-card); color: var(--text); border: none; border-top: 1px solid var(--line); padding: 8px; box-sizing: border-box; resize: vertical;" placeholder="Console logs will appear here..."></textarea>
+                    <button id="copy-log-btn" type="button" style="margin: 8px; padding: 6px 12px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 11px;">Copy Logs</button>
+                </details>
+            </aside>
+            <div class="map-shell">
+                <div id="map" class="map"></div>
+                <div class="map-prompt" id="map-prompt">
+                    <span>01</span>
+                    <strong>Choose your trailhead</strong>
+                    <p>Click anywhere on the map to place the start.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="js/pages/gentrail.js"></script>
+</body>
+</html>

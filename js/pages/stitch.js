@@ -324,12 +324,17 @@ function initEvents() {
     });
 }
 
-// Hide debug console on production host (only display on localhost)
+// Hide debug console on production host (only display on localhost and local network development)
 function initDebugVisibility() {
     const debugSection = getElement("debug-section");
     if (debugSection) {
-        const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-        debugSection.style.display = isLocalhost ? "block" : "none";
+        const hostname = window.location.hostname;
+        const isLocal =
+            hostname === "localhost" ||
+            hostname === "127.0.0.1" ||
+            hostname.match(/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/) ||
+            hostname.endsWith(".local");
+        debugSection.style.display = isLocal ? "block" : "none";
     }
 }
 

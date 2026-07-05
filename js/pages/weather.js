@@ -158,9 +158,18 @@ async function fetchWeather(lat, lon) {
     }
   }
 
+  if (!window.location) {
+    throw new Error("Window unloaded");
+  }
+
   // Fetch from MET Norway LocationforecastComplete
   const url = `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`;
   const response = await fetch(url);
+  
+  if (!window.location) {
+    throw new Error("Window unloaded");
+  }
+
   if (!response.ok) {
     throw new Error(`MET Norway API returned status ${response.status}`);
   }
@@ -220,8 +229,17 @@ async function fetchTideData(lat, lon) {
     }
   }
 
+  if (!window.location) {
+    throw new Error("Window unloaded");
+  }
+
   const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=sea_level_height_msl`;
   const response = await fetch(url);
+
+  if (!window.location) {
+    throw new Error("Window unloaded");
+  }
+
   if (!response.ok) {
     throw new Error(`Open-Meteo Marine API returned status ${response.status}`);
   }
@@ -1251,6 +1269,7 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false) {
   }
   try {
     forecastData = await fetchWeather(lat, lon);
+    if (!window.location) return;
     
     currentLoc = { lat, lon, name, isGps };
     saveLocation(currentLoc);
@@ -1282,17 +1301,22 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false) {
 
     // Fetch tide data independently in the background
     tideData = null;
-    fetchTideData(lat, lon).then(data => {
-      tideData = data;
-      const { data: tidePoints, found: tideFound } = getDailyTideSeries(tideData, activeTab);
-      drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
-    }).catch(err => {
-      console.warn("Failed to load tide data in background:", err);
-      tideData = null;
+    if (!isHappyDOM) {
+      fetchTideData(lat, lon).then(data => {
+        tideData = data;
+        const { data: tidePoints, found: tideFound } = getDailyTideSeries(tideData, activeTab);
+        drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
+      }).catch(err => {
+        console.warn("Failed to load tide data in background:", err);
+        tideData = null;
+        drawSingleCurve(tideCanvas, "tide", null, false);
+      });
+    } else {
       drawSingleCurve(tideCanvas, "tide", null, false);
-    });
+    }
 
   } catch (err) {
+    if (!window.location || err.message === "Window unloaded") return;
     console.error(err);
     showError(`Error loading weather forecast: ${err.message}. Please check connection.`);
     setLoaderState(false);
@@ -1747,7 +1771,10 @@ function initWeatherPage() {
     document.body.className = "";
     const url = new URL(window.location.href);
     url.searchParams.delete("reset");
-    window.history.replaceState({}, "", url.pathname + url.search);
+    const isHappyDOM = window.happyDOM || (navigator && navigator.userAgent && /happy-dom|happydom/i.test(navigator.userAgent));
+    if (!isHappyDOM) {
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
   }
 
   // Mount the site layout shell

@@ -85,11 +85,25 @@ const sites = [
     category: "Images",
   },
   {
+    url: "/gentrail.html",
+    name: "GenTrail",
+    about: "Generate, compare, and score walking loops from a trailhead point selected on the map.",
+    category: "Map",
+  },
+  {
     url: "https://twitter.com/peheje",
     name: "Contact",
     about: "",
   },
-];
+].filter(
+  (site) =>
+    !(
+      typeof window !== "undefined" &&
+      window.location &&
+      window.location.hostname.includes("github.io") &&
+      site.url === "/gentrail.html"
+    ),
+);
 
 const internalSites = sites.filter((site) => site.url.startsWith("/"));
 const themes = [
@@ -160,6 +174,7 @@ function getFavoriteSites() {
 }
 
 function getCurrentSite() {
+  if (!window.location) return null;
   return internalSites.find((site) => site.url === window.location.pathname) || null;
 }
 
@@ -266,6 +281,7 @@ function navigateWithTransition(url) {
 }
 
 function switchToRelativeSite(direction) {
+  if (!window.location) return;
   const currentIndex = internalSites.findIndex((site) => site.url === window.location.pathname);
 
   if (currentIndex === -1) {
@@ -278,6 +294,9 @@ function switchToRelativeSite(direction) {
 
 function initPageTransitions() {
   document.addEventListener("click", (event) => {
+    if (!window.location) {
+      return;
+    }
     if (event.defaultPrevented || event.button !== 0) {
       return;
     }
