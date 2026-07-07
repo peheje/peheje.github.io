@@ -45,6 +45,7 @@ const rainCanvas = document.getElementById("rain-canvas");
 const windCanvas = document.getElementById("wind-canvas");
 const tideCanvas = document.getElementById("tide-canvas");
 const cloudsCanvas = document.getElementById("clouds-canvas");
+const moonCanvas = document.getElementById("moon-canvas");
 
 // WHO UV Levels config
 const UV_LEVELS = [
@@ -688,6 +689,7 @@ function drawForecastCurves() {
   const { data: tidePoints, found: tideFound } = getDailyTideSeries(tideData, activeTab);
   drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
   drawSingleCurve(cloudsCanvas, "clouds", dayPoints);
+  drawSingleCurve(moonCanvas, "moon", dayPoints);
 }
 
 // Canvas rendering helper for a single curve parameters
@@ -724,6 +726,11 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   const accent2Color = computedStyle.getPropertyValue("--accent-2").trim() || "#d4763a";
 
   ctx.clearRect(0, 0, W, H);
+
+  if (paramType === "moon") {
+    renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, accentColor, dayPoints);
+    return;
+  }
 
   if (!dataFound || !dayPoints) {
     ctx.save();
@@ -1884,6 +1891,295 @@ function initWeatherPage() {
         }
       }
     }
+  });
+}
+
+// Calculate moon phase parameters for a given date
+function getMoonPhase(date) {
+  const referenceNewMoon = new Date("2000-01-06T18:14:00Z");
+  const synodicMonth = 29.530588853;
+  const diffMs = date.getTime() - referenceNewMoon.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  const phaseFraction = (diffDays / synodicMonth) % 1;
+  const normalizedFraction = phaseFraction < 0 ? phaseFraction + 1 : phaseFraction;
+  const age = normalizedFraction * synodicMonth;
+  
+  let name = "";
+  let emoji = "";
+  if (age < 1.38 || age > 28.15) {
+    name = "New Moon";
+    emoji = "🌑";
+  } else if (age < 6.0) {
+    name = "Waxing Crescent";
+    emoji = "🌒";
+  } else if (age < 8.76) {
+    name = "First Quarter";
+    emoji = "🌓";
+  } else if (age < 13.38) {
+    name = "Waxing Gibbous";
+    emoji = "🌔";
+  } else if (age < 16.15) {
+    name = "Full Moon";
+    emoji = "🌕";
+  } else if (age < 20.77) {
+    name = "Waning Gibbous";
+    emoji = "🌖";
+  } else if (age < 23.53) {
+    name = "Third Quarter";
+    emoji = "🌗";
+  } else {
+    name = "Waning Crescent";
+    emoji = "🌘";
+  }
+  
+  const illumination = (1 - Math.cos(normalizedFraction * 2 * Math.PI)) / 2;
+  
+  return {
+    fraction: normalizedFraction,
+    age: age,
+    illumination: illumination,
+    name: name,
+    emoji: emoji
+  };
+}
+
+// Draw a moon sphere graphic on canvas representing the phase
+function drawMoonGraphic(ctx, cx, cy, R, norm, darkMoonBg, darkMoonBorder, lightMoonBg) {
+  const isWaxing = norm <= 0.5;
+  
+  // 1. Draw full dark background circle
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+  ctx.fillStyle = darkMoonBg;
+  ctx.strokeStyle = darkMoonBorder;
+  ctx.lineWidth = 1;
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+  
+  // 2. Draw lit side using clipping
+  ctx.save();
+  ctx.beginPath();
+  if (isWaxing) {
+    ctx.rect(cx, cy - R, R + 2, R * 2 + 4);
+  } else {
+    ctx.rect(cx - R - 2, cy - R, R + 2, R * 2 + 4);
+  }
+  ctx.clip();
+  
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+  ctx.fillStyle = lightMoonBg;
+  ctx.fill();
+  ctx.restore();
+  
+  // 3. Draw the terminator ellipse
+  ctx.save();
+  const k = isWaxing ? norm : (1 - norm);
+  const W_term = R * Math.abs(1 - 4 * k);
+  
+  if (W_term > 0.01) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, W_term, R, 0, 0, 2 * Math.PI);
+    if (k < 0.25) {
+      ctx.fillStyle = darkMoonBg;
+    } else {
+      ctx.fillStyle = lightMoonBg;
+    }
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Render the entire Moon Phase dashboard inside its card
+function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, accentColor, dayPoints) {
+  let isLightMode = false;
+  if (textColor.startsWith("#")) {
+    const hex = textColor.substring(1);
+    const r = parseInt(hex.substring(0, 2), 16) || 0;
+    const g = parseInt(hex.substring(2, 4), 16) || 0;
+    const b = parseInt(hex.substring(4, 6), 16) || 0;
+    isLightMode = (r * 0.299 + g * 0.587 + b * 0.114) < 128;
+  } else if (textColor.startsWith("rgb")) {
+    const match = textColor.match(/\d+/g);
+    if (match) {
+      const r = parseInt(match[0], 10) || 0;
+      const g = parseInt(match[1], 10) || 0;
+      const b = parseInt(match[2], 10) || 0;
+      isLightMode = (r * 0.299 + g * 0.587 + b * 0.114) < 128;
+    }
+  }
+
+  const darkMoonBg = isLightMode ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.08)";
+  const darkMoonBorder = isLightMode ? "rgba(0, 0, 0, 0.12)" : "rgba(255, 255, 255, 0.12)";
+  const lightMoonBg = isLightMode ? accentColor : "#fffae8";
+  
+  // 1. Calculate active date & moon phase details for the main moon display
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + activeTab);
+  if (hoverHour !== null) {
+    targetDate.setHours(hoverHour, 0, 0, 0);
+  } else if (activeTab === 0) {
+    // Keep current hour
+  } else {
+    targetDate.setHours(12, 0, 0, 0);
+  }
+  
+  const mainPhase = getMoonPhase(targetDate);
+  const isCompact = W < 450;
+  
+  // Main Moon position & size (centered!)
+  const mainMoonRadius = isCompact ? 24 : 28;
+  const mainMoonCx = W / 2;
+  const mainMoonCy = 36;
+  
+  drawMoonGraphic(ctx, mainMoonCx, mainMoonCy, mainMoonRadius, mainPhase.fraction, darkMoonBg, darkMoonBorder, lightMoonBg);
+  
+  // Draw stats centered underneath the main moon
+  ctx.save();
+  ctx.fillStyle = textColor;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  
+  // Title (Phase Name)
+  ctx.font = `bold ${isCompact ? "12px" : "13px"} sans-serif`;
+  ctx.fillText(mainPhase.name, W / 2, 76);
+  
+  // Sub-stats (Illumination, Age, Next Full Moon)
+  let daysToFull = 0;
+  if (mainPhase.fraction <= 0.5) {
+    daysToFull = (0.5 - mainPhase.fraction) * 29.53059;
+  } else {
+    daysToFull = (1.5 - mainPhase.fraction) * 29.53059;
+  }
+  
+  const dateOptions = { month: 'short', day: 'numeric' };
+  const dateStr = targetDate.toLocaleDateString([], dateOptions);
+  const timeStr = hoverHour !== null ? `${String(hoverHour).padStart(2, '0')}:00` : dateStr;
+  
+  ctx.font = `${isCompact ? "9px" : "10px"} sans-serif`;
+  ctx.fillStyle = mutedColor;
+  const statsLine = `Illumination: ${(mainPhase.illumination * 100).toFixed(0)}%   •   Age: ${mainPhase.age.toFixed(1)}d   •   Full Moon: in ${daysToFull.toFixed(1)}d   •   Time: ${timeStr}`;
+  ctx.fillText(statsLine, W / 2, 94);
+  
+  // Draw horizontal divider line
+  ctx.beginPath();
+  ctx.moveTo(W * 0.15, 108);
+  ctx.lineTo(W * 0.85, 108);
+  ctx.strokeStyle = isLightMode ? "rgba(0, 0, 0, 0.06)" : "rgba(255, 255, 255, 0.06)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+  
+  // 2. Render the sliding 7-day trend timeline centered at the bottom
+  const graphStartX = W * 0.12;
+  const graphEndX = W - W * 0.12;
+  const graphWidth = graphEndX - graphStartX;
+  
+  // Collect 7 days of sliding data
+  const daysData = [];
+  for (let s = 0; s < 7; s++) {
+    const dayOffset = s - 3;
+    const targetDayIndex = activeTab + dayOffset;
+    
+    const d = new Date();
+    d.setDate(d.getDate() + targetDayIndex);
+    d.setHours(12, 0, 0, 0);
+    
+    daysData.push({
+      slot: s,
+      dayIndex: targetDayIndex,
+      phase: getMoonPhase(d),
+      x: graphStartX + (s / 6) * graphWidth
+    });
+  }
+  
+  // Layout Y geometry (vertical height bounds)
+  const topTextY = 126;
+  const bottomTextY = H - 18;
+  
+  const curveMinY = 144;
+  const curveMaxY = H - 38;
+  const curveH = curveMaxY - curveMinY;
+  const getY = (ill) => curveMinY + (1 - ill) * curveH;
+  
+  // Draw curve connecting the mini moons
+  ctx.save();
+  ctx.beginPath();
+  daysData.forEach((day, idx) => {
+    const y = getY(day.phase.illumination);
+    if (idx === 0) {
+      ctx.moveTo(day.x, y);
+    } else {
+      ctx.lineTo(day.x, y);
+    }
+  });
+  ctx.strokeStyle = isLightMode ? "rgba(0, 0, 0, 0.15)" : "rgba(255, 255, 255, 0.18)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([2, 3]);
+  ctx.stroke();
+  ctx.restore();
+  
+  // Draw small moons, fixed text labels, and vertical dotted connection lines
+  daysData.forEach(day => {
+    const y = getY(day.phase.illumination);
+    const r = isCompact ? 10 : 12; // Beautifully sized mini-moons
+    const isActive = day.slot === 3;
+    
+    // Vertical dotted alignment line
+    ctx.save();
+    ctx.strokeStyle = isLightMode ? "rgba(0, 0, 0, 0.08)" : "rgba(255, 255, 255, 0.08)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([1, 2]);
+    ctx.beginPath();
+    ctx.moveTo(day.x, topTextY + 6);
+    ctx.lineTo(day.x, bottomTextY - 6);
+    ctx.stroke();
+    ctx.restore();
+    
+    if (isActive) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(day.x, y, r + 4, 0, 2 * Math.PI);
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+    
+    // Draw the mini moon
+    drawMoonGraphic(ctx, day.x, y, r, day.phase.fraction, darkMoonBg, darkMoonBorder, lightMoonBg);
+    
+    // Weekday label
+    ctx.save();
+    let dayName = "";
+    if (day.dayIndex === 0) {
+      dayName = "Today";
+      ctx.fillStyle = textColor;
+      ctx.font = `bold ${isCompact ? "8px" : "9px"} sans-serif`;
+    } else {
+      const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const d = new Date();
+      d.setDate(d.getDate() + day.dayIndex);
+      dayName = weekdays[d.getDay()];
+      
+      ctx.fillStyle = isActive ? accentColor : mutedColor;
+      ctx.font = `${isActive ? "bold" : "normal"} ${isCompact ? "8px" : "9px"} sans-serif`;
+    }
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(dayName, day.x, topTextY);
+    ctx.restore();
+    
+    // Illumination percentage
+    ctx.save();
+    ctx.fillStyle = textColor;
+    ctx.font = `${isCompact ? "8px" : "9px"} sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${(day.phase.illumination * 100).toFixed(0)}%`, day.x, bottomTextY);
+    ctx.restore();
   });
 }
 
