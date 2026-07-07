@@ -1712,6 +1712,7 @@ function showContextMenu(x, y, card) {
     uv: "MET Norway",
     wind: "MET Norway",
     tide: "Open-Meteo",
+    moon: "Local Calculation",
     radar: "Windy"
   };
   const sourceName = CARD_SOURCES[key] || "Unknown";
