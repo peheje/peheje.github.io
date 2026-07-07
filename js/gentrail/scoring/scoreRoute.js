@@ -53,6 +53,12 @@ export class DefaultRouteScorer {
         "motorway",
         featureDistances,
       ),
+      minorRoadPenalty: scoreRoadPenalty(
+        route,
+        osmFeatures,
+        "minorRoad",
+        featureDistances,
+      ),
       repetitionPenalty: scoreRepetitionPenalty(
         route,
         context.repetitionMetrics,
@@ -83,12 +89,15 @@ export class DefaultRouteScorer {
 
     const roadWeight = preferences.avoidRoads * SCORING_WEIGHTS.negative.roadMultiplier;
     const motorwayWeight = preferences.avoidHighways * SCORING_WEIGHTS.negative.motorwayMultiplier;
+    const minorRoadWeight = preferences.avoidMinorRoads * SCORING_WEIGHTS.negative.minorRoadMultiplier;
     const repetitionWeight = preferences.avoidRepetitions * SCORING_WEIGHTS.negative.repetitionMultiplier;
     const urbanWeight = preferences.forest * SCORING_WEIGHTS.negative.urbanMultiplier;
     components.roadPenalty.weightedPoints =
       -(components.roadPenalty.value / 100) * roadWeight;
     components.motorwayPenalty.weightedPoints =
       -(components.motorwayPenalty.value / 100) * motorwayWeight;
+    components.minorRoadPenalty.weightedPoints =
+      -(components.minorRoadPenalty.value / 100) * minorRoadWeight;
     components.repetitionPenalty.weightedPoints =
       -(components.repetitionPenalty.value / 100) * repetitionWeight;
     components.urbanPenalty.weightedPoints =
@@ -101,6 +110,7 @@ export class DefaultRouteScorer {
           ((positive +
             components.roadPenalty.weightedPoints +
             components.motorwayPenalty.weightedPoints +
+            components.minorRoadPenalty.weightedPoints +
             components.repetitionPenalty.weightedPoints +
             components.urbanPenalty.weightedPoints) /
             maximum) *

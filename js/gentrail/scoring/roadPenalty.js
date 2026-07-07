@@ -3,13 +3,24 @@ import { minimumDistanceToFeatureMeters } from "../geo.js";
 export function scoreRoadPenalty(route, features, category, featureDistances) {
   const matches = features.filter((feature) => feature.category === category);
   if (!matches.length) {
+    let typeName = "primary/secondary road";
+    if (category === "motorway") typeName = "motorway/trunk";
+    else if (category === "minorRoad") typeName = "minor road/street";
+
     return {
       value: 0,
       weightedPoints: 0,
-      explanation: `No ${category === "motorway" ? "motorway/trunk" : "primary/secondary road"} features found nearby.`,
+      explanation: `No ${typeName} features found nearby.`,
     };
   }
-  const threshold = category === "motorway" ? 250 : 80;
+
+  let threshold = 80;
+  if (category === "motorway") {
+    threshold = 250;
+  } else if (category === "minorRoad") {
+    threshold = 50;
+  }
+
   const distances = matches
     .map(
       (feature) =>
@@ -22,9 +33,14 @@ export function scoreRoadPenalty(route, features, category, featureDistances) {
   const value = Math.round(
     100 * Math.max(0, 1 - nearest / threshold) * Math.min(1, 0.65 + closeCount * 0.12),
   );
+
+  let explanationLabel = "major road";
+  if (category === "motorway") explanationLabel = "motorway/trunk";
+  else if (category === "minorRoad") explanationLabel = "minor road/street";
+
   return {
     value,
     weightedPoints: 0,
-    explanation: `Nearest ${category === "motorway" ? "motorway/trunk" : "major road"}: ${Math.round(nearest)} m.`,
+    explanation: `Nearest ${explanationLabel}: ${Math.round(nearest)} m.`,
   };
 }

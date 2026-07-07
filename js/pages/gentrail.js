@@ -79,7 +79,7 @@ initDebugVisibility();
 
 // State variables
 let start = null;
-let targetDistanceKm = 3;
+let targetDistanceKm = parseFloat(localStorage.getItem("gentrail-target-distance")) || 3;
 let candidateCount = 3;
 let preferences = {
   forest: 7,
@@ -87,6 +87,7 @@ let preferences = {
   water: 5,
   avoidRoads: 8,
   avoidHighways: 10,
+  avoidMinorRoads: 3,
   avoidRepetitions: 9,
   elevation: 3,
 };
@@ -156,6 +157,13 @@ function initMap() {
       return;
     }
 
+    // Prevent accidental click-away if routes are already generated
+    if (routes && routes.length > 0) {
+      if (!confirm("Are you sure you want to discard the generated routes and select a new trailhead?")) {
+        return;
+      }
+    }
+
     // Set trailhead start point
     setStartPoint({
       lng: event.lngLat.lng,
@@ -212,7 +220,7 @@ function clearMapRoutes() {
 }
 
 // Bind sliders
-const preferencesKeys = ["forest", "trail", "water", "avoidRoads", "avoidHighways", "avoidRepetitions", "elevation"];
+const preferencesKeys = ["forest", "trail", "water", "avoidRoads", "avoidHighways", "avoidMinorRoads", "avoidRepetitions", "elevation"];
 preferencesKeys.forEach((key) => {
   const input = document.getElementById(`pref-${key}`);
   const output = document.getElementById(`val-${key}`);
@@ -229,6 +237,7 @@ preferencesKeys.forEach((key) => {
 inputTargetDistance.addEventListener("change", (e) => {
   targetDistanceKm = Math.max(1, Math.min(40, parseFloat(e.target.value) || 1));
   inputTargetDistance.value = targetDistanceKm;
+  localStorage.setItem("gentrail-target-distance", targetDistanceKm);
 });
 
 selectCandidateCount.addEventListener("change", (e) => {
@@ -360,6 +369,16 @@ function buildRouteCard(scoredRoute, index) {
     <div class="warnings">
       ${score.warnings.map(w => `<span>${w}</span>`).join("")}
     </div>
+    <div class="route-card__actions" style="margin-top: 12px; display: flex; justify-content: flex-end;">
+      <button class="gpx-export-btn" title="Download GPX file">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; display: inline-block; vertical-align: middle;">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Export GPX</span>
+      </button>
+    </div>
     <div class="score-breakdown display-none" id="breakdown-${route.candidateId}">
       <!-- Score breakdown rows -->
     </div>
@@ -386,6 +405,14 @@ function buildRouteCard(scoredRoute, index) {
     `;
     breakdownContainer.appendChild(row);
   });
+
+  const exportBtn = card.querySelector(".gpx-export-btn");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      downloadGPX(scoredRoute, index);
+    });
+  }
 
   card.addEventListener("click", () => {
     selectRoute(route.candidateId);
@@ -510,3 +537,41 @@ function loadStoredStartPoint() {
 // Initialize
 initMap();
 loadStoredStartPoint();
+inputTargetDistance.value = targetDistanceKm;
+
+function downloadGPX(scoredRoute, index) {
+  const { route } = scoredRoute;
+  const name = `GenTrail_Hike_Loop_${index + 1}`;
+  const coordinates = route.coordinates;
+  
+  let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="GenTrail" xmlns="http://www.topographic.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topographic.com/GPX/1/1 http://www.topographic.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>${name}</name>
+    <desc>Generated route from GenTrail with distance ${(route.distanceMeters / 1000).toFixed(2)} km</desc>
+    <time>${new Date().toISOString()}</time>
+  </metadata>
+  <trk>
+    <name>${name}</name>
+    <desc>GenTrail Route - Option ${index + 1}</desc>
+    <trkseg>
+`;
+
+  coordinates.forEach(coord => {
+    gpxContent += `      <trkpt lat="${coord.lat}" lon="${coord.lng}"></trkpt>\n`;
+  });
+
+  gpxContent += `    </trkseg>
+  </trk>
+</gpx>`;
+
+  const blob = new Blob([gpxContent], { type: "application/gpx+xml" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${name}.gpx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}

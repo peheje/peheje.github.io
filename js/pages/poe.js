@@ -99,7 +99,7 @@ function readStoredNumber(key, fallback) {
 }
 
 function saveSettings(limitInput, resetDayInput) {
-  const limit = Math.max(1, Math.round(limitInput.valueAsNumber || 1000000));
+  const limit = Math.max(1, Math.round(limitInput.valueAsNumber || 660000));
   const resetDay = clampResetDay(resetDayInput.valueAsNumber || 1);
   limitInput.value = String(limit);
   resetDayInput.value = String(resetDay);
@@ -533,7 +533,7 @@ function initPoePage() {
   const resetDayInput = getElement("poe-reset-day");
   const statusElement = getElement("poe-status");
 
-  limitInput.value = String(Math.max(1, readStoredNumber(monthlyLimitKey, 1000000)));
+  limitInput.value = String(Math.max(1, readStoredNumber(monthlyLimitKey, 660000)));
   resetDayInput.value = String(clampResetDay(readStoredNumber(resetDayKey, 1)));
 
   let parsedRows = [];

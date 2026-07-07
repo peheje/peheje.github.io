@@ -122,9 +122,17 @@ function categoriesFor(tags) {
   if (tags.natural === "beach") result.add("beach");
   if (["motorway", "trunk"].includes(tags.highway)) result.add("motorway");
   if (["primary", "secondary"].includes(tags.highway)) result.add("road");
+  
+  const isUnpaved = ["gravel", "ground", "dirt", "unpaved", "grass", "sand", "woodchips", "bark"].includes(tags.surface);
+  if (
+    ["tertiary", "residential", "service", "unclassified", "living_street"].includes(tags.highway) &&
+    !isUnpaved
+  ) {
+    result.add("minorRoad");
+  }
   if (
     ["path", "footway", "track"].includes(tags.highway) ||
-    ["gravel", "ground", "dirt", "unpaved"].includes(tags.surface)
+    isUnpaved
   ) {
     result.add("trail");
   }

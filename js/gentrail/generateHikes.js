@@ -249,39 +249,61 @@ async function generateHikesWithWorker(
       }
     }
 
-    // Crossover: pair with other seeds
+    // Crossover: pair with other seeds using Intersection Crossover
     for (let j = i + 1; j < topSeeds.length; j++) {
-      const partner = topSeeds[j];
+      const partner = topSeeds[j].route;
       if (!partner.c1 || !partner.c2) continue;
 
-      // Crossover 1: seed C1 + partner C2
       signal?.throwIfAborted();
-      evCount++;
-      onProgress?.(`Evolving candidate ${evCount}/${totalEvolved}... (${elapsed()}s)`);
+      
+      const intersectionOffspring = performIntersectionCrossover(
+        seed,
+        partner,
+        finalSnapAdjacency,
+        nodeCoords,
+        startNodeId
+      );
 
-      const crossRoute1 = routeLoop(startNodeId, seed.c1, partner.c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency);
-      if (crossRoute1) {
-        evolvedCandidates.push({
-          ...crossRoute1,
-          candidateId: `evolved-cross1-${i}-${j}-${Date.now()}`,
-          c1: seed.c1,
-          c2: partner.c2
+      if (intersectionOffspring.length > 0) {
+        intersectionOffspring.forEach((crossRoute, idx) => {
+          evCount++;
+          onProgress?.(`Evolving candidate (intersection) ${evCount}... (${elapsed()}s)`);
+          evolvedCandidates.push({
+            ...crossRoute,
+            candidateId: `evolved-cross-intersection-${i}-${j}-${idx}-${Date.now()}`,
+            c1: seed.c1,
+            c2: partner.c2
+          });
         });
-      }
+      } else {
+        // Fallback to geometry-based crossover if no intersection found
+        // Crossover 1: seed C1 + partner C2
+        evCount++;
+        onProgress?.(`Evolving candidate (geom fallback 1) ${evCount}... (${elapsed()}s)`);
 
-      // Crossover 2: partner C1 + seed C2
-      signal?.throwIfAborted();
-      evCount++;
-      onProgress?.(`Evolving candidate ${evCount}/${totalEvolved}... (${elapsed()}s)`);
+        const crossRoute1 = routeLoop(startNodeId, seed.c1, partner.c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency);
+        if (crossRoute1) {
+          evolvedCandidates.push({
+            ...crossRoute1,
+            candidateId: `evolved-cross1-fallback-${i}-${j}-${Date.now()}`,
+            c1: seed.c1,
+            c2: partner.c2
+          });
+        }
 
-      const crossRoute2 = routeLoop(startNodeId, partner.c1, seed.c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency);
-      if (crossRoute2) {
-        evolvedCandidates.push({
-          ...crossRoute2,
-          candidateId: `evolved-cross2-${i}-${j}-${Date.now()}`,
-          c1: partner.c1,
-          c2: seed.c2
-        });
+        // Crossover 2: partner C1 + seed C2
+        evCount++;
+        onProgress?.(`Evolving candidate (geom fallback 2) ${evCount}... (${elapsed()}s)`);
+
+        const crossRoute2 = routeLoop(startNodeId, partner.c1, seed.c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency);
+        if (crossRoute2) {
+          evolvedCandidates.push({
+            ...crossRoute2,
+            candidateId: `evolved-cross2-fallback-${i}-${j}-${Date.now()}`,
+            c1: partner.c1,
+            c2: seed.c2
+          });
+        }
       }
     }
   }
@@ -572,6 +594,10 @@ function routeLoop(startNodeId, c1, c2, snapGraph, snapAdjacency, nodeCoords, ad
   if (!p3) return null;
 
   const nodePath = [...p1, ...p2.slice(1), ...p3.slice(1)];
+  return buildRouteFromNodePath(nodePath, adjacency, nodeCoords);
+}
+
+function buildRouteFromNodePath(nodePath, adjacency, nodeCoords) {
   const coords = nodePath.map((id) => nodeCoords.get(id));
 
   let distanceMeters = 0;
@@ -597,6 +623,7 @@ function routeLoop(startNodeId, c1, c2, snapGraph, snapAdjacency, nodeCoords, ad
   const geometry = lineFromLatLng(coords);
 
   return {
+    nodePath,
     coordinates: coords,
     geometry,
     distanceMeters,
@@ -608,6 +635,58 @@ function routeLoop(startNodeId, c1, c2, snapGraph, snapAdjacency, nodeCoords, ad
       descentMeters: null
     }
   };
+}
+
+function performIntersectionCrossover(routeA, routeB, adjacency, nodeCoords, startNodeId) {
+  if (!routeA.nodePath || !routeB.nodePath) return [];
+
+  const pathA = routeA.nodePath;
+  const pathB = routeB.nodePath;
+
+  // Find all shared nodes, excluding the trailhead
+  const setA = new Set(pathA);
+  const sharedNodes = [];
+  
+  for (let idxB = 0; idxB < pathB.length; idxB++) {
+    const node = pathB[idxB];
+    if (node !== startNodeId && setA.has(node)) {
+      const idxA = pathA.indexOf(node);
+      // Ensure the node occurs at valid positions in both (excluding the very ends)
+      if (idxA > 0 && idxA < pathA.length - 1 && idxB > 0 && idxB < pathB.length - 1) {
+        sharedNodes.push({ node, idxA, idxB });
+      }
+    }
+  }
+
+  if (sharedNodes.length === 0) return [];
+
+  // Sort by proximity to midpoints of both paths
+  sharedNodes.sort((x, y) => {
+    const midA = pathA.length / 2;
+    const midB = pathB.length / 2;
+    const distX = Math.abs(x.idxA - midA) + Math.abs(x.idxB - midB);
+    const distY = Math.abs(y.idxA - midA) + Math.abs(y.idxB - midB);
+    return distX - distY;
+  });
+
+  const offspring = [];
+  // Use the best 2 intersection points to avoid generating too many similar routes
+  const pointsToUse = sharedNodes.slice(0, 2);
+
+  for (const { idxA, idxB } of pointsToUse) {
+    // Child 1: Route A first half + Route B second half
+    const pathChild1 = [...pathA.slice(0, idxA), ...pathB.slice(idxB)];
+    // Child 2: Route B first half + Route A second half
+    const pathChild2 = [...pathB.slice(0, idxB), ...pathA.slice(idxA)];
+
+    const r1 = buildRouteFromNodePath(pathChild1, adjacency, nodeCoords);
+    const r2 = buildRouteFromNodePath(pathChild2, adjacency, nodeCoords);
+
+    if (r1 && r1.distanceMeters > 0) offspring.push(r1);
+    if (r2 && r2.distanceMeters > 0) offspring.push(r2);
+  }
+
+  return offspring;
 }
 
 function getReachableSubGraph(adjacency, startNodeId) {

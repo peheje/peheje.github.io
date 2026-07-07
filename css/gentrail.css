@@ -561,6 +561,35 @@
   }
 }
 
+.gpx-export-btn {
+  padding: 6px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.gpx-export-btn:hover {
+  background: var(--line) !important;
+  border-color: var(--muted) !important;
+}
+
+.gpx-export-btn svg {
+  color: var(--muted);
+  transition: color 150ms ease;
+}
+
+.gpx-export-btn:hover svg {
+  color: var(--text);
+}
+
 @media (max-width: 760px) {
   .gentrail-app {
     grid-template-columns: 1fr;

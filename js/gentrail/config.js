@@ -17,6 +17,7 @@ export const SCORING_WEIGHTS = {
   negative: {
     roadMultiplier: 0.95,
     motorwayMultiplier: 1.35,
+    minorRoadMultiplier: 0.35,
     repetitionMultiplier: 2.2,
     urbanMultiplier: 2, // multiplied by preference.forest
   },
