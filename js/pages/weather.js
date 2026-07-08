@@ -1,4 +1,5 @@
 import { mountSiteShell } from "../site.js";
+import SunCalc from "../lib/suncalc.js";
 
 // Default location (Oslo, Norway)
 const DEFAULT_LOC = {
@@ -650,6 +651,28 @@ function updateDashboardUI(data) {
   document.getElementById("uv-max").textContent = maxUV.toFixed(1);
   document.getElementById("uv-max-time").textContent = `${String(maxUVHour).padStart(2, '0')}:00`;
 
+  // Calculate Sunrise and Sunset for Today
+  try {
+    const today = new Date();
+    const sunTimes = SunCalc.getTimes(today, currentLoc.lat, currentLoc.lon);
+    if (sunTimes && sunTimes.sunrise && !isNaN(sunTimes.sunrise.getTime())) {
+      const sunriseStr = `${String(sunTimes.sunrise.getHours()).padStart(2, '0')}:${String(sunTimes.sunrise.getMinutes()).padStart(2, '0')}`;
+      document.getElementById("uv-sunrise").textContent = sunriseStr;
+    } else {
+      document.getElementById("uv-sunrise").textContent = "--:--";
+    }
+    if (sunTimes && sunTimes.sunset && !isNaN(sunTimes.sunset.getTime())) {
+      const sunsetStr = `${String(sunTimes.sunset.getHours()).padStart(2, '0')}:${String(sunTimes.sunset.getMinutes()).padStart(2, '0')}`;
+      document.getElementById("uv-sunset").textContent = sunsetStr;
+    } else {
+      document.getElementById("uv-sunset").textContent = "--:--";
+    }
+  } catch (err) {
+    console.error("Failed to calculate sunrise/sunset:", err);
+    document.getElementById("uv-sunrise").textContent = "--:--";
+    document.getElementById("uv-sunset").textContent = "--:--";
+  }
+
   // Draw forecast day selection tabs
   renderDayTabs();
 
@@ -1062,6 +1085,71 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
     ctx.stroke();
     ctx.restore();
+
+    // Draw sunrise and sunset lines on the UV curve
+    if (paramType === "uv") {
+      try {
+        const targetDate = new Date();
+        targetDate.setDate(targetDate.getDate() + activeTab);
+        const sunTimes = SunCalc.getTimes(targetDate, currentLoc.lat, currentLoc.lon);
+        const sunrise = sunTimes.sunrise;
+        const sunset = sunTimes.sunset;
+
+        if (sunrise && !isNaN(sunrise.getTime())) {
+          const sunriseHour = sunrise.getHours() + sunrise.getMinutes() / 60 + sunrise.getSeconds() / 3600;
+          const xSunrise = getX(sunriseHour);
+          if (xSunrise >= paddingL && xSunrise <= W - paddingR) {
+            ctx.save();
+            ctx.strokeStyle = "rgba(234, 179, 8, 0.45)"; // Amber/yellow dashed line
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(xSunrise, paddingT + 32);
+            ctx.lineTo(xSunrise, H - paddingB);
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            ctx.fillStyle = textColor;
+            ctx.font = "bold 9px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            const timeStr = `${String(sunrise.getHours()).padStart(2, '0')}:${String(sunrise.getMinutes()).padStart(2, '0')}`;
+            ctx.fillText("Sunrise", xSunrise, paddingT + 5);
+            ctx.fillText(timeStr, xSunrise, paddingT + 17);
+            ctx.restore();
+          }
+        }
+
+        if (sunset && !isNaN(sunset.getTime())) {
+          const sunsetHour = sunset.getHours() + sunset.getMinutes() / 60 + sunset.getSeconds() / 3600;
+          const xSunset = getX(sunsetHour);
+          if (xSunset >= paddingL && xSunset <= W - paddingR) {
+            ctx.save();
+            ctx.strokeStyle = "rgba(168, 85, 247, 0.45)"; // Purple/dusk dashed line
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(xSunset, paddingT + 32);
+            ctx.lineTo(xSunset, H - paddingB);
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            ctx.fillStyle = textColor;
+            ctx.font = "bold 9px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            const timeStr = `${String(sunset.getHours()).padStart(2, '0')}:${String(sunset.getMinutes()).padStart(2, '0')}`;
+            ctx.fillText("Sunset", xSunset, paddingT + 5);
+            ctx.fillText(timeStr, xSunset, paddingT + 17);
+            ctx.restore();
+          }
+        }
+      } catch (err) {
+        console.error("Error drawing sunrise/sunset lines:", err);
+      }
+    }
 
     // 4b. Draw wind direction arrows at 3-hour intervals
     if (paramType === "wind") {
@@ -1541,6 +1629,59 @@ function saveMinimizedStates() {
   localStorage.setItem("weather_graphs_minimized", JSON.stringify(states));
 }
 
+// Update the hidden curves bar with pills
+function updateHiddenCurvesBar() {
+  const bar = document.getElementById("hidden-curves-bar");
+  const pillsContainer = document.getElementById("hidden-curves-pills");
+  if (!bar || !pillsContainer) return;
+
+  pillsContainer.innerHTML = "";
+  let anyHidden = false;
+
+  document.querySelectorAll(".graphs-grid .graph-card").forEach(card => {
+    const key = card.getAttribute("data-key");
+    if (card.classList.contains("minimized")) {
+      anyHidden = true;
+      
+      const titleEl = card.querySelector(".curve-title");
+      let title = key;
+      if (titleEl) {
+        const clone = titleEl.cloneNode(true);
+        const dateEl = clone.querySelector(".graph-date");
+        if (dateEl) dateEl.remove();
+        title = clone.textContent.trim();
+      }
+
+      const pill = document.createElement("button");
+      pill.className = "hidden-curve-pill";
+      pill.style.cssText = "display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; font-size: 0.7rem; border-radius: 12px; background: var(--bg-soft); border: 1px dashed var(--muted); color: var(--text); cursor: pointer; transition: all 0.2s; font-weight: 500; line-height: 1.2;";
+      pill.innerHTML = `<span>+ ${title}</span>`;
+      
+      pill.onmouseover = () => {
+        pill.style.borderColor = "var(--accent)";
+        pill.style.color = "var(--accent)";
+        pill.style.background = "var(--nav-hover-bg)";
+      };
+      pill.onmouseout = () => {
+        pill.style.borderColor = "var(--muted)";
+        pill.style.color = "var(--text)";
+        pill.style.background = "var(--bg-soft)";
+      };
+
+      pill.addEventListener("click", () => {
+        card.classList.remove("minimized");
+        saveMinimizedStates();
+        updateHiddenCurvesBar();
+        drawForecastCurves();
+      });
+
+      pillsContainer.appendChild(pill);
+    }
+  });
+
+  bar.style.display = anyHidden ? "flex" : "none";
+}
+
 // Restore minimized states of graph cards from LocalStorage
 function restoreMinimizedStates() {
   const stored = localStorage.getItem("weather_graphs_minimized");
@@ -1557,6 +1698,7 @@ function restoreMinimizedStates() {
       console.warn("Failed to restore minimized states:", e);
     }
   }
+  updateHiddenCurvesBar();
 }
 
 // Setup context menu (right click & long press) on graph headers
@@ -1706,6 +1848,7 @@ function showContextMenu(x, y, card) {
   btnToggle.addEventListener("click", () => {
     card.classList.toggle("minimized");
     saveMinimizedStates();
+    updateHiddenCurvesBar();
     drawForecastCurves();
     menu.remove();
   });
