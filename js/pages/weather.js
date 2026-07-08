@@ -1844,8 +1844,17 @@ function initWeatherPage() {
     }
   });
 
-  // Canvas drawing & resize event listeners
-  window.addEventListener("resize", drawForecastCurves);
+  // Redraw canvases on window resize using requestAnimationFrame throttling
+  let resizeTimeout = null;
+  window.addEventListener("resize", () => {
+    if (resizeTimeout) {
+      window.cancelAnimationFrame(resizeTimeout);
+    }
+    resizeTimeout = window.requestAnimationFrame(() => {
+      drawForecastCurves();
+      resizeTimeout = null;
+    });
+  });
 
   // Bind synced mouse/touch event listeners across all canvases
   [uvCanvas, tempCanvas, rainCanvas, windCanvas, tideCanvas, cloudsCanvas].forEach(canvas => {
