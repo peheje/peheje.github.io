@@ -22,7 +22,8 @@ let globalLimits = {
   uvMax: 10,
   tempMin: 0,
   tempMax: 10,
-  rainMax: 2.0
+  rainMax: 2.0,
+  windMax: 8
 };
 
 // DOM Elements
@@ -808,7 +809,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       gridLevels.push(val);
     }
   } else if (paramType === "wind") {
-    const maxVal = globalLimits ? globalLimits.windMax : Math.max(...dayPoints.map(p => p.windSpeed), 0);
+    const maxVal = (globalLimits && globalLimits.windMax !== undefined) ? globalLimits.windMax : Math.max(...dayPoints.map(p => p.windSpeed), 0);
     minScaleY = 0;
     let step = 2;
     if (maxVal > 20) {
@@ -817,6 +818,12 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     } else if (maxVal > 10) {
       step = 4;
       maxScaleY = Math.ceil(maxVal / 4) * 4;
+    } else if (maxVal > 8.5) {
+      step = 2;
+      maxScaleY = 10;
+    } else if (maxVal > 6.0) {
+      step = 2;
+      maxScaleY = 8;
     } else {
       step = 2;
       maxScaleY = Math.max(4, Math.ceil(maxVal / 2) * 2);
