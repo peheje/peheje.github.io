@@ -1,5 +1,11 @@
 export class AnalysisWorkerClient {
   constructor() {
+    if (typeof window === "undefined" || typeof Worker === "undefined") {
+      this.isNode = true;
+      this.nextId = 1;
+      this.pending = new Map();
+      return;
+    }
     this.worker = new Worker(
       "js/gentrail/analysis-worker.js",
       { type: "module" },
@@ -40,11 +46,21 @@ export class AnalysisWorkerClient {
   }
 
   terminate(reason = "Generation cancelled") {
+    if (this.isNode) return;
     this.worker.terminate();
     this.rejectAll(new DOMException(reason, "AbortError"));
   }
 
-  send(request) {
+  async send(request) {
+    if (this.isNode) {
+      const { analyzeRoutes, scoreRoutes } = await import("./analysisTasks.js");
+      if (request.type === "analyze-routes") {
+        return analyzeRoutes(request);
+      } else if (request.type === "score-routes") {
+        return await scoreRoutes(request);
+      }
+      throw new Error(`Unknown task type: ${request.type}`);
+    }
     const id = this.nextId;
     this.nextId += 1;
     return new Promise((resolve, reject) => {

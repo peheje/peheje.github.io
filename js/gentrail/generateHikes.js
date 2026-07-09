@@ -181,7 +181,7 @@ async function generateHikesWithWorker(
       const c1 = destinationPoint(start, R, dir - spread);
       const c2 = destinationPoint(start, R, dir + spread);
 
-      const route = routeLoop(startNodeId, c1, c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency);
+      const route = routeLoop(startNodeId, c1, c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency, settings.preferences);
       if (route) {
         candidateRoutes.push({
           ...route,
@@ -238,7 +238,7 @@ async function generateHikesWithWorker(
 
       const mutC1 = mutatePoint(seed.c1, 250);
       const mutC2 = mutatePoint(seed.c2, 250);
-      const route = routeLoop(startNodeId, mutC1, mutC2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency);
+      const route = routeLoop(startNodeId, mutC1, mutC2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency, settings.preferences);
       if (route) {
         evolvedCandidates.push({
           ...route,
@@ -281,7 +281,7 @@ async function generateHikesWithWorker(
         evCount++;
         onProgress?.(`Evolving candidate (geom fallback 1) ${evCount}... (${elapsed()}s)`);
 
-        const crossRoute1 = routeLoop(startNodeId, seed.c1, partner.c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency);
+        const crossRoute1 = routeLoop(startNodeId, seed.c1, partner.c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency, settings.preferences);
         if (crossRoute1) {
           evolvedCandidates.push({
             ...crossRoute1,
@@ -295,7 +295,7 @@ async function generateHikesWithWorker(
         evCount++;
         onProgress?.(`Evolving candidate (geom fallback 2) ${evCount}... (${elapsed()}s)`);
 
-        const crossRoute2 = routeLoop(startNodeId, partner.c1, seed.c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency);
+        const crossRoute2 = routeLoop(startNodeId, partner.c1, seed.c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency, settings.preferences);
         if (crossRoute2) {
           evolvedCandidates.push({
             ...crossRoute2,
@@ -439,7 +439,7 @@ function haversineDistance(p1, p2) {
   return R * c;
 }
 
-function runAStar(adjacency, nodeCoords, startNode, endNode, traversedEdges = null, repetitionPenalty = 50.0) {
+function runAStar(adjacency, nodeCoords, startNode, endNode, traversedEdges = null, repetitionPenalty = 50.0, preferences = null) {
   const openSet = new PriorityQueue();
   const cameFrom = new Map();
   const gScore = new Map();
@@ -466,6 +466,36 @@ function runAStar(adjacency, nodeCoords, startNode, endNode, traversedEdges = nu
 
     for (const [neighbor, edge] of neighbors.entries()) {
       let edgeCost = edge.cost;
+      
+      if (preferences) {
+        let weight = 1.0;
+        const highway = edge.highway || "";
+        const surface = edge.surface || "";
+        
+        if (["motorway", "trunk", "motorway_link", "trunk_link"].includes(highway)) {
+          weight = 50.0 + (preferences.avoidHighways ?? 10) * 10.0;
+        } else if (["primary", "secondary", "primary_link", "secondary_link"].includes(highway)) {
+          weight = 5.0 + (preferences.avoidRoads ?? 8) * 1.5;
+        } else if (["tertiary", "tertiary_link", "residential", "service", "unclassified", "living_street"].includes(highway)) {
+          const isUnpaved = ["gravel", "ground", "dirt", "unpaved", "grass", "sand", "woodchips", "bark"].includes(surface);
+          if (isUnpaved) {
+            weight = 1.0 - (preferences.trail ?? 8) * 0.05;
+          } else {
+            weight = 2.0 + (preferences.avoidMinorRoads ?? 3) * 0.8;
+          }
+        } else if (["path", "footway", "track", "pedestrian", "steps"].includes(highway)) {
+          const isUnpaved = ["gravel", "ground", "dirt", "unpaved", "grass", "sand", "woodchips", "bark"].includes(surface);
+          if (isUnpaved) {
+            weight = 0.8 - (preferences.trail ?? 8) * 0.05;
+          } else {
+            weight = 1.0 - (preferences.trail ?? 8) * 0.03;
+          }
+        }
+        
+        weight = Math.max(0.1, weight);
+        edgeCost = edge.distance * weight;
+      }
+
       if (traversedEdges) {
         const edgeKey1 = `${current}-${neighbor}`;
         const edgeKey2 = `${neighbor}-${current}`;
@@ -565,7 +595,7 @@ function mutatePoint(point, maxOffsetMeters) {
   return destinationPoint(point, distance, bearing);
 }
 
-function routeLoop(startNodeId, c1, c2, snapGraph, snapAdjacency, nodeCoords, adjacency) {
+function routeLoop(startNodeId, c1, c2, snapGraph, snapAdjacency, nodeCoords, adjacency, preferences) {
   const n1 = snapToNearestNode(snapGraph, c1, snapAdjacency);
   const n2 = snapToNearestNode(snapGraph, c2, snapAdjacency);
 
@@ -573,7 +603,7 @@ function routeLoop(startNodeId, c1, c2, snapGraph, snapAdjacency, nodeCoords, ad
     return null;
   }
 
-  const p1 = runAStar(adjacency, nodeCoords, startNodeId, n1, null);
+  const p1 = runAStar(adjacency, nodeCoords, startNodeId, n1, null, 50.0, preferences);
   if (!p1) return null;
 
   const traversedEdges = new Set();
@@ -582,7 +612,7 @@ function routeLoop(startNodeId, c1, c2, snapGraph, snapAdjacency, nodeCoords, ad
     traversedEdges.add(`${p1[i]}-${p1[i-1]}`);
   }
 
-  const p2 = runAStar(adjacency, nodeCoords, n1, n2, traversedEdges);
+  const p2 = runAStar(adjacency, nodeCoords, n1, n2, traversedEdges, 50.0, preferences);
   if (!p2) return null;
 
   for (let i = 1; i < p2.length; i++) {
@@ -590,7 +620,7 @@ function routeLoop(startNodeId, c1, c2, snapGraph, snapAdjacency, nodeCoords, ad
     traversedEdges.add(`${p2[i]}-${p2[i-1]}`);
   }
 
-  const p3 = runAStar(adjacency, nodeCoords, n2, startNodeId, traversedEdges);
+  const p3 = runAStar(adjacency, nodeCoords, n2, startNodeId, traversedEdges, 50.0, preferences);
   if (!p3) return null;
 
   const nodePath = [...p1, ...p2.slice(1), ...p3.slice(1)];

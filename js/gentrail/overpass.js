@@ -18,6 +18,7 @@ export async function fetchOsmFeatures(bounds, signal) {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+          "User-Agent": "GenTrailHikeGenerator/1.0 (https://github.com/peheje/peheje_fable)",
         },
         body: `data=${encodeURIComponent(query)}`,
         signal,
