@@ -156,7 +156,8 @@ async function generateHikesWithWorker(
   const candidateRoutes = [];
 
   // Radius for check points (triangle loop: Start -> C1 -> C2 -> Start)
-  const baseR = targetMeters / 3.0;
+  // We divide by 3.8 instead of 3.0 to account for network tortuosity (winding path factor ~1.26)
+  const baseR = targetMeters / 3.8;
 
   const totalInitial = directions.length * 3;
   let count = 0;
