@@ -145,9 +145,14 @@ function initMap() {
   );
 
   map.on("click", (event) => {
-    // Check if clicked a route line
+    // Check if clicked a route line (using an 8px buffer for easier selection)
     const activeRouteLayers = routeLayerIds.filter((id) => map.getLayer(id));
-    const features = map.queryRenderedFeatures(event.point, {
+    const buffer = 8;
+    const bbox = [
+      [event.point.x - buffer, event.point.y - buffer],
+      [event.point.x + buffer, event.point.y + buffer]
+    ];
+    const features = map.queryRenderedFeatures(bbox, {
       layers: activeRouteLayers,
     });
     
@@ -173,7 +178,12 @@ function initMap() {
 
   map.on("mousemove", (event) => {
     const activeRouteLayers = routeLayerIds.filter((id) => map.getLayer(id));
-    const overRoute = map.queryRenderedFeatures(event.point, {
+    const buffer = 8;
+    const bbox = [
+      [event.point.x - buffer, event.point.y - buffer],
+      [event.point.x + buffer, event.point.y + buffer]
+    ];
+    const overRoute = map.queryRenderedFeatures(bbox, {
       layers: activeRouteLayers,
     }).length;
     map.getCanvas().style.cursor = overRoute ? "pointer" : "crosshair";
@@ -189,6 +199,10 @@ function setStartPoint(coords) {
 
   // Cache chosen trailhead in LocalStorage
   localStorage.setItem("gentrail-start-coords", JSON.stringify(coords));
+  // Clear cached routes
+  localStorage.removeItem("gentrail-cached-routes");
+  localStorage.removeItem("gentrail-cached-debug");
+  localStorage.removeItem("gentrail-cached-selected-route-id");
 
   // Update trailhead marker
   if (marker) marker.remove();
@@ -290,6 +304,9 @@ async function runGeneration() {
     );
 
     routes = result.routes;
+    // Cache generated hikes in LocalStorage
+    localStorage.setItem("gentrail-cached-routes", JSON.stringify(routes));
+    localStorage.setItem("gentrail-cached-debug", JSON.stringify(result.debug));
     renderResults(result.debug);
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
@@ -423,6 +440,7 @@ function buildRouteCard(scoredRoute, index) {
 
 function selectRoute(routeId) {
   selectedRouteId = routeId;
+  localStorage.setItem("gentrail-cached-selected-route-id", routeId);
 
   // Update DOM active card state
   const cards = document.querySelectorAll(".route-card");
@@ -519,18 +537,50 @@ function formatComponentLabel(camelCaseKey) {
 
 function loadStoredStartPoint() {
   try {
-    const stored = localStorage.getItem("gentrail-start-coords");
-    if (stored) {
-      const coords = JSON.parse(stored);
+    const storedStart = localStorage.getItem("gentrail-start-coords");
+    if (storedStart) {
+      const coords = JSON.parse(storedStart);
       if (coords && typeof coords.lat === "number" && typeof coords.lng === "number") {
         map.on("load", () => {
-          setStartPoint(coords);
+          start = coords;
+          
+          // Update trailhead marker
+          if (marker) marker.remove();
+          const el = document.createElement("div");
+          el.className = "start-marker";
+          el.setAttribute("aria-label", "Hike starting point");
+          marker = new window.maplibregl.Marker({ element: el, anchor: "center" })
+            .setLngLat([start.lng, start.lat])
+            .addTo(map);
+
+          // Update UI Readout
+          startReadout.classList.add("start-readout--set");
+          startStatus.textContent = "Trailhead set";
+          startCoords.textContent = `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`;
+          btnGenerate.disabled = false;
+          mapPrompt.classList.add("display-none");
+          
           map.flyTo({ center: [coords.lng, coords.lat], zoom: 14 });
+
+          // Load cached routes
+          const storedRoutes = localStorage.getItem("gentrail-cached-routes");
+          const storedDebug = localStorage.getItem("gentrail-cached-debug");
+          if (storedRoutes) {
+            routes = JSON.parse(storedRoutes);
+            const debugData = storedDebug ? JSON.parse(storedDebug) : null;
+            renderResults(debugData);
+            
+            // Restore selection if stored
+            const storedSel = localStorage.getItem("gentrail-cached-selected-route-id");
+            if (storedSel && routes.some(r => r.route.candidateId === storedSel)) {
+              selectRoute(storedSel);
+            }
+          }
         });
       }
     }
   } catch (err) {
-    console.warn("Failed to load stored trailhead:", err);
+    console.warn("Failed to load stored trailhead and hikes:", err);
   }
 }
 
