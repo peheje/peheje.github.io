@@ -373,6 +373,10 @@ function getDailyTimeseries(timeseries, dayIndex) {
         h.cloudsHigh = tomorrowHoursData[h.hour].cloudsHigh;
         h.windSpeed = tomorrowHoursData[h.hour].windSpeed;
         h.windDir = tomorrowHoursData[h.hour].windDir;
+      } else if (h.uv === 0 && tomorrowHoursData[h.hour].uv > 0) {
+        // Fallback for UV index: clear-sky UV is purely astronomical,
+        // so Today's UV at this hour must match Tomorrow's if Today's cached value is missing or 0.
+        h.uv = tomorrowHoursData[h.hour].uv;
       }
     });
   }
