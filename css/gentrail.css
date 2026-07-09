@@ -2,6 +2,11 @@
   --bg-card: var(--surface, rgba(250, 250, 245, 0.94));
 }
 
+#menu,
+.app-shell {
+  width: min(1800px, 100%);
+}
+
 .gentrail-app {
   display: grid;
   grid-template-columns: 410px 1fr;
