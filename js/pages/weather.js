@@ -144,11 +144,11 @@ function saveLocation(loc) {
 }
 
 // Fetch forecast from api.met.no with local caching
-async function fetchWeather(lat, lon) {
+async function fetchWeather(lat, lon, forceRefresh = false) {
   const cacheKey = `${CACHE_PREFIX}${lat.toFixed(3)}_${lon.toFixed(3)}`;
   const cached = localStorage.getItem(cacheKey);
 
-  if (cached) {
+  if (cached && !forceRefresh) {
     try {
       const parsed = JSON.parse(cached);
       const age = Date.now() - parsed.timestamp;
@@ -1364,13 +1364,13 @@ function handleCanvasLeave() {
 }
 
 // Fetch forecast and refresh page
-async function loadWeatherData(lat, lon, name, silent = false, isGps = false) {
+async function loadWeatherData(lat, lon, name, silent = false, isGps = false, forceRefresh = false) {
   showError("");
   if (!silent) {
     setLoaderState(true);
   }
   try {
-    forecastData = await fetchWeather(lat, lon);
+    forecastData = await fetchWeather(lat, lon, forceRefresh);
     if (!window.location) return;
     
     currentLoc = { lat, lon, name, isGps };
@@ -1946,8 +1946,14 @@ function initWeatherPage() {
   // Load last stored location if any
   loadStoredLocation();
 
+  // Detect if page was reloaded (F5) to bypass cache and force update
+  const isReload = !!(
+    (window.performance && window.performance.navigation && window.performance.navigation.type === 1) ||
+    (window.performance && window.performance.getEntriesByType && window.performance.getEntriesByType("navigation")[0] && window.performance.getEntriesByType("navigation")[0].type === "reload")
+  );
+
   // Initial data load
-  loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, false, currentLoc.isGps);
+  loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, false, currentLoc.isGps, isReload);
 
   // Setup tab switches
   setupTabs();
