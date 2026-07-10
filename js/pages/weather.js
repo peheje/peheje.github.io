@@ -1602,6 +1602,9 @@ function handleCanvasHover(e) {
   const relativeX = x - paddingL;
   const range = viewEndHour - viewStartHour;
   let hr = viewStartHour + (relativeX / graphW) * range;
+  if (zoomIndex === 0) {
+    hr = Math.round(hr);
+  }
   hr = Math.max(0, Math.min(23, hr));
 
   if (hoverHour !== hr) {
