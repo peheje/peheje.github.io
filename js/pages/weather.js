@@ -333,27 +333,69 @@ function getDailyTimeseries(timeseries, dayIndex) {
 
   if (dayIndex < 6) {
     const nextDayHoursData = getDailyTimeseriesRaw(timeseries, dayIndex + 1);
-    const firstVal = nextDayHoursData.find(h => h.temp !== null);
-
-    let lastAvailableHour = -1;
-    hoursData.forEach(h => {
-      if (h.temp !== null) {
-        lastAvailableHour = h.hour;
+    
+    // Record which hours were originally null
+    const originallyNull = hoursData.map(h => h.temp === null);
+    
+    // Find first available hour in the current day (originally)
+    let currentDayFirstHour = 24;
+    for (let hr = 0; hr < 24; hr++) {
+      if (!originallyNull[hr]) {
+        currentDayFirstHour = hr;
+        break;
       }
-    });
+    }
 
+    // Find last available hour in the current day (originally)
+    let currentDayLastHour = -1;
+    for (let hr = 23; hr >= 0; hr--) {
+      if (!originallyNull[hr]) {
+        currentDayLastHour = hr;
+        break;
+      }
+    }
+
+    // Find first available hour in the next day
+    let nextDayFirstHour = -1;
+    for (let hr = 0; hr < 24; hr++) {
+      if (nextDayHoursData[hr] && nextDayHoursData[hr].temp !== null) {
+        nextDayFirstHour = hr;
+        break;
+      }
+    }
+
+    // Linearly interpolate the trailing missing hours between currentDayLastHour and nextDayFirstHour
+    if (currentDayLastHour !== -1 && nextDayFirstHour !== -1 && currentDayLastHour < 23) {
+      const lastVal = hoursData[currentDayLastHour];
+      const nextVal = nextDayHoursData[nextDayFirstHour];
+      const gapSize = (24 + nextDayFirstHour) - currentDayLastHour;
+
+      for (let hr = currentDayLastHour + 1; hr < 24; hr++) {
+        const step = hr - currentDayLastHour;
+        const ratio = step / gapSize;
+
+        hoursData[hr].temp = lastVal.temp + (nextVal.temp - lastVal.temp) * ratio;
+        hoursData[hr].uv = lastVal.uv + (nextVal.uv - lastVal.uv) * ratio;
+        hoursData[hr].rain = lastVal.rain + (nextVal.rain - lastVal.rain) * ratio;
+        hoursData[hr].rainMax = lastVal.rainMax + (nextVal.rainMax - lastVal.rainMax) * ratio;
+        hoursData[hr].rainMin = lastVal.rainMin + (nextVal.rainMin - lastVal.rainMin) * ratio;
+        hoursData[hr].clouds = lastVal.clouds + (nextVal.clouds - lastVal.clouds) * ratio;
+        hoursData[hr].cloudsLow = lastVal.cloudsLow + (nextVal.cloudsLow - lastVal.cloudsLow) * ratio;
+        hoursData[hr].cloudsMid = lastVal.cloudsMid + (nextVal.cloudsMid - lastVal.cloudsMid) * ratio;
+        hoursData[hr].cloudsHigh = lastVal.cloudsHigh + (nextVal.cloudsHigh - lastVal.cloudsHigh) * ratio;
+        hoursData[hr].windSpeed = lastVal.windSpeed + (nextVal.windSpeed - lastVal.windSpeed) * ratio;
+        hoursData[hr].windDir = lastVal.windDir + (nextVal.windDir - lastVal.windDir) * ratio;
+
+        hoursData[hr].symbol = ratio < 0.5 ? lastVal.symbol : nextVal.symbol;
+        hoursData[hr].rainProb = ratio < 0.5 ? lastVal.rainProb : nextVal.rainProb;
+      }
+    }
+
+    // Fill in past hours (specifically on Today's tab) using Tomorrow's values
     hoursData.forEach(h => {
-      if (h.temp === null) {
-        if (h.hour < lastAvailableHour) {
-          // Past hour: copy same hour from next day
-          if (nextDayHoursData[h.hour] && nextDayHoursData[h.hour].temp !== null) {
-            copyHourData(h, nextDayHoursData[h.hour]);
-          }
-        } else {
-          // Trailing hour: copy first available hour from next day
-          if (firstVal) {
-            copyHourData(h, firstVal);
-          }
+      if (originallyNull[h.hour] && h.hour < currentDayFirstHour) {
+        if (nextDayHoursData[h.hour] && nextDayHoursData[h.hour].temp !== null) {
+          copyHourData(h, nextDayHoursData[h.hour]);
         }
       } else if (h.uv === 0 && nextDayHoursData[h.hour] && nextDayHoursData[h.hour].uv > 0) {
         h.uv = nextDayHoursData[h.hour].uv;
@@ -402,25 +444,55 @@ function getDailyTideSeries(tideData, dayIndex) {
 
   if (dayIndex < 6) {
     const nextDayTideData = getDailyTideSeriesRaw(tideData, dayIndex + 1);
-    const firstVal = nextDayTideData.find(h => h.value !== null);
 
-    let lastAvailableHour = -1;
-    hoursData.forEach(h => {
-      if (h.value !== null) {
-        lastAvailableHour = h.hour;
+    // Record which hours were originally null
+    const originallyNull = hoursData.map(h => h.value === null);
+
+    // Find first available hour in the current day (originally)
+    let currentDayFirstHour = 24;
+    for (let hr = 0; hr < 24; hr++) {
+      if (!originallyNull[hr]) {
+        currentDayFirstHour = hr;
+        break;
       }
-    });
+    }
 
+    // Find last available hour in the current day (originally)
+    let currentDayLastHour = -1;
+    for (let hr = 23; hr >= 0; hr--) {
+      if (!originallyNull[hr]) {
+        currentDayLastHour = hr;
+        break;
+      }
+    }
+
+    // Find first available hour in next day
+    let nextDayFirstHour = -1;
+    for (let hr = 0; hr < 24; hr++) {
+      if (nextDayTideData[hr] && nextDayTideData[hr].value !== null) {
+        nextDayFirstHour = hr;
+        break;
+      }
+    }
+
+    // Linearly interpolate the trailing missing hours between currentDayLastHour and nextDayFirstHour
+    if (currentDayLastHour !== -1 && nextDayFirstHour !== -1 && currentDayLastHour < 23) {
+      const lastVal = hoursData[currentDayLastHour].value;
+      const nextVal = nextDayTideData[nextDayFirstHour].value;
+      const gapSize = (24 + nextDayFirstHour) - currentDayLastHour;
+
+      for (let hr = currentDayLastHour + 1; hr < 24; hr++) {
+        const step = hr - currentDayLastHour;
+        const ratio = step / gapSize;
+        hoursData[hr].value = lastVal + (nextVal - lastVal) * ratio;
+      }
+    }
+
+    // Fill in past hours (if any are null) using next day's values
     hoursData.forEach(h => {
-      if (h.value === null) {
-        if (h.hour < lastAvailableHour) {
-          if (nextDayTideData[h.hour] && nextDayTideData[h.hour].value !== null) {
-            h.value = nextDayTideData[h.hour].value;
-          }
-        } else {
-          if (firstVal) {
-            h.value = firstVal.value;
-          }
+      if (originallyNull[h.hour] && h.hour < currentDayFirstHour) {
+        if (nextDayTideData[h.hour] && nextDayTideData[h.hour].value !== null) {
+          h.value = nextDayTideData[h.hour].value;
         }
       }
     });
