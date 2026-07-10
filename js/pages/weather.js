@@ -40,6 +40,7 @@ const dashboardContent = document.getElementById("dashboard-content");
 const loadingSpinner = document.getElementById("loading-spinner");
 
 const dayTabsContainer = document.getElementById("day-tabs");
+const zoomToggleBtn = document.getElementById("zoom-toggle-btn");
 
 const uvCanvas = document.getElementById("uv-canvas");
 const tempCanvas = document.getElementById("temp-canvas");
@@ -936,9 +937,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   ctx.textBaseline = "top";
   
   let hoursToShow = [];
-  if (zoomLevel === 24) {
+  if (zoomIndex === 0) {
     hoursToShow = [0, 4, 8, 12, 16, 20, 23];
-  } else if (zoomLevel === 12) {
+  } else if (zoomIndex === 1) {
     const s = Math.ceil(viewStartHour);
     const e = Math.floor(viewEndHour);
     for (let hr = s; hr <= e; hr++) {
@@ -946,7 +947,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         hoursToShow.push(hr);
       }
     }
-  } else { // 8
+  } else { // 2
     const s = Math.ceil(viewStartHour);
     const e = Math.floor(viewEndHour);
     for (let hr = s; hr <= e; hr++) {
@@ -1438,27 +1439,64 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       ctx.restore();
     }
   }
+
+  // 7. Draw zoom level indicator (drawn when zoomIndex > 0)
+  if (zoomIndex > 0) {
+    ctx.save();
+    ctx.font = "bold 9px sans-serif";
+    ctx.fillStyle = accentColor;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    const label = zoomIndex === 1 ? "Zoom: Near-term" : (zoomIndex === 2 ? "Zoom: Immediate" : "Zoom: Full Day");
+    ctx.fillText(`🔍 ${label}`, W - paddingR - 4, paddingT - 18);
+    ctx.restore();
+  }
 }
 
-let zoomLevel = 24;
-let zoomCenterHour = 12;
+let zoomIndex = 0; // 0 = Full Day, 1 = Near-term Overview, 2 = Immediate Future
 let startTouchDist = null;
 
 function getZoomWindow() {
-  let start = zoomCenterHour - zoomLevel / 2;
-  let end = zoomCenterHour + zoomLevel / 2;
-  
-  if (start < 0) {
-    end -= start;
-    start = 0;
+  const now = new Date();
+  const currentHour = now.getHours();
+
+  if (zoomIndex === 0) {
+    return { start: 0, end: 23 };
+  } else if (zoomIndex === 1) {
+    let start = currentHour - 2;
+    let end = currentHour + 8;
+    if (start < 0) {
+      end -= start;
+      start = 0;
+    }
+    if (end > 23) {
+      start -= (end - 23);
+      end = 23;
+    }
+    start = Math.max(0, start);
+    end = Math.min(23, end);
+    return { start, end };
+  } else { // 2
+    let start = currentHour;
+    let end = currentHour + 4;
+    if (end > 23) {
+      start -= (end - 23);
+      end = 23;
+    }
+    start = Math.max(0, start);
+    end = Math.min(23, end);
+    return { start, end };
   }
-  if (end > 23) {
-    start -= (end - 23);
-    end = 23;
+}
+
+function updateZoomUI() {
+  const btn = document.getElementById("zoom-toggle-btn");
+  if (btn) {
+    if (zoomIndex === 0) btn.textContent = "🔍 Zoom: Full Day";
+    else if (zoomIndex === 1) btn.textContent = "🔍 Zoom: Near-term";
+    else btn.textContent = "🔍 Zoom: Immediate";
   }
-  start = Math.max(0, start);
-  end = Math.min(23, end);
-  return { start, end };
+  drawForecastCurves();
 }
 
 function handleTouchStart(e) {
@@ -1470,19 +1508,6 @@ function handleTouchStart(e) {
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
     );
-    
-    const canvas = e.currentTarget;
-    const rect = canvas.getBoundingClientRect();
-    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-    const paddingL = 38;
-    const paddingR = 15;
-    const graphW = rect.width - paddingL - paddingR;
-    const relativeX = midX - rect.left - paddingL;
-    
-    const { start, end } = getZoomWindow();
-    const range = end - start;
-    const hour = start + (relativeX / graphW) * range;
-    zoomCenterHour = Math.max(0, Math.min(23, hour));
   } else if (e.touches.length === 1) {
     handleCanvasHover(e);
   }
@@ -1501,24 +1526,24 @@ function handleTouchMove(e) {
     const ratio = dist / startTouchDist;
     
     if (ratio > 1.25) { // Pinch out -> Zoom in
-      if (zoomLevel === 24) {
-        zoomLevel = 12;
+      if (zoomIndex === 0) {
+        zoomIndex = 1;
         startTouchDist = dist;
-        drawForecastCurves();
-      } else if (zoomLevel === 12) {
-        zoomLevel = 8;
+        updateZoomUI();
+      } else if (zoomIndex === 1) {
+        zoomIndex = 2;
         startTouchDist = dist;
-        drawForecastCurves();
+        updateZoomUI();
       }
     } else if (ratio < 0.8) { // Pinch in -> Zoom out
-      if (zoomLevel === 8) {
-        zoomLevel = 12;
+      if (zoomIndex === 2) {
+        zoomIndex = 1;
         startTouchDist = dist;
-        drawForecastCurves();
-      } else if (zoomLevel === 12) {
-        zoomLevel = 24;
+        updateZoomUI();
+      } else if (zoomIndex === 1) {
+        zoomIndex = 0;
         startTouchDist = dist;
-        drawForecastCurves();
+        updateZoomUI();
       }
     }
   } else if (e.touches.length === 1) {
@@ -1538,34 +1563,21 @@ function handleCanvasWheel(e) {
   
   e.preventDefault();
   
-  const canvas = e.currentTarget;
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const paddingL = 38;
-  const paddingR = 15;
-  const graphW = rect.width - paddingL - paddingR;
-  const relativeX = x - paddingL;
-  
-  const { start, end } = getZoomWindow();
-  const range = end - start;
-  const hour = start + (relativeX / graphW) * range;
-  zoomCenterHour = Math.max(0, Math.min(23, hour));
-
   if (e.deltaY < 0) { // Scroll up -> Zoom in
-    if (zoomLevel === 24) {
-      zoomLevel = 12;
-      drawForecastCurves();
-    } else if (zoomLevel === 12) {
-      zoomLevel = 8;
-      drawForecastCurves();
+    if (zoomIndex === 0) {
+      zoomIndex = 1;
+      updateZoomUI();
+    } else if (zoomIndex === 1) {
+      zoomIndex = 2;
+      updateZoomUI();
     }
   } else if (e.deltaY > 0) { // Scroll down -> Zoom out
-    if (zoomLevel === 8) {
-      zoomLevel = 12;
-      drawForecastCurves();
-    } else if (zoomLevel === 12) {
-      zoomLevel = 24;
-      drawForecastCurves();
+    if (zoomIndex === 2) {
+      zoomIndex = 1;
+      updateZoomUI();
+    } else if (zoomIndex === 1) {
+      zoomIndex = 0;
+      updateZoomUI();
     }
   }
   
@@ -2208,6 +2220,14 @@ function initWeatherPage() {
 
   // Search button click handler
   searchBtn.addEventListener("click", performSearch);
+
+  // Zoom toggle button handler
+  if (zoomToggleBtn) {
+    zoomToggleBtn.addEventListener("click", () => {
+      zoomIndex = (zoomIndex + 1) % 3;
+      updateZoomUI();
+    });
+  }
 
   // Search enter handler
   searchInput.addEventListener("keydown", (e) => {

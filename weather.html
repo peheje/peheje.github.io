@@ -650,9 +650,14 @@
             </section>
 
             <!-- Global Day Toggle Bar -->
-            <div class="actions weather-actions margin-bottom-10">
-                <span style="font-weight: 700; color: var(--text);">Daily Forecasts</span>
-                <div id="day-tabs" class="curve-tabs">
+            <div class="actions weather-actions margin-bottom-10" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-weight: 700; color: var(--text);">Daily Forecasts</span>
+                    <button id="zoom-toggle-btn" class="btn-small" style="font-size: 11px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; min-height: 28px; min-width: 125px;">
+                        🔍 Zoom: Full Day
+                    </button>
+                </div>
+                <div id="day-tabs" class="curve-tabs" style="margin-left: auto;">
                     <!-- Populated dynamically in JS -->
                 </div>
             </div>
