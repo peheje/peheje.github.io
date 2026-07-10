@@ -1252,10 +1252,53 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     }
   }
 
-  // 6. Draw hover tooltip / inspector cursor
-  if (hoverHour !== null && hoverHour >= 0 && hoverHour < 24) {
-    const hp = points.find(p => p.hour === hoverHour);
-    if (hp) {
+  // 6. Draw hover tooltip / inspector cursor (interpolated continuously for the hovered minute)
+  if (hoverHour !== null && hoverHour >= 0 && hoverHour <= 23) {
+    const h0 = Math.floor(hoverHour);
+    const h1 = Math.min(23, h0 + 1);
+    
+    const p0 = points.find(p => p.hour === h0);
+    const p1 = points.find(p => p.hour === h1) || p0;
+    
+    if (p0) {
+      const t = hoverHour - h0;
+      
+      const hpX = p0.x + t * (p1.x - p0.x);
+      const hpY = p0.y + t * (p1.y - p0.y);
+      const hpVal = p0.val + t * (p1.val - p0.val);
+      const hpUv = p0.uv + t * (p1.uv - p0.uv);
+      const hpTemp = p0.temp !== null && p1.temp !== null ? p0.temp + t * (p1.temp - p0.temp) : p0.temp;
+      const hpRain = p0.rain !== null && p1.rain !== null ? p0.rain + t * (p1.rain - p0.rain) : p0.rain;
+      const hpWindSpeed = p0.windSpeed + t * (p1.windSpeed - p0.windSpeed);
+      const hpTideValue = p0.tideValue !== null && p1.tideValue !== null ? p0.tideValue + t * (p1.tideValue - p0.tideValue) : p0.tideValue;
+      const hpClouds = p0.clouds + t * (p1.clouds - p0.clouds);
+      const hpCloudsLow = p0.cloudsLow + t * (p1.cloudsLow - p0.cloudsLow);
+      const hpCloudsMid = p0.cloudsMid + t * (p1.cloudsMid - p0.cloudsMid);
+      const hpCloudsHigh = p0.cloudsHigh + t * (p1.cloudsHigh - p0.cloudsHigh);
+      
+      const hpRainProb = p0.rainProb !== null && p1.rainProb !== null ? Math.round(p0.rainProb + t * (p1.rainProb - p0.rainProb)) : p0.rainProb;
+      const hpRainMax = p0.rainMax !== null && p1.rainMax !== null ? p0.rainMax + t * (p1.rainMax - p0.rainMax) : p0.rainMax;
+
+      const hp = {
+        x: hpX,
+        y: hpY,
+        val: hpVal,
+        uv: hpUv,
+        temp: hpTemp,
+        rain: hpRain,
+        windSpeed: hpWindSpeed,
+        windDir: p0.windDir,
+        tideValue: hpTideValue,
+        clouds: hpClouds,
+        cloudsLow: hpCloudsLow,
+        cloudsMid: hpCloudsMid,
+        cloudsHigh: hpCloudsHigh,
+        hour: hoverHour,
+        symbol: p0.symbol,
+        rainProb: hpRainProb,
+        rainMax: hpRainMax
+      };
+
       // Dotted hover line
       ctx.save();
       ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
@@ -1281,22 +1324,27 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       ctx.save();
       const tooltipLines = [];
       let boxColor = accentColor;
+
+      const totalMinutes = Math.round(hp.hour * 60);
+      const hh = Math.floor(totalMinutes / 60);
+      const mm = totalMinutes % 60;
+      const timeStr = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
       
       if (paramType === "uv") {
         const uvLevel = getUVLevel(hp.uv);
         boxColor = uvLevel.color;
-        tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
+        tooltipLines.push(`Time: ${timeStr}`);
         tooltipLines.push(`UV Index: ${hp.uv.toFixed(1)}`);
         tooltipLines.push(`Level: ${uvLevel.label}`);
       } else if (paramType === "temp") {
         const emojiInfo = getWeatherInfo(hp.symbol);
         boxColor = "#ff6b8b";
-        tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
+        tooltipLines.push(`Time: ${timeStr}`);
         tooltipLines.push(`Temp: ${hp.temp !== null ? hp.temp.toFixed(1) : "--"}\u00B0C`);
         tooltipLines.push(`Weather: ${emojiInfo.emoji}`);
       } else if (paramType === "rain") {
         boxColor = "#38d4ff";
-        tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
+        tooltipLines.push(`Time: ${timeStr}`);
         tooltipLines.push(`Rain: ${hp.rain !== null ? hp.rain.toFixed(1) : "0.0"} mm`);
         if (hp.rainProb !== null && hp.rainProb !== undefined) {
           tooltipLines.push(`Chance: ${hp.rainProb}%`);
@@ -1306,16 +1354,16 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         }
       } else if (paramType === "wind") {
         boxColor = "#00f5d4";
-        tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
+        tooltipLines.push(`Time: ${timeStr}`);
         tooltipLines.push(`Wind: ${hp.windSpeed.toFixed(1)} m/s`);
         tooltipLines.push(`Direction: ${getWindDirectionLabel(hp.windDir)} (${hp.windDir}\u00B0)`);
       } else if (paramType === "tide") {
         boxColor = "#00b4d8";
-        tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
+        tooltipLines.push(`Time: ${timeStr}`);
         tooltipLines.push(`Tide Level: ${hp.tideValue !== null ? hp.tideValue.toFixed(1) : "--"} cm`);
       } else if (paramType === "clouds") {
         boxColor = "#38b2ff";
-        tooltipLines.push(`Time: ${String(hp.hour).padStart(2, '0')}:00`);
+        tooltipLines.push(`Time: ${timeStr}`);
         tooltipLines.push(`Total Cloud Cover: ${hp.clouds.toFixed(0)}%`);
         tooltipLines.push(`Low Clouds: ${hp.cloudsLow.toFixed(0)}%`);
         tooltipLines.push(`Mid Clouds: ${hp.cloudsMid.toFixed(0)}%`);
@@ -1377,7 +1425,7 @@ function handleCanvasHover(e) {
   const graphW = rect.width - paddingL - paddingR;
 
   const relativeX = x - paddingL;
-  let hr = Math.round((relativeX / graphW) * 23);
+  let hr = (relativeX / graphW) * 23;
   hr = Math.max(0, Math.min(23, hr));
 
   if (hoverHour !== hr) {
@@ -2062,6 +2110,13 @@ function initWeatherPage() {
     }
   }, 5 * 60 * 1000);
 
+  // Periodically update the time indicators and dashboard values every 60 seconds (smooth interpolation update)
+  setInterval(() => {
+    if (document.visibilityState === "visible" && forecastData) {
+      updateDashboardUI(forecastData);
+    }
+  }, 60 * 1000);
+
   // Manage resources and refresh when user returns to the tab
   document.addEventListener("visibilitychange", () => {
     const radarIframe = document.getElementById("radar-iframe");
@@ -2083,8 +2138,8 @@ function initWeatherPage() {
       if (forecastData && forecastData.lastUpdated) {
         const age = Date.now() - forecastData.lastUpdated;
         // Bypasses the cache and immediately forces a refresh if the user has been away 
-        // and returns after 1 minute or more since the last update.
-        if (age >= 60 * 1000) {
+        // and returns after 5 minutes or more since the last update.
+        if (age >= 5 * 60 * 1000) {
           loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true, currentLoc.isGps, true);
         }
       }
@@ -2217,7 +2272,9 @@ function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, ac
   const targetDate = new Date();
   targetDate.setDate(targetDate.getDate() + activeTab);
   if (hoverHour !== null) {
-    targetDate.setHours(hoverHour, 0, 0, 0);
+    const hh = Math.floor(hoverHour);
+    const mm = Math.round((hoverHour - hh) * 60);
+    targetDate.setHours(hh, mm, 0, 0);
   } else if (activeTab === 0) {
     // Keep current hour
   } else {
@@ -2254,7 +2311,12 @@ function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, ac
   
   const dateOptions = { month: 'short', day: 'numeric' };
   const dateStr = targetDate.toLocaleDateString([], dateOptions);
-  const timeStr = hoverHour !== null ? `${String(hoverHour).padStart(2, '0')}:00` : dateStr;
+  let timeStr = dateStr;
+  if (hoverHour !== null) {
+    const hh = Math.floor(hoverHour);
+    const mm = Math.round((hoverHour - hh) * 60);
+    timeStr = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  }
   
   ctx.font = `${isCompact ? "9px" : "10px"} sans-serif`;
   ctx.fillStyle = mutedColor;
