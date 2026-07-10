@@ -163,24 +163,13 @@ async function stitchImages(files, X, Y, canvasW, canvasH, direction, widths, he
     const ctx = canvas.getContext("2d");
 
     postStatus("Stitching Image 1/" + files.length + "...");
-    let bitmap = await createImageBitmap(files[0]);
-    let img = bitmapToCanvas(bitmap);
-    bitmap.close();
-    if (direction === "horizontal") {
-        img = rotateCanvas90CW(img);
-    }
+    let img = await loadResizedCanvas(files[0], widths[0], heights[0], direction);
     ctx.drawImage(img, X[0], Y[0]);
     img.width = 0; img.height = 0; // Release memory
 
     for (let i = 1; i < files.length; i++) {
         postStatus(`Stitching Image ${i + 1}/${files.length}...`);
-        
-        bitmap = await createImageBitmap(files[i]);
-        img = bitmapToCanvas(bitmap);
-        bitmap.close();
-        if (direction === "horizontal") {
-            img = rotateCanvas90CW(img);
-        }
+        img = await loadResizedCanvas(files[i], widths[i], heights[i], direction);
 
         const yi = Y[i];
         const xi = X[i];
@@ -250,6 +239,33 @@ async function stitchImages(files, X, Y, canvasW, canvasH, direction, widths, he
     return croppedCanvas;
 }
 
+// Helper to load and resize image directly on decoding to save RAM/VRAM
+async function loadResizedCanvas(file, targetW, targetH, direction) {
+    let bitmap;
+    try {
+        const decodeW = direction === "horizontal" ? targetH : targetW;
+        bitmap = await createImageBitmap(file, { resizeWidth: decodeW });
+    } catch (e) {
+        bitmap = await createImageBitmap(file);
+    }
+    
+    let img = bitmapToCanvas(bitmap);
+    bitmap.close();
+    
+    if (direction === "horizontal") {
+        img = rotateCanvas90CW(img);
+    }
+    
+    if (img.width !== targetW || img.height !== targetH) {
+        const scaled = new OffscreenCanvas(targetW, targetH);
+        const ctx = scaled.getContext("2d");
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+        img.width = 0; img.height = 0; // Release memory
+        return scaled;
+    }
+    return img;
+}
+
 // Helper to load a file/blob as a low-res canvas for alignment
 async function loadLowResCanvasForAlignment(file, direction) {
     let bitmap = await createImageBitmap(file);
@@ -279,6 +295,19 @@ async function loadLowResCanvasForAlignment(file, direction) {
     
     bitmap.close();
     return { canvas, originalW, originalH };
+}
+
+// Dynamic test to check maximum canvas width/height supported by device GPU
+function getMaxCanvasDimension() {
+    const testSizes = [16384, 8192, 4096];
+    for (const size of testSizes) {
+        try {
+            const canvas = new OffscreenCanvas(size, size);
+            const ctx = canvas.getContext("2d");
+            if (ctx) return size;
+        } catch (e) {}
+    }
+    return 4096;
 }
 
 // Listen for messages from the main thread
@@ -348,8 +377,8 @@ self.onmessage = async function (e) {
         postLog(`Normalized positions: X=${JSON.stringify(normX)}, Y=${JSON.stringify(normY)}`);
 
         // Get high-res dimensions for each image when placed (rotated if horizontal)
-        const widths = [];
-        const heights = [];
+        let widths = [];
+        let heights = [];
         for (let i = 0; i < files.length; i++) {
             const origW = lowResData[i].originalW;
             const origH = lowResData[i].originalH;
@@ -363,12 +392,37 @@ self.onmessage = async function (e) {
         }
 
         // Canvas dimensions
-        const canvasW = Math.max(...normX.map((x, idx) => x + widths[idx]));
-        const canvasH = Math.max(...normY.map((y, idx) => y + heights[idx]));
-        postLog(`Output canvas size: ${canvasW}x${canvasH}`);
+        let canvasW = Math.max(...normX.map((x, idx) => x + widths[idx]));
+        let canvasH = Math.max(...normY.map((y, idx) => y + heights[idx]));
+        postLog(`Calculated full-res output canvas size: ${canvasW}x${canvasH}`);
+
+        // Check device limits to prevent Aw Snap crashes
+        const maxDim = getMaxCanvasDimension();
+        const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const maxArea = isMobile ? 60000000 : 400000000; // 60MP for mobile, 400MP for desktop
+
+        let s = 1.0;
+        if (canvasW > maxDim) s = Math.min(s, maxDim / canvasW);
+        if (canvasH > maxDim) s = Math.min(s, maxDim / canvasH);
+        const currentArea = canvasW * canvasH;
+        if (currentArea * s * s > maxArea) s = Math.min(s, Math.sqrt(maxArea / currentArea));
+
+        let normX_scaled = normX;
+        let normY_scaled = normY;
+
+        if (s < 1.0) {
+            postLog(`Canvas size ${canvasW}x${canvasH} exceeds limits (max dimension: ${maxDim}, max area: ${maxArea}px). Auto-scaling stitching pipeline to ${(s * 100).toFixed(1)}% to fit device hardware...`);
+            normX_scaled = normX.map(x => Math.round(x * s));
+            normY_scaled = normY.map(y => Math.round(y * s));
+            widths = widths.map(w => Math.round(w * s));
+            heights = heights.map(h => Math.round(h * s));
+            canvasW = Math.round(canvasW * s);
+            canvasH = Math.round(canvasH * s);
+            postLog(`New scaled canvas size: ${canvasW}x${canvasH}`);
+        }
 
         postStatus("Blending and stitching seams on background thread...");
-        let stitchedCanvas = await stitchImages(files, normX, normY, canvasW, canvasH, direction, widths, heights);
+        let stitchedCanvas = await stitchImages(files, normX_scaled, normY_scaled, canvasW, canvasH, direction, widths, heights);
 
         if (direction === "horizontal") {
             postStatus("Rotating stitched panorama back...");
@@ -394,4 +448,4 @@ self.onmessage = async function (e) {
         postLog(`Worker Error: ${err.stack || err.message}`);
         self.postMessage({ action: "error", message: err.message });
     }
-}
+};
