@@ -1561,6 +1561,11 @@ function handleTouchEnd(e) {
 function handleCanvasWheel(e) {
   if (!forecastData) return;
   
+  // Only zoom if a modifier key (Ctrl, Cmd, Alt, Shift) is held down
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+    return;
+  }
+  
   e.preventDefault();
   
   if (e.deltaY < 0) { // Scroll up -> Zoom in
