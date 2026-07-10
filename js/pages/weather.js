@@ -311,28 +311,50 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
   return hoursData;
 }
 
+function copyHourData(target, source) {
+  target.uv = source.uv;
+  target.temp = source.temp;
+  target.symbol = source.symbol;
+  target.rain = source.rain;
+  target.rainMax = source.rainMax;
+  target.rainMin = source.rainMin;
+  target.rainProb = source.rainProb;
+  target.clouds = source.clouds;
+  target.cloudsLow = source.cloudsLow;
+  target.cloudsMid = source.cloudsMid;
+  target.cloudsHigh = source.cloudsHigh;
+  target.windSpeed = source.windSpeed;
+  target.windDir = source.windDir;
+}
+
 function getDailyTimeseries(timeseries, dayIndex) {
   const hoursData = getDailyTimeseriesRaw(timeseries, dayIndex);
   const hasData = hoursData.some(h => h.temp !== null);
 
-  // Fill in missing hours (like past hours today, or trailing hours on future days) using the next day's values
   if (dayIndex < 6) {
     const nextDayHoursData = getDailyTimeseriesRaw(timeseries, dayIndex + 1);
+    const firstVal = nextDayHoursData.find(h => h.temp !== null);
+
+    let lastAvailableHour = -1;
     hoursData.forEach(h => {
-      if (h.temp === null && nextDayHoursData[h.hour] && nextDayHoursData[h.hour].temp !== null) {
-        h.uv = nextDayHoursData[h.hour].uv;
-        h.temp = nextDayHoursData[h.hour].temp;
-        h.symbol = nextDayHoursData[h.hour].symbol;
-        h.rain = nextDayHoursData[h.hour].rain;
-        h.rainMax = nextDayHoursData[h.hour].rainMax;
-        h.rainMin = nextDayHoursData[h.hour].rainMin;
-        h.rainProb = nextDayHoursData[h.hour].rainProb;
-        h.clouds = nextDayHoursData[h.hour].clouds;
-        h.cloudsLow = nextDayHoursData[h.hour].cloudsLow;
-        h.cloudsMid = nextDayHoursData[h.hour].cloudsMid;
-        h.cloudsHigh = nextDayHoursData[h.hour].cloudsHigh;
-        h.windSpeed = nextDayHoursData[h.hour].windSpeed;
-        h.windDir = nextDayHoursData[h.hour].windDir;
+      if (h.temp !== null) {
+        lastAvailableHour = h.hour;
+      }
+    });
+
+    hoursData.forEach(h => {
+      if (h.temp === null) {
+        if (h.hour < lastAvailableHour) {
+          // Past hour: copy same hour from next day
+          if (nextDayHoursData[h.hour] && nextDayHoursData[h.hour].temp !== null) {
+            copyHourData(h, nextDayHoursData[h.hour]);
+          }
+        } else {
+          // Trailing hour: copy first available hour from next day
+          if (firstVal) {
+            copyHourData(h, firstVal);
+          }
+        }
       } else if (h.uv === 0 && nextDayHoursData[h.hour] && nextDayHoursData[h.hour].uv > 0) {
         h.uv = nextDayHoursData[h.hour].uv;
       }
@@ -380,9 +402,26 @@ function getDailyTideSeries(tideData, dayIndex) {
 
   if (dayIndex < 6) {
     const nextDayTideData = getDailyTideSeriesRaw(tideData, dayIndex + 1);
+    const firstVal = nextDayTideData.find(h => h.value !== null);
+
+    let lastAvailableHour = -1;
     hoursData.forEach(h => {
-      if (h.value === null && nextDayTideData[h.hour] && nextDayTideData[h.hour].value !== null) {
-        h.value = nextDayTideData[h.hour].value;
+      if (h.value !== null) {
+        lastAvailableHour = h.hour;
+      }
+    });
+
+    hoursData.forEach(h => {
+      if (h.value === null) {
+        if (h.hour < lastAvailableHour) {
+          if (nextDayTideData[h.hour] && nextDayTideData[h.hour].value !== null) {
+            h.value = nextDayTideData[h.hour].value;
+          }
+        } else {
+          if (firstVal) {
+            h.value = firstVal.value;
+          }
+        }
       }
     });
   }
