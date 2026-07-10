@@ -896,7 +896,11 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   }
 
   // Coordinate converter helpers
-  const getX = (hour) => paddingL + (hour / 23) * graphW;
+  const { start: viewStartHour, end: viewEndHour } = getZoomWindow();
+  const getX = (hour) => {
+    const range = viewEndHour - viewStartHour;
+    return paddingL + ((hour - viewStartHour) / (range || 1)) * graphW;
+  };
   const getY = (val) => {
     const norm = (val - minScaleY) / (maxScaleY - minScaleY);
     return H - paddingB - norm * graphH;
@@ -931,7 +935,25 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   
-  const hoursToShow = [0, 4, 8, 12, 16, 20, 23];
+  let hoursToShow = [];
+  if (zoomLevel === 24) {
+    hoursToShow = [0, 4, 8, 12, 16, 20, 23];
+  } else if (zoomLevel === 12) {
+    const s = Math.ceil(viewStartHour);
+    const e = Math.floor(viewEndHour);
+    for (let hr = s; hr <= e; hr++) {
+      if (hr % 2 === 0) {
+        hoursToShow.push(hr);
+      }
+    }
+  } else { // 8
+    const s = Math.ceil(viewStartHour);
+    const e = Math.floor(viewEndHour);
+    for (let hr = s; hr <= e; hr++) {
+      hoursToShow.push(hr);
+    }
+  }
+
   hoursToShow.forEach(hr => {
     const x = getX(hr);
     ctx.fillText(`${String(hr).padStart(2, '0')}:00`, x, H - paddingB + 8);
@@ -971,6 +993,12 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   });
 
   if (points.length === 0) return;
+
+  // Clip content area horizontally (between paddingL and W - paddingR)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(paddingL, 0, graphW, H);
+  ctx.clip();
 
   if (paramType === "rain") {
     // ---- Draw Precipitation Bar Chart ----
@@ -1252,6 +1280,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     }
   }
 
+  ctx.restore(); // End horizontal clipping!
+
   // 6. Draw hover tooltip / inspector cursor (interpolated continuously for the hovered minute)
   if (hoverHour !== null && hoverHour >= 0 && hoverHour <= 23) {
     const h0 = Math.floor(hoverHour);
@@ -1410,6 +1440,138 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   }
 }
 
+let zoomLevel = 24;
+let zoomCenterHour = 12;
+let startTouchDist = null;
+
+function getZoomWindow() {
+  let start = zoomCenterHour - zoomLevel / 2;
+  let end = zoomCenterHour + zoomLevel / 2;
+  
+  if (start < 0) {
+    end -= start;
+    start = 0;
+  }
+  if (end > 23) {
+    start -= (end - 23);
+    end = 23;
+  }
+  start = Math.max(0, start);
+  end = Math.min(23, end);
+  return { start, end };
+}
+
+function handleTouchStart(e) {
+  if (!forecastData) return;
+  
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    startTouchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    
+    const canvas = e.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const paddingL = 38;
+    const paddingR = 15;
+    const graphW = rect.width - paddingL - paddingR;
+    const relativeX = midX - rect.left - paddingL;
+    
+    const { start, end } = getZoomWindow();
+    const range = end - start;
+    const hour = start + (relativeX / graphW) * range;
+    zoomCenterHour = Math.max(0, Math.min(23, hour));
+  } else if (e.touches.length === 1) {
+    handleCanvasHover(e);
+  }
+}
+
+function handleTouchMove(e) {
+  if (!forecastData) return;
+
+  if (e.touches.length === 2 && startTouchDist !== null) {
+    e.preventDefault();
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    
+    const ratio = dist / startTouchDist;
+    
+    if (ratio > 1.25) { // Pinch out -> Zoom in
+      if (zoomLevel === 24) {
+        zoomLevel = 12;
+        startTouchDist = dist;
+        drawForecastCurves();
+      } else if (zoomLevel === 12) {
+        zoomLevel = 8;
+        startTouchDist = dist;
+        drawForecastCurves();
+      }
+    } else if (ratio < 0.8) { // Pinch in -> Zoom out
+      if (zoomLevel === 8) {
+        zoomLevel = 12;
+        startTouchDist = dist;
+        drawForecastCurves();
+      } else if (zoomLevel === 12) {
+        zoomLevel = 24;
+        startTouchDist = dist;
+        drawForecastCurves();
+      }
+    }
+  } else if (e.touches.length === 1) {
+    handleCanvasHover(e);
+  }
+}
+
+function handleTouchEnd(e) {
+  if (e.touches.length === 0) {
+    startTouchDist = null;
+    handleCanvasLeave();
+  }
+}
+
+function handleCanvasWheel(e) {
+  if (!forecastData) return;
+  
+  e.preventDefault();
+  
+  const canvas = e.currentTarget;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const paddingL = 38;
+  const paddingR = 15;
+  const graphW = rect.width - paddingL - paddingR;
+  const relativeX = x - paddingL;
+  
+  const { start, end } = getZoomWindow();
+  const range = end - start;
+  const hour = start + (relativeX / graphW) * range;
+  zoomCenterHour = Math.max(0, Math.min(23, hour));
+
+  if (e.deltaY < 0) { // Scroll up -> Zoom in
+    if (zoomLevel === 24) {
+      zoomLevel = 12;
+      drawForecastCurves();
+    } else if (zoomLevel === 12) {
+      zoomLevel = 8;
+      drawForecastCurves();
+    }
+  } else if (e.deltaY > 0) { // Scroll down -> Zoom out
+    if (zoomLevel === 8) {
+      zoomLevel = 12;
+      drawForecastCurves();
+    } else if (zoomLevel === 12) {
+      zoomLevel = 24;
+      drawForecastCurves();
+    }
+  }
+  
+  handleCanvasHover(e);
+}
+
 // Track hover coordinates on canvas
 function handleCanvasHover(e) {
   if (!forecastData) return;
@@ -1424,8 +1586,10 @@ function handleCanvasHover(e) {
   const paddingR = 15;
   const graphW = rect.width - paddingL - paddingR;
 
+  const { start: viewStartHour, end: viewEndHour } = getZoomWindow();
   const relativeX = x - paddingL;
-  let hr = (relativeX / graphW) * 23;
+  const range = viewEndHour - viewStartHour;
+  let hr = viewStartHour + (relativeX / graphW) * range;
   hr = Math.max(0, Math.min(23, hr));
 
   if (hoverHour !== hr) {
@@ -2089,9 +2253,11 @@ function initWeatherPage() {
     canvas.addEventListener("mousemove", handleCanvasHover);
     canvas.addEventListener("mouseleave", handleCanvasLeave);
 
-    canvas.addEventListener("touchstart", handleCanvasHover, { passive: true });
-    canvas.addEventListener("touchmove", handleCanvasHover, { passive: true });
-    canvas.addEventListener("touchend", handleCanvasLeave);
+    canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
+    canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
+    
+    canvas.addEventListener("wheel", handleCanvasWheel, { passive: false });
   });
 
   // Redraw canvases if active page theme is toggled
