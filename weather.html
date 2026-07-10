@@ -389,6 +389,23 @@
             }
         }
 
+        #zoom-toggle-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: var(--btn-radius);
+            color: var(--muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: none;
+            transition: all 0.15s ease;
+        }
+
+        #zoom-toggle-btn:hover {
+            color: var(--text);
+            border-color: var(--accent);
+        }
+
         .canvas-container {
             position: relative;
             width: 100%;
@@ -634,14 +651,6 @@
                             <span id="uv-max-time" class="weather-detail-val">13:00</span>
                             <span class="weather-detail-lbl">Max Time</span>
                         </div>
-                        <div class="weather-detail-item">
-                            <span id="uv-sunrise" class="weather-detail-val">--:--</span>
-                            <span class="weather-detail-lbl">Sunrise</span>
-                        </div>
-                        <div class="weather-detail-item">
-                            <span id="uv-sunset" class="weather-detail-val">--:--</span>
-                            <span class="weather-detail-lbl">Sunset</span>
-                        </div>
                     </div>
 
                     <div id="uv-advice" class="uv-advice" style="margin-top: 10px;">
@@ -654,7 +663,7 @@
             <div class="actions weather-actions margin-bottom-10" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span style="font-weight: 700; color: var(--text);">Daily Forecasts</span>
-                    <button id="zoom-toggle-btn" class="btn-small" style="font-size: 11px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; min-height: 28px; min-width: 125px;">
+                    <button id="zoom-toggle-btn" style="padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; min-height: 28px; min-width: 125px;">
                         🔍 Zoom: Full Day
                     </button>
                 </div>

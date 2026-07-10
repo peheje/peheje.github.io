@@ -258,12 +258,11 @@ async function fetchTideData(lat, lon) {
 }
 
 // Get the weather timeseries data grouped for Today, Tomorrow, or future days
-function getDailyTimeseries(timeseries, dayIndex) {
+function getDailyTimeseriesRaw(timeseries, dayIndex) {
   const targetDate = new Date();
   targetDate.setDate(targetDate.getDate() + dayIndex);
   const targetStr = getLocalDateString(targetDate);
 
-  // Initialize a 24-hour bucket
   const hoursData = Array.from({ length: 24 }, (_, i) => ({
     hour: i,
     uv: 0,
@@ -281,103 +280,61 @@ function getDailyTimeseries(timeseries, dayIndex) {
     windDir: 0
   }));
 
-  let hasData = false;
-
   timeseries.forEach(item => {
     const itemDate = new Date(item.time);
     const dateStr = getLocalDateString(itemDate);
     if (dateStr === targetStr) {
       const hr = itemDate.getHours();
       const details = item.data.instant.details;
-      hoursData[hr].uv = details.ultraviolet_index_clear_sky || 0;
-      hoursData[hr].temp = details.air_temperature;
-      hoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || item.data.next_6_hours?.summary?.symbol_code || null;
-      
-      const rainDetails = item.data.next_1_hours?.details || item.data.next_6_hours?.details;
-      hoursData[hr].rain = rainDetails?.precipitation_amount || 0;
-      hoursData[hr].rainMax = rainDetails?.precipitation_amount_max || rainDetails?.precipitation_amount || 0;
-      hoursData[hr].rainMin = rainDetails?.precipitation_amount_min || rainDetails?.precipitation_amount || 0;
-      hoursData[hr].rainProb = rainDetails?.probability_of_precipitation !== undefined ? rainDetails.probability_of_precipitation : null;
+      if (details) {
+        hoursData[hr].uv = details.ultraviolet_index_clear_sky || 0;
+        hoursData[hr].temp = details.air_temperature;
+        hoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || item.data.next_6_hours?.summary?.symbol_code || null;
+        
+        const rainDetails = item.data.next_1_hours?.details || item.data.next_6_hours?.details;
+        hoursData[hr].rain = rainDetails?.precipitation_amount || 0;
+        hoursData[hr].rainMax = rainDetails?.precipitation_amount_max || rainDetails?.precipitation_amount || 0;
+        hoursData[hr].rainMin = rainDetails?.precipitation_amount_min || rainDetails?.precipitation_amount || 0;
+        hoursData[hr].rainProb = rainDetails?.probability_of_precipitation !== undefined ? rainDetails.probability_of_precipitation : null;
 
-      hoursData[hr].clouds = details.cloud_area_fraction !== undefined ? details.cloud_area_fraction : 0;
-      hoursData[hr].cloudsLow = details.cloud_area_fraction_low !== undefined ? details.cloud_area_fraction_low : 0;
-      hoursData[hr].cloudsMid = details.cloud_area_fraction_medium !== undefined ? details.cloud_area_fraction_medium : 0;
-      hoursData[hr].cloudsHigh = details.cloud_area_fraction_high !== undefined ? details.cloud_area_fraction_high : 0;
+        hoursData[hr].clouds = details.cloud_area_fraction !== undefined ? details.cloud_area_fraction : 0;
+        hoursData[hr].cloudsLow = details.cloud_area_fraction_low !== undefined ? details.cloud_area_fraction_low : 0;
+        hoursData[hr].cloudsMid = details.cloud_area_fraction_medium !== undefined ? details.cloud_area_fraction_medium : 0;
+        hoursData[hr].cloudsHigh = details.cloud_area_fraction_high !== undefined ? details.cloud_area_fraction_high : 0;
 
-      hoursData[hr].windSpeed = details.wind_speed || 0;
-      hoursData[hr].windDir = details.wind_from_direction || 0;
-      hasData = true;
+        hoursData[hr].windSpeed = details.wind_speed || 0;
+        hoursData[hr].windDir = details.wind_from_direction || 0;
+      }
     }
   });
 
-  // If requesting Today (dayIndex === 0), fill in past hours with Tomorrow's values to make curves complete
-  if (dayIndex === 0) {
-    const tomorrowDate = new Date();
-    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-    const tomorrowStr = getLocalDateString(tomorrowDate);
+  return hoursData;
+}
 
-    const tomorrowHoursData = Array.from({ length: 24 }, (_, i) => ({
-      hour: i,
-      uv: 0,
-      temp: null,
-      symbol: null,
-      rain: 0,
-      rainMax: 0,
-      rainMin: 0,
-      rainProb: null,
-      clouds: 0,
-      cloudsLow: 0,
-      cloudsMid: 0,
-      cloudsHigh: 0,
-      windSpeed: 0,
-      windDir: 0
-    }));
+function getDailyTimeseries(timeseries, dayIndex) {
+  const hoursData = getDailyTimeseriesRaw(timeseries, dayIndex);
+  const hasData = hoursData.some(h => h.temp !== null);
 
-    timeseries.forEach(item => {
-      const itemDate = new Date(item.time);
-      if (getLocalDateString(itemDate) === tomorrowStr) {
-        const hr = itemDate.getHours();
-        const details = item.data.instant.details;
-        tomorrowHoursData[hr].uv = details.ultraviolet_index_clear_sky || 0;
-        tomorrowHoursData[hr].temp = details.air_temperature;
-        tomorrowHoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || item.data.next_6_hours?.summary?.symbol_code || null;
-        
-        const rainDetails = item.data.next_1_hours?.details || item.data.next_6_hours?.details;
-        tomorrowHoursData[hr].rain = rainDetails?.precipitation_amount || 0;
-        tomorrowHoursData[hr].rainMax = rainDetails?.precipitation_amount_max || rainDetails?.precipitation_amount || 0;
-        tomorrowHoursData[hr].rainMin = rainDetails?.precipitation_amount_min || rainDetails?.precipitation_amount || 0;
-        tomorrowHoursData[hr].rainProb = rainDetails?.probability_of_precipitation !== undefined ? rainDetails.probability_of_precipitation : null;
-
-        tomorrowHoursData[hr].clouds = details.cloud_area_fraction !== undefined ? details.cloud_area_fraction : 0;
-        tomorrowHoursData[hr].cloudsLow = details.cloud_area_fraction_low !== undefined ? details.cloud_area_fraction_low : 0;
-        tomorrowHoursData[hr].cloudsMid = details.cloud_area_fraction_medium !== undefined ? details.cloud_area_fraction_medium : 0;
-        tomorrowHoursData[hr].cloudsHigh = details.cloud_area_fraction_high !== undefined ? details.cloud_area_fraction_high : 0;
-
-        tomorrowHoursData[hr].windSpeed = details.wind_speed || 0;
-        tomorrowHoursData[hr].windDir = details.wind_from_direction || 0;
-      }
-    });
-
-    // Copy tomorrow's values for any hour that doesn't have forecast data today
+  // Fill in missing hours (like past hours today, or trailing hours on future days) using the next day's values
+  if (dayIndex < 6) {
+    const nextDayHoursData = getDailyTimeseriesRaw(timeseries, dayIndex + 1);
     hoursData.forEach(h => {
-      if (h.temp === null) {
-        h.uv = tomorrowHoursData[h.hour].uv;
-        h.temp = tomorrowHoursData[h.hour].temp;
-        h.symbol = tomorrowHoursData[h.hour].symbol;
-        h.rain = tomorrowHoursData[h.hour].rain;
-        h.rainMax = tomorrowHoursData[h.hour].rainMax;
-        h.rainMin = tomorrowHoursData[h.hour].rainMin;
-        h.rainProb = tomorrowHoursData[h.hour].rainProb;
-        h.clouds = tomorrowHoursData[h.hour].clouds;
-        h.cloudsLow = tomorrowHoursData[h.hour].cloudsLow;
-        h.cloudsMid = tomorrowHoursData[h.hour].cloudsMid;
-        h.cloudsHigh = tomorrowHoursData[h.hour].cloudsHigh;
-        h.windSpeed = tomorrowHoursData[h.hour].windSpeed;
-        h.windDir = tomorrowHoursData[h.hour].windDir;
-      } else if (h.uv === 0 && tomorrowHoursData[h.hour].uv > 0) {
-        // Fallback for UV index: clear-sky UV is purely astronomical,
-        // so Today's UV at this hour must match Tomorrow's if Today's cached value is missing or 0.
-        h.uv = tomorrowHoursData[h.hour].uv;
+      if (h.temp === null && nextDayHoursData[h.hour] && nextDayHoursData[h.hour].temp !== null) {
+        h.uv = nextDayHoursData[h.hour].uv;
+        h.temp = nextDayHoursData[h.hour].temp;
+        h.symbol = nextDayHoursData[h.hour].symbol;
+        h.rain = nextDayHoursData[h.hour].rain;
+        h.rainMax = nextDayHoursData[h.hour].rainMax;
+        h.rainMin = nextDayHoursData[h.hour].rainMin;
+        h.rainProb = nextDayHoursData[h.hour].rainProb;
+        h.clouds = nextDayHoursData[h.hour].clouds;
+        h.cloudsLow = nextDayHoursData[h.hour].cloudsLow;
+        h.cloudsMid = nextDayHoursData[h.hour].cloudsMid;
+        h.cloudsHigh = nextDayHoursData[h.hour].cloudsHigh;
+        h.windSpeed = nextDayHoursData[h.hour].windSpeed;
+        h.windDir = nextDayHoursData[h.hour].windDir;
+      } else if (h.uv === 0 && nextDayHoursData[h.hour] && nextDayHoursData[h.hour].uv > 0) {
+        h.uv = nextDayHoursData[h.hour].uv;
       }
     });
   }
@@ -385,12 +342,7 @@ function getDailyTimeseries(timeseries, dayIndex) {
   return { data: hoursData, found: hasData };
 }
 
-// Extract tide points for the target forecast day
-function getDailyTideSeries(tideData, dayIndex) {
-  if (!tideData || !tideData.hourly) {
-    return { data: null, found: false };
-  }
-
+function getDailyTideSeriesRaw(tideData, dayIndex) {
   const targetDate = new Date();
   targetDate.setDate(targetDate.getDate() + dayIndex);
   const targetStr = getLocalDateString(targetDate);
@@ -400,12 +352,14 @@ function getDailyTideSeries(tideData, dayIndex) {
     value: null
   }));
 
-  let hasData = false;
+  if (!tideData || !tideData.hourly) {
+    return hoursData;
+  }
+
   const times = tideData.hourly.time;
   const values = tideData.hourly.sea_level_height_msl;
 
   for (let i = 0; i < times.length; i++) {
-    // Append 'Z' to parse Open-Meteo GMT time as UTC, converting to browser local time
     const itemDate = new Date(times[i] + 'Z');
     const dateStr = getLocalDateString(itemDate);
     if (dateStr === targetStr) {
@@ -413,9 +367,24 @@ function getDailyTideSeries(tideData, dayIndex) {
       const val = values[i];
       if (val !== null && val !== undefined) {
         hoursData[hr].value = val * 100; // convert meters to centimeters
-        hasData = true;
       }
     }
+  }
+
+  return hoursData;
+}
+
+function getDailyTideSeries(tideData, dayIndex) {
+  const hoursData = getDailyTideSeriesRaw(tideData, dayIndex);
+  const hasData = hoursData.some(h => h.value !== null);
+
+  if (dayIndex < 6) {
+    const nextDayTideData = getDailyTideSeriesRaw(tideData, dayIndex + 1);
+    hoursData.forEach(h => {
+      if (h.value === null && nextDayTideData[h.hour] && nextDayTideData[h.hour].value !== null) {
+        h.value = nextDayTideData[h.hour].value;
+      }
+    });
   }
 
   return { data: hoursData, found: hasData };
@@ -673,27 +642,7 @@ function updateDashboardUI(data) {
   document.getElementById("uv-max").textContent = maxUV.toFixed(1);
   document.getElementById("uv-max-time").textContent = `${String(maxUVHour).padStart(2, '0')}:00`;
 
-  // Calculate Sunrise and Sunset for Today
-  try {
-    const today = new Date();
-    const sunTimes = SunCalc.getTimes(today, currentLoc.lat, currentLoc.lon);
-    if (sunTimes && sunTimes.sunrise && !isNaN(sunTimes.sunrise.getTime())) {
-      const sunriseStr = `${String(sunTimes.sunrise.getHours()).padStart(2, '0')}:${String(sunTimes.sunrise.getMinutes()).padStart(2, '0')}`;
-      document.getElementById("uv-sunrise").textContent = sunriseStr;
-    } else {
-      document.getElementById("uv-sunrise").textContent = "--:--";
-    }
-    if (sunTimes && sunTimes.sunset && !isNaN(sunTimes.sunset.getTime())) {
-      const sunsetStr = `${String(sunTimes.sunset.getHours()).padStart(2, '0')}:${String(sunTimes.sunset.getMinutes()).padStart(2, '0')}`;
-      document.getElementById("uv-sunset").textContent = sunsetStr;
-    } else {
-      document.getElementById("uv-sunset").textContent = "--:--";
-    }
-  } catch (err) {
-    console.error("Failed to calculate sunrise/sunset:", err);
-    document.getElementById("uv-sunrise").textContent = "--:--";
-    document.getElementById("uv-sunset").textContent = "--:--";
-  }
+
 
   // Draw forecast day selection tabs
   renderDayTabs();
