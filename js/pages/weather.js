@@ -604,7 +604,24 @@ function updateDashboardUI(data) {
 
   if (currentForecast) {
     const details = currentForecast.data.instant.details;
-    const uvVal = details.ultraviolet_index_clear_sky || 0;
+    let uvVal = details.ultraviolet_index_clear_sky || 0;
+    
+    // Interpolate UV index based on current minute to show exact minute-by-minute value
+    const nextHour = (currentHour + 1) % 24;
+    let nextForecast = null;
+    for (const item of timeseries) {
+      const itemDate = new Date(item.time);
+      if (getLocalDateString(itemDate) === todayStr && itemDate.getHours() === nextHour) {
+        nextForecast = item;
+        break;
+      }
+    }
+    if (nextForecast) {
+      const nextUv = nextForecast.data.instant.details.ultraviolet_index_clear_sky || 0;
+      const t = now.getMinutes() / 60 + now.getSeconds() / 3600;
+      uvVal = uvVal + t * (nextUv - uvVal);
+    }
+
     const tempVal = details.air_temperature;
     
     const uvLevel = getUVLevel(uvVal);
@@ -1193,33 +1210,42 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     }
   }
 
-  // 5. Current hour vertical line indicator
+  // 5. Current hour vertical line indicator (shows the current minute via linear interpolation)
   const now = new Date();
-  const currentHour = now.getHours();
   if (activeTab === 0) {
-    const curPoint = points.find(p => p.hour === currentHour);
-    if (curPoint) {
+    const currentTimeDec = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+    const h0 = Math.floor(currentTimeDec);
+    const h1 = Math.min(23, h0 + 1);
+    
+    const p0 = points.find(p => p.hour === h0);
+    const p1 = points.find(p => p.hour === h1) || p0;
+    
+    if (p0) {
+      const t = currentTimeDec - h0;
+      const curX = p0.x + t * (p1.x - p0.x);
+      const curY = p0.y + t * (p1.y - p0.y);
+
       ctx.save();
       ctx.strokeStyle = paramType === "rain" ? "rgba(56, 178, 255, 0.7)" : accentColor;
       ctx.lineWidth = 1;
       ctx.setLineDash([2, 2]);
       ctx.beginPath();
-      ctx.moveTo(curPoint.x, paddingT);
-      ctx.lineTo(curPoint.x, H - paddingB);
+      ctx.moveTo(curX, paddingT);
+      ctx.lineTo(curX, H - paddingB);
       ctx.stroke();
       ctx.restore();
 
       ctx.save();
       ctx.fillStyle = paramType === "rain" ? "rgba(56, 178, 255, 0.25)" : "rgba(232, 160, 69, 0.3)";
       ctx.beginPath();
-      ctx.arc(curPoint.x, curPoint.y, 8, 0, 2 * Math.PI);
+      ctx.arc(curX, curY, 8, 0, 2 * Math.PI);
       ctx.fill();
 
       ctx.fillStyle = paramType === "rain" ? "#38d4ff" : accentColor;
       ctx.strokeStyle = textColor;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(curPoint.x, curPoint.y, 4, 0, 2 * Math.PI);
+      ctx.arc(curX, curY, 4, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
       ctx.restore();
@@ -2056,8 +2082,10 @@ function initWeatherPage() {
 
       if (forecastData && forecastData.lastUpdated) {
         const age = Date.now() - forecastData.lastUpdated;
-        if (age >= CACHE_EXPIRY_MS) {
-          loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true, currentLoc.isGps);
+        // Bypasses the cache and immediately forces a refresh if the user has been away 
+        // and returns after 1 minute or more since the last update.
+        if (age >= 60 * 1000) {
+          loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true, currentLoc.isGps, true);
         }
       }
     }
