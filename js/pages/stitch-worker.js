@@ -158,18 +158,24 @@ function rotateCanvas90CCW(canvas) {
 }
 
 // Perform layout, blending, and cropping on OffscreenCanvas sequentially (one high-res image decoded at a time)
-async function stitchImages(files, X, Y, canvasW, canvasH, direction, widths, heights) {
+async function stitchImages(files, X, Y, canvasW, canvasH, direction, widths, heights, brightnessLevels, autoExposure) {
     const canvas = new OffscreenCanvas(canvasW, canvasH);
     const ctx = canvas.getContext("2d");
 
     postStatus("Stitching Image 1/" + files.length + "...");
     let img = await loadResizedCanvas(files[0], widths[0], heights[0], direction);
+    if (brightnessLevels && brightnessLevels[0] !== 0) {
+        applyBrightnessOffset(img, brightnessLevels[0]);
+    }
     ctx.drawImage(img, X[0], Y[0]);
     img.width = 0; img.height = 0; // Release memory
 
     for (let i = 1; i < files.length; i++) {
         postStatus(`Stitching Image ${i + 1}/${files.length}...`);
         img = await loadResizedCanvas(files[i], widths[i], heights[i], direction);
+        if (brightnessLevels && brightnessLevels[i] !== 0) {
+            applyBrightnessOffset(img, brightnessLevels[i]);
+        }
 
         const yi = Y[i];
         const xi = X[i];
@@ -184,6 +190,11 @@ async function stitchImages(files, X, Y, canvasW, canvasH, direction, widths, he
             const blendH = 80;
             const b1 = Math.floor(overlapMid - blendH / 2);
             const b2 = Math.floor(overlapMid + blendH / 2);
+
+            // Run auto exposure correction if requested
+            if (autoExposure) {
+                matchExposure(img, ctx, xi, yi, overlapStart, overlapEnd);
+            }
 
             postLog(`Blending seam between Image ${i} and Image ${i+1} at rows [${b1} - ${b2}]`);
 
@@ -237,6 +248,81 @@ async function stitchImages(files, X, Y, canvasW, canvasH, direction, widths, he
     canvas.width = 0; canvas.height = 0; // Release memory
 
     return croppedCanvas;
+}
+
+// Apply brightness gain using direct color multiplier
+function applyBrightnessGain(imgCanvas, gain) {
+    const imgCtx = imgCanvas.getContext("2d");
+    const fullData = imgCtx.getImageData(0, 0, imgCanvas.width, imgCanvas.height);
+    const dataLen = fullData.data.length;
+    for (let i = 0; i < dataLen; i += 4) {
+        fullData.data[i]   = Math.max(0, Math.min(255, Math.round(fullData.data[i]   * gain))); // R
+        fullData.data[i+1] = Math.max(0, Math.min(255, Math.round(fullData.data[i+1] * gain))); // G
+        fullData.data[i+2] = Math.max(0, Math.min(255, Math.round(fullData.data[i+2] * gain))); // B
+    }
+    imgCtx.putImageData(fullData, 0, 0);
+}
+
+// Convert brightness percentage to multiplier and apply
+function applyBrightnessOffset(imgCanvas, percentage) {
+    const gain = 1 + (percentage / 100);
+    applyBrightnessGain(imgCanvas, gain);
+    postLog(`Applied ${percentage >= 0 ? "+" : ""}${percentage}% manual brightness offset.`);
+}
+
+// Auto match exposure between new image and existing canvas in the overlap region
+function matchExposure(imgCanvas, canvasCtx, xi, yi, overlapStart, overlapEnd) {
+    const overlapH = overlapEnd - overlapStart;
+    if (overlapH <= 10) return; // too small overlap
+    
+    // We sample a centered strip of the overlap zone to compute average brightness
+    const sampleW = Math.min(200, imgCanvas.width);
+    const sampleX = Math.floor((imgCanvas.width - sampleW) / 2);
+    
+    const prevData = canvasCtx.getImageData(xi + sampleX, overlapStart, sampleW, overlapH);
+    
+    const sliceCanvas = new OffscreenCanvas(sampleW, overlapH);
+    const sliceCtx = sliceCanvas.getContext("2d");
+    sliceCtx.drawImage(imgCanvas, sampleX, overlapStart - yi, sampleW, overlapH, 0, 0, sampleW, overlapH);
+    const newData = sliceCtx.getImageData(0, 0, sampleW, overlapH);
+    
+    let sumPrev = 0;
+    let sumNew = 0;
+    let count = 0;
+    
+    const len = prevData.data.length;
+    for (let i = 0; i < len; i += 4) {
+        const rP = prevData.data[i];
+        const gP = prevData.data[i+1];
+        const bP = prevData.data[i+2];
+        const aP = prevData.data[i+3];
+        
+        const rN = newData.data[i];
+        const gN = newData.data[i+1];
+        const bN = newData.data[i+2];
+        const aN = newData.data[i+3];
+        
+        if (aP > 200 && aN > 200) {
+            const lumP = 0.299 * rP + 0.587 * gP + 0.114 * bP;
+            const lumN = 0.299 * rN + 0.587 * gN + 0.114 * bN;
+            
+            if (lumP > 5 && lumN > 5) {
+                sumPrev += lumP;
+                sumNew += lumN;
+                count++;
+            }
+        }
+    }
+    
+    if (count > 100) {
+        const ratio = sumPrev / sumNew;
+        const finalRatio = Math.max(0.5, Math.min(2.0, ratio));
+        postLog(`Auto Exposure: gain ratio calculated as ${finalRatio.toFixed(3)} based on ${count} pixels.`);
+        
+        if (Math.abs(finalRatio - 1.0) > 0.01) {
+            applyBrightnessGain(imgCanvas, finalRatio);
+        }
+    }
 }
 
 // Helper to load and resize image directly on decoding to save RAM/VRAM
@@ -320,6 +406,8 @@ self.onmessage = async function (e) {
     try {
         const files = data.files;
         const direction = data.direction;
+        const brightnessLevels = data.brightnessLevels;
+        const autoExposure = data.autoExposure;
 
         postStatus("Decoding low-res images for alignment...");
         const lowResData = [];
@@ -422,7 +510,7 @@ self.onmessage = async function (e) {
         }
 
         postStatus("Blending and stitching seams on background thread...");
-        let stitchedCanvas = await stitchImages(files, normX_scaled, normY_scaled, canvasW, canvasH, direction, widths, heights);
+        let stitchedCanvas = await stitchImages(files, normX_scaled, normY_scaled, canvasW, canvasH, direction, widths, heights, brightnessLevels, autoExposure);
 
         if (direction === "horizontal") {
             postStatus("Rotating stitched panorama back...");

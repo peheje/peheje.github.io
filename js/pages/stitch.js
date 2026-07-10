@@ -115,6 +115,7 @@ async function processStitch() {
             if (file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif")) {
                 activeFile = await convertHeicToJpeg(file);
             }
+            activeFile.brightness = file.brightness || 0;
             processedFiles.push(activeFile);
         }
 
@@ -179,7 +180,9 @@ async function processStitch() {
         worker.postMessage({
             action: "stitch",
             files: processedFiles,
-            direction: direction
+            direction: direction,
+            brightnessLevels: processedFiles.map(f => f.brightness || 0),
+            autoExposure: document.getElementById("stitch-auto-exposure").checked
         });
 
     } catch (err) {
@@ -210,6 +213,14 @@ function updateFileList() {
     const rows = selectedFilesList.map((file) => {
         const item = document.createElement("article");
         item.className = "heic-metadata-row";
+        item.style.display = "flex";
+        item.style.flexDirection = "column";
+        item.style.gap = "8px";
+
+        const fileInfo = document.createElement("div");
+        fileInfo.style.display = "flex";
+        fileInfo.style.justifyContent = "space-between";
+        fileInfo.style.width = "100%";
 
         const title = document.createElement("p");
         title.className = "heic-result-title";
@@ -220,7 +231,43 @@ function updateFileList() {
         const kbSize = (file.size / 1024).toFixed(1);
         sizeLabel.textContent = `${kbSize} KB`;
 
-        item.append(title, sizeLabel);
+        fileInfo.append(title, sizeLabel);
+
+        const expContainer = document.createElement("div");
+        expContainer.style.display = "flex";
+        expContainer.style.alignItems = "center";
+        expContainer.style.gap = "10px";
+        expContainer.style.fontSize = "0.85rem";
+        expContainer.style.color = "var(--muted)";
+        expContainer.style.width = "100%";
+
+        const expLabel = document.createElement("label");
+        expLabel.textContent = "Brightness Offset: ";
+        expLabel.style.minWidth = "120px";
+
+        const expVal = document.createElement("span");
+        expVal.style.fontWeight = "bold";
+        expVal.style.minWidth = "40px";
+        expVal.style.display = "inline-block";
+        const currentVal = file.brightness || 0;
+        expVal.textContent = (currentVal >= 0 ? "+" : "") + currentVal + "%";
+
+        const expSlider = document.createElement("input");
+        expSlider.type = "range";
+        expSlider.min = "-100";
+        expSlider.max = "100";
+        expSlider.value = String(currentVal);
+        expSlider.style.flex = "1";
+        expSlider.style.cursor = "pointer";
+
+        expSlider.addEventListener("input", (e) => {
+            const val = parseInt(e.target.value);
+            file.brightness = val;
+            expVal.textContent = (val >= 0 ? "+" : "") + val + "%";
+        });
+
+        expContainer.append(expLabel, expSlider, expVal);
+        item.append(fileInfo, expContainer);
         return item;
     });
 
