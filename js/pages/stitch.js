@@ -214,8 +214,65 @@ function updateFileList() {
         const item = document.createElement("article");
         item.className = "heic-metadata-row";
         item.style.display = "flex";
-        item.style.flexDirection = "column";
-        item.style.gap = "8px";
+        item.style.flexDirection = "row";
+        item.style.gap = "12px";
+        item.style.alignItems = "center";
+
+        // Setup thumbnail canvas if not already done
+        if (!file.thumbCanvas) {
+            const canvas = document.createElement("canvas");
+            canvas.width = 120;
+            canvas.height = 90;
+            canvas.style.borderRadius = "4px";
+            canvas.style.border = "1px solid var(--border)";
+            canvas.style.objectFit = "cover";
+            canvas.style.backgroundColor = "var(--bg-card)";
+            
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "var(--muted)";
+            ctx.font = "11px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("Loading...", 60, 45);
+            
+            file.thumbCanvas = canvas;
+            
+            // Asynchronously load thumbnail image
+            (async () => {
+                try {
+                    let activeFile = file;
+                    if (file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif")) {
+                        activeFile = await convertHeicToJpeg(file);
+                    }
+                    const url = URL.createObjectURL(activeFile);
+                    const img = new Image();
+                    img.onload = () => {
+                        const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+                        const w = img.width * scale;
+                        const h = img.height * scale;
+                        const x = (canvas.width - w) / 2;
+                        const y = (canvas.height - h) / 2;
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, x, y, w, h);
+                        URL.revokeObjectURL(url);
+                    };
+                    img.src = url;
+                } catch (e) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillText("Error loading", 60, 45);
+                }
+            })();
+        }
+
+        const currentVal = file.brightness || 0;
+        file.thumbCanvas.style.filter = `brightness(${1 + currentVal / 100})`;
+
+        // Right side info & controls
+        const infoCol = document.createElement("div");
+        infoCol.style.display = "flex";
+        infoCol.style.flexDirection = "column";
+        infoCol.style.gap = "8px";
+        infoCol.style.flex = "1";
 
         const fileInfo = document.createElement("div");
         fileInfo.style.display = "flex";
@@ -242,14 +299,13 @@ function updateFileList() {
         expContainer.style.width = "100%";
 
         const expLabel = document.createElement("label");
-        expLabel.textContent = "Brightness Offset: ";
-        expLabel.style.minWidth = "120px";
+        expLabel.textContent = "Brightness: ";
+        expLabel.style.minWidth = "80px";
 
         const expVal = document.createElement("span");
         expVal.style.fontWeight = "bold";
         expVal.style.minWidth = "40px";
         expVal.style.display = "inline-block";
-        const currentVal = file.brightness || 0;
         expVal.textContent = (currentVal >= 0 ? "+" : "") + currentVal + "%";
 
         const expSlider = document.createElement("input");
@@ -264,10 +320,12 @@ function updateFileList() {
             const val = parseInt(e.target.value);
             file.brightness = val;
             expVal.textContent = (val >= 0 ? "+" : "") + val + "%";
+            file.thumbCanvas.style.filter = `brightness(${1 + val / 100})`;
         });
 
         expContainer.append(expLabel, expSlider, expVal);
-        item.append(fileInfo, expContainer);
+        infoCol.append(fileInfo, expContainer);
+        item.append(file.thumbCanvas, infoCol);
         return item;
     });
 
