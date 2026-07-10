@@ -58,37 +58,26 @@ function matFromImageData(cv, imgData) {
 // with the highest match score — robust to varying overlap sizes.
 // Uses a 320px wide centered template in a 400px wide search space to allow
 // horizontal alignment shifts up to ~600px.
-function findTranslationTM(cv, canvasA, canvasB) {
-    postLog(`TM [Step 1]: Reading image dimensions (${canvasA.width}x${canvasA.height})...`);
+function findTranslationTM(cv, smallA, smallB, originalW, originalH, direction) {
+    postLog(`TM [Step 1]: Matching template on downsampled matrices (${smallA.width}x${smallA.height})...`);
 
-    // Downsample to ~400px wide for speed
     const targetW = 400;
-    const scale = targetW / canvasA.width;
-    const targetH = Math.round(canvasA.height * scale);
+    const scale = direction === "horizontal" ? (targetW / originalH) : (targetW / originalW);
 
-    postLog(`TM [Step 2]: Downsampling on canvas to ${targetW}x${targetH}...`);
-    const smallCanvasA = new OffscreenCanvas(targetW, targetH);
-    const ctxA = smallCanvasA.getContext("2d");
-    ctxA.drawImage(canvasA, 0, 0, targetW, targetH);
+    const imgDataA = smallA.getContext("2d").getImageData(0, 0, smallA.width, smallA.height);
+    const imgDataB = smallB.getContext("2d").getImageData(0, 0, smallB.width, smallB.height);
 
-    const smallCanvasB = new OffscreenCanvas(targetW, targetH);
-    const ctxB = smallCanvasB.getContext("2d");
-    ctxB.drawImage(canvasB, 0, 0, targetW, targetH);
+    postLog("TM [Step 2]: Allocating OpenCV RGBA matrices...");
+    let matA = matFromImageData(cv, imgDataA);
+    let matB = matFromImageData(cv, imgDataB);
 
-    const imgDataA = ctxA.getImageData(0, 0, targetW, targetH);
-    const imgDataB = ctxB.getImageData(0, 0, targetW, targetH);
-
-    postLog("TM [Step 3]: Allocating OpenCV RGBA matrices...");
-    let smallA = matFromImageData(cv, imgDataA);
-    let smallB = matFromImageData(cv, imgDataB);
-
-    postLog("TM [Step 4]: Converting matrices to Grayscale...");
+    postLog("TM [Step 3]: Converting matrices to Grayscale...");
     let grayA = new cv.Mat();
     let grayB = new cv.Mat();
-    cv.cvtColor(smallA, grayA, cv.COLOR_RGBA2GRAY);
-    cv.cvtColor(smallB, grayB, cv.COLOR_RGBA2GRAY);
+    cv.cvtColor(matA, grayA, cv.COLOR_RGBA2GRAY);
+    cv.cvtColor(matB, grayB, cv.COLOR_RGBA2GRAY);
 
-    const templateHeight = Math.max(10, Math.floor(targetH * 0.08)); // 8% strip height
+    const templateHeight = Math.max(10, Math.floor(smallA.height * 0.08)); // 8% strip height
     const margin = 40; // 40px margin on each side for horizontal search
     const templateW = targetW - 2 * margin; // 320px template width
 
@@ -99,10 +88,10 @@ function findTranslationTM(cv, canvasA, canvasB) {
     let bestMatchX = 0;
     let bestTemplateTop = 0;
 
-    postLog(`TM [Step 5]: Testing ${candidateRatios.length} candidate template positions...`);
+    postLog(`TM [Step 4]: Testing ${candidateRatios.length} candidate template positions...`);
     for (const ratio of candidateRatios) {
-        const templateTop = Math.floor(targetH * ratio);
-        if (templateTop + templateHeight >= targetH) continue;
+        const templateTop = Math.floor(smallA.height * ratio);
+        if (templateTop + templateHeight >= smallA.height) continue;
 
         // Crop centered template from A
         const template = grayA.roi(new cv.Rect(margin, templateTop, templateW, templateHeight));
@@ -113,7 +102,6 @@ function findTranslationTM(cv, canvasA, canvasB) {
 
         const minMaxLoc = cv.minMaxLoc(result);
         const score = minMaxLoc.maxVal;
-        postLog(`  Template at ${(ratio*100).toFixed(0)}%: score=${score.toFixed(3)} at pos=(${minMaxLoc.maxLoc.x}, ${minMaxLoc.maxLoc.y})`);
 
         if (score > bestScore) {
             bestScore = score;
@@ -126,25 +114,16 @@ function findTranslationTM(cv, canvasA, canvasB) {
         result.delete();
     }
 
-    postLog(`TM [Step 6]: Best overall score=${bestScore.toFixed(3)}, templateTop=${bestTemplateTop}, matchY=${bestMatchY}, matchX=${bestMatchX}`);
-
-    if (bestScore < 0.2) {
-        postLog("WARNING: Very low match score — results may be unreliable.");
-    }
-
-    // dx: bestMatchX is the left edge of the matched template in B.
-    // If B has no horizontal shift, the template matches at matchX = margin.
-    // dy: negative when B is below A
     const dx_small = bestMatchX - margin;
     const dy_small = bestMatchY - bestTemplateTop;
 
     const original_dx = Math.round(dx_small / scale);
     const original_dy = Math.round(dy_small / scale);
 
-    postLog(`TM [Step 7]: TM Alignment result: dx=${original_dx}, dy=${original_dy}`);
+    postLog(`TM [Step 5]: TM Alignment result: dx=${original_dx}, dy=${original_dy}`);
 
     // Cleanup
-    smallA.delete(); smallB.delete();
+    matA.delete(); matB.delete();
     grayA.delete(); grayB.delete();
 
     return { dx: original_dx, dy: original_dy };
@@ -178,20 +157,35 @@ function rotateCanvas90CCW(canvas) {
     return rotated;
 }
 
-// Perform layout, blending, and cropping on OffscreenCanvas
-function stitchImages(canvases, X, Y, canvasW, canvasH) {
+// Perform layout, blending, and cropping on OffscreenCanvas sequentially (one high-res image decoded at a time)
+async function stitchImages(files, X, Y, canvasW, canvasH, direction, widths, heights) {
     const canvas = new OffscreenCanvas(canvasW, canvasH);
     const ctx = canvas.getContext("2d");
 
-    // Draw first image
-    ctx.drawImage(canvases[0], X[0], Y[0]);
+    postStatus("Stitching Image 1/" + files.length + "...");
+    let bitmap = await createImageBitmap(files[0]);
+    let img = bitmapToCanvas(bitmap);
+    bitmap.close();
+    if (direction === "horizontal") {
+        img = rotateCanvas90CW(img);
+    }
+    ctx.drawImage(img, X[0], Y[0]);
+    img.width = 0; img.height = 0; // Release memory
 
-    for (let i = 1; i < canvases.length; i++) {
-        const img = canvases[i];
+    for (let i = 1; i < files.length; i++) {
+        postStatus(`Stitching Image ${i + 1}/${files.length}...`);
+        
+        bitmap = await createImageBitmap(files[i]);
+        img = bitmapToCanvas(bitmap);
+        bitmap.close();
+        if (direction === "horizontal") {
+            img = rotateCanvas90CW(img);
+        }
+
         const yi = Y[i];
         const xi = X[i];
         const yp = Y[i - 1];
-        const hp = canvases[i - 1].height;
+        const hp = heights[i - 1];
 
         const overlapStart = yi;
         const overlapEnd = yp + hp;
@@ -238,11 +232,12 @@ function stitchImages(canvases, X, Y, canvasW, canvasH) {
             postLog(`No vertical overlap between Image ${i} and Image ${i+1}. Stacking directly.`);
             ctx.drawImage(img, xi, yi);
         }
+        img.width = 0; img.height = 0; // Release memory
     }
 
     // Crop horizontally to eliminate black side borders
     const startX = Math.max(...X);
-    const endX = Math.min(...X.map((x, idx) => x + canvases[idx].width));
+    const endX = Math.min(...X.map((x, idx) => x + widths[idx]));
     const croppedW = Math.max(1, endX - startX);
 
     postLog(`Cropping horizontal borders. Width: ${canvasW}px -> ${croppedW}px.`);
@@ -250,8 +245,40 @@ function stitchImages(canvases, X, Y, canvasW, canvasH) {
     const croppedCanvas = new OffscreenCanvas(croppedW, canvasH);
     const croppedCtx = croppedCanvas.getContext("2d");
     croppedCtx.drawImage(canvas, startX, 0, croppedW, canvasH, 0, 0, croppedW, canvasH);
+    canvas.width = 0; canvas.height = 0; // Release memory
 
     return croppedCanvas;
+}
+
+// Helper to load a file/blob as a low-res canvas for alignment
+async function loadLowResCanvasForAlignment(file, direction) {
+    let bitmap = await createImageBitmap(file);
+    const originalW = bitmap.width;
+    const originalH = bitmap.height;
+    
+    let targetW = 400;
+    let scale, targetH, canvas;
+    
+    if (direction === "horizontal") {
+        scale = targetW / originalH;
+        targetH = Math.round(originalW * scale);
+        
+        const tempCanvas = new OffscreenCanvas(Math.round(originalW * scale), Math.round(originalH * scale));
+        const tempCtx = tempCanvas.getContext("2d");
+        tempCtx.drawImage(bitmap, 0, 0, tempCanvas.width, tempCanvas.height);
+        
+        canvas = rotateCanvas90CW(tempCanvas);
+    } else {
+        scale = targetW / originalW;
+        targetH = Math.round(originalH * scale);
+        
+        canvas = new OffscreenCanvas(targetW, targetH);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+    }
+    
+    bitmap.close();
+    return { canvas, originalW, originalH };
 }
 
 // Listen for messages from the main thread
@@ -262,18 +289,17 @@ self.onmessage = async function (e) {
     postLog("Background worker starting stitching process...");
 
     try {
-        const bitmaps = data.bitmaps;
+        const files = data.files;
         const direction = data.direction;
 
-        postStatus("Converting image bitmaps in background...");
-        let canvases = bitmaps.map(bitmapToCanvas);
-        postLog(`Converted ${canvases.length} bitmaps to OffscreenCanvas.`);
-
-        if (direction === "horizontal") {
-            postStatus("Rotating images for horizontal alignment...");
-            canvases = canvases.map(rotateCanvas90CW);
-            postLog("Images rotated 90 degrees clockwise.");
+        postStatus("Decoding low-res images for alignment...");
+        const lowResData = [];
+        for (let i = 0; i < files.length; i++) {
+            postStatus(`Decoding low-res Image ${i + 1}/${files.length}...`);
+            const loaded = await loadLowResCanvasForAlignment(files[i], direction);
+            lowResData.push(loaded);
         }
+        postLog(`Loaded ${lowResData.length} low-res canvases.`);
 
         postStatus("Initializing OpenCV WebAssembly on background thread...");
         const { cv } = await initOpenCV();
@@ -283,18 +309,30 @@ self.onmessage = async function (e) {
         const DX = [0];
         const DY = [0];
 
-        for (let i = 1; i < canvases.length; i++) {
+        for (let i = 1; i < lowResData.length; i++) {
             postStatus(`Aligning Image ${i} -> Image ${i+1}...`);
-            const shift = findTranslationTM(cv, canvases[i-1], canvases[i]);
-            postLog(`Pair ${i}->${i+1}: dx=${shift.dx}, dy=${shift.dy}`);
+            const shift = findTranslationTM(
+                cv, 
+                lowResData[i-1].canvas, 
+                lowResData[i].canvas, 
+                lowResData[i-1].originalW, 
+                lowResData[i-1].originalH, 
+                direction
+            );
             DX.push(shift.dx);
             DY.push(shift.dy);
         }
 
-        // Calculate absolute offsets (img_i is below img_{i-1}, so dy is positive)
+        // Clean up low-res canvases immediately
+        lowResData.forEach(item => {
+            item.canvas.width = 0;
+            item.canvas.height = 0;
+        });
+
+        // Calculate absolute offsets
         const X = [0];
         const Y = [0];
-        for (let i = 1; i < canvases.length; i++) {
+        for (let i = 1; i < files.length; i++) {
             X.push(X[i-1] - DX[i]);
             Y.push(Y[i-1] - DY[i]);
         }
@@ -309,13 +347,28 @@ self.onmessage = async function (e) {
 
         postLog(`Normalized positions: X=${JSON.stringify(normX)}, Y=${JSON.stringify(normY)}`);
 
+        // Get high-res dimensions for each image when placed (rotated if horizontal)
+        const widths = [];
+        const heights = [];
+        for (let i = 0; i < files.length; i++) {
+            const origW = lowResData[i].originalW;
+            const origH = lowResData[i].originalH;
+            if (direction === "horizontal") {
+                widths.push(origH);
+                heights.push(origW);
+            } else {
+                widths.push(origW);
+                heights.push(origH);
+            }
+        }
+
         // Canvas dimensions
-        const canvasW = Math.max(...normX.map((x, idx) => x + canvases[idx].width));
-        const canvasH = Math.max(...normY.map((y, idx) => y + canvases[idx].height));
+        const canvasW = Math.max(...normX.map((x, idx) => x + widths[idx]));
+        const canvasH = Math.max(...normY.map((y, idx) => y + heights[idx]));
         postLog(`Output canvas size: ${canvasW}x${canvasH}`);
 
         postStatus("Blending and stitching seams on background thread...");
-        let stitchedCanvas = stitchImages(canvases, normX, normY, canvasW, canvasH);
+        let stitchedCanvas = await stitchImages(files, normX, normY, canvasW, canvasH, direction, widths, heights);
 
         if (direction === "horizontal") {
             postStatus("Rotating stitched panorama back...");
@@ -341,4 +394,4 @@ self.onmessage = async function (e) {
         postLog(`Worker Error: ${err.stack || err.message}`);
         self.postMessage({ action: "error", message: err.message });
     }
-};
+}

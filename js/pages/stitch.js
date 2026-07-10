@@ -108,17 +108,14 @@ async function processStitch() {
         });
 
         setStatus("Processing files...");
-        const bitmaps = [];
+        const processedFiles = [];
         
         for (const file of sortedFiles) {
             let activeFile = file;
             if (file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif")) {
                 activeFile = await convertHeicToJpeg(file);
             }
-            setStatus(`Loading image data: ${activeFile.name}...`);
-            // Create GPU-decoded ImageBitmap from file
-            const bitmap = await createImageBitmap(activeFile);
-            bitmaps.push(bitmap);
+            processedFiles.push(activeFile);
         }
 
         setStatus("Spawning background worker thread...");
@@ -178,12 +175,12 @@ async function processStitch() {
             }
         };
 
-        // Post message with bitmaps transferred
+        // Post message with files
         worker.postMessage({
             action: "stitch",
-            bitmaps: bitmaps,
+            files: processedFiles,
             direction: direction
-        }, bitmaps);
+        });
 
     } catch (err) {
         console.error(err);
