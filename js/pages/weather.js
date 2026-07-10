@@ -937,9 +937,10 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   ctx.textBaseline = "top";
   
   let hoursToShow = [];
-  if (zoomIndex === 0) {
+  const visibleHours = viewEndHour - viewStartHour;
+  if (visibleHours > 16) {
     hoursToShow = [0, 4, 8, 12, 16, 20, 23];
-  } else if (zoomIndex === 1) {
+  } else if (visibleHours > 8) {
     const s = Math.ceil(viewStartHour);
     const e = Math.floor(viewEndHour);
     for (let hr = s; hr <= e; hr++) {
@@ -947,7 +948,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         hoursToShow.push(hr);
       }
     }
-  } else { // 2
+  } else {
     const s = Math.ceil(viewStartHour);
     const e = Math.floor(viewEndHour);
     for (let hr = s; hr <= e; hr++) {
