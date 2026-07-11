@@ -1032,7 +1032,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   ctx.clearRect(0, 0, W, H);
 
   if (paramType === "moon") {
-    renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, accentColor, dayPoints);
+    renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, accentColor);
     return;
   }
 
@@ -2759,7 +2759,7 @@ function drawMoonGraphic(ctx, cx, cy, R, norm, darkMoonBg, darkMoonBorder, light
 }
 
 // Render the entire Moon Phase dashboard inside its card
-function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, accentColor, dayPoints) {
+function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, accentColor) {
   let isLightMode = false;
   if (textColor.startsWith("#")) {
     const hex = textColor.substring(1);

@@ -257,7 +257,7 @@ function updateFileList() {
                         URL.revokeObjectURL(url);
                     };
                     img.src = url;
-                } catch (e) {
+                } catch {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.fillText("Error loading", 60, 45);
                 }

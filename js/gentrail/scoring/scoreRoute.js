@@ -39,6 +39,7 @@ export class DefaultRouteScorer {
         "beach",
         400,
         featureDistances,
+        0.75,
       ),
       gravelTrailScore: scoreTrail(route, osmFeatures, featureDistances),
       roadPenalty: scoreRoadPenalty(
@@ -65,7 +66,6 @@ export class DefaultRouteScorer {
       ),
       urbanPenalty: scoreUrbanPenalty(route, osmFeatures, context.spatialIndex),
       varietyScore: varietyScore(osmFeatures, featureDistances),
-      elevationScore: elevationScore(route),
     };
 
     const positiveWeights = {
@@ -76,7 +76,6 @@ export class DefaultRouteScorer {
       beachScore: preferences.water * SCORING_WEIGHTS.positive.beachMultiplier,
       gravelTrailScore: SCORING_WEIGHTS.positive.gravelTrailBase + preferences.trail * SCORING_WEIGHTS.positive.gravelTrailMultiplier,
       varietyScore: SCORING_WEIGHTS.positive.varietyScore,
-      elevationScore: preferences.elevation * SCORING_WEIGHTS.positive.elevationMultiplier,
     };
     let positive = 0;
     let maximum = 0;
@@ -166,23 +165,5 @@ function varietyScore(features, featureDistances) {
     value,
     weightedPoints: 0,
     explanation: `${present.size} nearby feature type${present.size === 1 ? "" : "s"}: ${[...present].join(", ") || "none"}.`,
-  };
-}
-
-function elevationScore(route) {
-  const ascent = route.metadata.ascentMeters;
-  if (ascent == null) {
-    return {
-      value: 0,
-      weightedPoints: 0,
-      explanation: "Elevation was not returned by the routing provider.",
-    };
-  }
-  const ascentPerKm = ascent / Math.max(route.distanceMeters / 1000, 0.1);
-  const value = Math.min(100, Math.round(ascentPerKm * 2.4));
-  return {
-    value,
-    weightedPoints: 0,
-    explanation: `${Math.round(ascent)} m ascent (${Math.round(ascentPerKm)} m/km).`,
   };
 }

@@ -127,10 +127,6 @@ const defaultFavorites = [
   "/poe.html",
 ];
 
-function getInternalSites() {
-  return internalSites;
-}
-
 function getFavoriteUrls() {
   try {
     const raw = localStorage.getItem(favoritesKey);
@@ -142,7 +138,7 @@ function getFavoriteUrls() {
         return parsed.filter((url) => validUrls.has(url));
       }
     }
-  } catch (_) {
+  } catch {
     // malformed JSON, fall through to defaults
   }
   return [...defaultFavorites];

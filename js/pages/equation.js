@@ -37,21 +37,6 @@ function multiply(left, right) {
   return { type: "multiply", left, right };
 }
 
-function evaluate(expression, scope = {}) {
-  switch (expression.type) {
-    case "variable":
-      return scope[expression.name];
-    case "add":
-      return evaluate(expression.left, scope) + evaluate(expression.right, scope);
-    case "subtract":
-      return evaluate(expression.left, scope) - evaluate(expression.right, scope);
-    case "multiply":
-      return evaluate(expression.left, scope) * evaluate(expression.right, scope);
-    default:
-      return expression.value;
-  }
-}
-
 function generateEquationData(depth) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const solution = randomInt(-12, 13);

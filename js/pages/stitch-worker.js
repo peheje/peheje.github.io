@@ -331,7 +331,7 @@ async function loadResizedCanvas(file, targetW, targetH, direction) {
     try {
         const decodeW = direction === "horizontal" ? targetH : targetW;
         bitmap = await createImageBitmap(file, { resizeWidth: decodeW });
-    } catch (e) {
+    } catch {
         bitmap = await createImageBitmap(file);
     }
     

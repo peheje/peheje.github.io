@@ -1,3 +1,5 @@
+export const ROUTE_DIVERSITY_MINIMUM_DIFFERENT_FRACTION = 0.5;
+
 export const SCORING_WEIGHTS = {
   // Positive components (base weight + preference multiplier if applicable)
   positive: {
@@ -7,11 +9,10 @@ export const SCORING_WEIGHTS = {
     forestMultiplier: 1.4,
     waterBase: 3,
     waterMultiplier: 0.8,
-    beachMultiplier: 0.35,
+    beachMultiplier: 0.8,
     gravelTrailBase: 4,
     gravelTrailMultiplier: 1.3,
     varietyScore: 8,
-    elevationMultiplier: 0.45,
   },
   // Negative components (preference multipliers)
   negative: {

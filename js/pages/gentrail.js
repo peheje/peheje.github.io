@@ -1,6 +1,9 @@
 import { mountSiteShell } from "../site.js";
-import { generateHikes } from "../gentrail/generateHikes.js";
-import { OpenRouteServiceProvider } from "../gentrail/routing.js";
+import { ROUTE_DIVERSITY_MINIMUM_DIFFERENT_FRACTION } from "../gentrail/config.js";
+
+const generateHikesForPage =
+  globalThis.__gentrailTestOverrides?.generateHikes ??
+  (await import("../gentrail/generateHikes.js")).generateHikes;
 
 // Mount standard site shell
 mountSiteShell();
@@ -89,7 +92,7 @@ let preferences = {
   avoidHighways: 10,
   avoidMinorRoads: 3,
   avoidRepetitions: 9,
-  elevation: 3,
+  beachWalking: true,
 };
 let routes = [];
 let selectedRouteId = undefined;
@@ -100,7 +103,6 @@ let marker = null;
 let routeLayerIds = [];
 
 // DOM elements
-const orsKeyInput = document.getElementById("ors-api-key");
 const startReadout = document.getElementById("start-readout");
 const startStatus = document.getElementById("start-status");
 const startCoords = document.getElementById("start-coords");
@@ -117,14 +119,6 @@ const infoMessage = document.getElementById("info-message");
 const routeList = document.getElementById("route-list");
 const debugContent = document.getElementById("debug-content");
 const mapPrompt = document.getElementById("map-prompt");
-
-// Initialize API Key from localStorage
-let orsApiKey = localStorage.getItem("ors-api-key") || "";
-orsKeyInput.value = orsApiKey;
-orsKeyInput.addEventListener("input", (e) => {
-  orsApiKey = e.target.value.trim();
-  localStorage.setItem("ors-api-key", orsApiKey);
-});
 
 // Setup map
 function initMap() {
@@ -234,7 +228,7 @@ function clearMapRoutes() {
 }
 
 // Bind sliders
-const preferencesKeys = ["forest", "trail", "water", "avoidRoads", "avoidHighways", "avoidMinorRoads", "avoidRepetitions", "elevation"];
+const preferencesKeys = ["forest", "trail", "water", "avoidRoads", "avoidHighways", "avoidMinorRoads", "avoidRepetitions"];
 preferencesKeys.forEach((key) => {
   const input = document.getElementById(`pref-${key}`);
   const output = document.getElementById(`val-${key}`);
@@ -245,6 +239,11 @@ preferencesKeys.forEach((key) => {
       preferences[key] = val;
     });
   }
+});
+
+const beachWalkingInput = document.getElementById("pref-beachWalking");
+beachWalkingInput.addEventListener("change", (event) => {
+  preferences.beachWalking = event.target.checked;
 });
 
 // Bind select & number inputs
@@ -286,17 +285,14 @@ async function runGeneration() {
   clearMapRoutes();
 
   currentController = new AbortController();
-  const routingProvider = new OpenRouteServiceProvider(orsApiKey);
-
   try {
-    const result = await generateHikes(
+    const result = await generateHikesForPage(
       {
         start,
         targetDistanceKm,
         candidateCount,
         preferences,
       },
-      routingProvider,
       (statusText) => {
         progressStatus.textContent = statusText;
       },
@@ -329,9 +325,20 @@ function renderResults(debugData) {
   resultsSection.classList.remove("display-none");
   routeList.innerHTML = "";
 
-  // Render info message if fewer routes than requested
+  const resultMessages = [];
+  if (debugData?.fallbackSelectedCount > 0) {
+    const count = debugData.fallbackSelectedCount;
+    resultMessages.push(
+      `${count} option${count === 1 ? " uses" : "s use"} relaxed distance or repetition limits.`,
+    );
+  }
   if (routes.length < candidateCount) {
-    infoMessage.textContent = `Found ${routes.length} of ${candidateCount} requested loops within the repetition limit. Rejected routes were not restored.`;
+    resultMessages.push(
+      `Found ${routes.length} of ${candidateCount} requested loops with at least ${Math.round(ROUTE_DIVERSITY_MINIMUM_DIFFERENT_FRACTION * 100)}% different paths.`,
+    );
+  }
+  if (resultMessages.length) {
+    infoMessage.textContent = resultMessages.join(" ");
     infoMessage.classList.remove("display-none");
   } else {
     infoMessage.classList.add("display-none");
@@ -364,7 +371,6 @@ function buildRouteCard(scoredRoute, index) {
 
   const durationStr = formatDuration(route.durationSeconds);
   const distStr = `${(route.distanceMeters / 1000).toFixed(1)} km`;
-  const ascentStr = route.metadata.ascentMeters != null ? `, +${Math.round(route.metadata.ascentMeters)} m` : "";
 
   card.innerHTML = `
     <div class="route-card__header">
@@ -381,7 +387,6 @@ function buildRouteCard(scoredRoute, index) {
       <span>${distStr}</span>
       <span>•</span>
       <span>${durationStr}</span>
-      ${route.metadata.ascentMeters != null ? `<span>•</span><span>${ascentStr}</span>` : ""}
     </div>
     <div class="warnings">
       ${score.warnings.map(w => `<span>${w}</span>`).join("")}
@@ -595,7 +600,7 @@ function downloadGPX(scoredRoute, index) {
   const coordinates = route.coordinates;
   
   let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="GenTrail" xmlns="http://www.topographic.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topographic.com/GPX/1/1 http://www.topographic.com/GPX/1/1/gpx.xsd">
+<gpx version="1.1" creator="GenTrail" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
   <metadata>
     <name>${name}</name>
     <desc>Generated route from GenTrail with distance ${(route.distanceMeters / 1000).toFixed(2)} km</desc>

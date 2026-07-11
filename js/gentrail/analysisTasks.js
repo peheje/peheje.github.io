@@ -1,6 +1,11 @@
-import { repetitionMetrics, routesAreSimilar } from "./geo.js";
+import { repetitionMetrics } from "./geo.js";
 import { DefaultRouteScorer } from "./scoring/scoreRoute.js";
 import { buildSpatialIndex } from "./scoring/featureAnalysis.js";
+import {
+  routesExactlyMatch,
+  selectDistinctScoredRoutes,
+} from "./routeSelection.js";
+import { routesAreTooSimilar } from "./routeDiversity.js";
 
 export function analyzeRoutes(request) {
   console.log(`[Worker] analyzeRoutes: starting analysis for ${request.routes.length} routes...`);
@@ -16,7 +21,6 @@ export function analyzeRoutes(request) {
     const t0 = performance.now();
     const metrics = repetitionMetrics(route.geometry);
     repetitionByRoute[route.candidateId] = metrics;
-    fallback.push(route);
     const dt = Math.round(performance.now() - t0);
     if (dt > 100) {
       console.warn(`[Worker] analyzeRoutes: repetitionMetrics for route ${idx} took ${dt}ms`);
@@ -27,24 +31,27 @@ export function analyzeRoutes(request) {
       route.distanceMeters > request.targetMeters * 1.75
     ) {
       rejectedByDistance += 1;
+      fallback.push(route);
       continue;
     }
     if (metrics.repeatedEdgeRatio > request.repetitionLimit) {
       rejectedByRepetition += 1;
+      fallback.push(route);
       continue;
     }
 
     const tSim0 = performance.now();
     const isDuplicate = [...request.existingRoutes, ...accepted].some((existing) =>
-      routesAreSimilar(existing, route)
+      routesExactlyMatch(existing, route) || routesAreTooSimilar(existing, route),
     );
     const dtSim = Math.round(performance.now() - tSim0);
     if (dtSim > 100) {
-      console.warn(`[Worker] analyzeRoutes: routesAreSimilar check for route ${idx} took ${dtSim}ms`);
+      console.warn(`[Worker] analyzeRoutes: route diversity check for route ${idx} took ${dtSim}ms`);
     }
 
     if (isDuplicate) {
       rejectedAsDuplicate += 1;
+      fallback.push(route);
       continue;
     }
     accepted.push(route);
@@ -98,24 +105,11 @@ export async function scoreRoutes(request) {
     return firstTier - secondTier || second.score.total - first.score.total;
   });
 
-  const selected = [];
-  let rejectedAsDuplicate = 0;
-  for (const item of scored) {
-    if (
-      selected.some((existing) =>
-        routesAreSimilar(existing.route, item.route),
-      )
-    ) {
-      rejectedAsDuplicate += 1;
-      continue;
-    }
-    selected.push(item);
-    if (selected.length === request.settings.candidateCount) break;
-  }
-  for (const item of scored) {
-    if (selected.length === request.settings.candidateCount) break;
-    if (!selected.includes(item)) selected.push(item);
-  }
+  const { selected, rejectedAsDuplicate } = selectDistinctScoredRoutes(
+    scored,
+    request.settings.candidateCount,
+    routesAreTooSimilar,
+  );
   console.log(`[Worker] scoreRoutes: finished. Selected: ${selected.length}, Rejected duplicate: ${rejectedAsDuplicate}`);
   return { selected, rejectedAsDuplicate };
 }

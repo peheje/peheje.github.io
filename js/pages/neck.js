@@ -39,11 +39,6 @@ function getIntervalDurationMs(source = defaultSettings) {
   return source.intervalValue * multiplier;
 }
 
-function getIntervalLabel(source = defaultSettings) {
-  const unit = source.intervalUnit === "seconds" ? "second" : "minute";
-  return `${source.intervalValue} ${unit}${source.intervalValue === 1 ? "" : "s"}`;
-}
-
 function loadJson(key, fallback) {
   const raw = localStorage.getItem(key);
 

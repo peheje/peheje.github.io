@@ -256,6 +256,34 @@
   cursor: pointer;
 }
 
+.preference--toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preference--toggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.preference--toggle strong {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.preference--toggle small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.preference--toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .generate-button {
   display: flex;
   width: 100%;

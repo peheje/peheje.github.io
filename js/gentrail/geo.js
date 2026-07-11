@@ -286,24 +286,6 @@ export function routeShapeMetrics(route) {
   return { uniqueRatio, spreadRatio, directionalSeparation };
 }
 
-export function similaritySignature(route) {
-  const samples = sampleLine(route.geometry, 300);
-  const start = point(route.geometry.geometry.coordinates[0]);
-  return samples.slice(1, -1).map((sample) => {
-    const angle = bearing(start, sample);
-    return Math.round((angle + 360) % 360 / 15) * 15;
-  });
-}
-
-export function routesAreSimilar(first, second) {
-  const firstSignature = similaritySignature(first);
-  const secondSignature = similaritySignature(second);
-  if (!firstSignature.length || !secondSignature.length) return false;
-  const firstSet = new Set(firstSignature);
-  const overlap = secondSignature.filter((value) => firstSet.has(value)).length;
-  return overlap / Math.max(firstSignature.length, secondSignature.length) > 0.72;
-}
-
 export function bboxAsFeature(value) {
   return bboxPolygon(value);
 }

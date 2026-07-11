@@ -1,4 +1,9 @@
-import { point, polygon, lineString } from "https://esm.sh/@turf/turf@7.2.0";
+import { lineString, multiPolygon, point, polygon } from "https://esm.sh/@turf/turf@7.2.0";
+import {
+  buildMultipolygonCoordinates,
+  stitchClosedRings,
+} from "./osmGeometry.js";
+import { buildFeatureQuery, categoriesFor } from "./osmQuery.js";
 
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
@@ -18,7 +23,6 @@ export async function fetchOsmFeatures(bounds, signal) {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-          "User-Agent": "GenTrailHikeGenerator/1.0 (https://github.com/peheje/peheje_fable)",
         },
         body: `data=${encodeURIComponent(query)}`,
         signal,
@@ -51,23 +55,6 @@ export async function fetchOsmFeatures(bounds, signal) {
   throw new Error(`Failed to fetch map data from all public Overpass API instances. Last error: ${lastError ? lastError.message : "Unknown"}`);
 }
 
-function buildFeatureQuery(bounds) {
-  const [west, south, east, north] = bounds;
-  const bboxStr = `${south},${west},${north},${east}`;
-  return `
-[out:json][timeout:25];
-(
-  way["landuse"~"forest|grass|meadow"](${bboxStr});
-  way["natural"~"wood|water|beach"](${bboxStr});
-  way["leisure"~"nature_reserve|park|garden"](${bboxStr});
-  way["waterway"~"river|stream"](${bboxStr});
-  node["natural"="beach"](${bboxStr});
-  way["highway"~"primary|secondary|tertiary|residential|service|unclassified|living_street|path|footway|track|steps|pedestrian"](${bboxStr});
-);
-out geom;
-`.trim();
-}
-
 function toOsmFeatures(element) {
   const tags = element.tags ?? {};
   const categories = categoriesFor(tags);
@@ -82,8 +69,23 @@ function toOsmFeatures(element) {
     }));
   }
 
+  const feature = featureForElement(element, categories);
+  if (!feature) return [];
+
+  return categories.map((category) => ({
+    id: `${element.type}/${element.id}/${category}`,
+    category,
+    tags,
+    feature,
+  }));
+}
+
+function featureForElement(element, categories) {
+  const relationFeature = featureForRelation(element, categories);
+  if (relationFeature) return relationFeature;
+
   const coordinates = element.geometry?.map((value) => [value.lon, value.lat]) ?? [];
-  if (coordinates.length < 2) return [];
+  if (coordinates.length < 2) return null;
   const isClosed =
     coordinates.length >= 4 &&
     coordinates[0][0] === coordinates[coordinates.length - 1][0] &&
@@ -94,53 +96,32 @@ function toOsmFeatures(element) {
       ["forest", "water", "beach", "urban"].includes(category),
     );
 
-  return categories.map((category) => ({
-    id: `${element.type}/${element.id}/${category}`,
-    category,
-    tags,
-    feature: usePolygon ? polygon([coordinates]) : lineString(coordinates),
-  }));
+  return usePolygon ? polygon([coordinates]) : lineString(coordinates);
 }
 
-function categoriesFor(tags) {
-  const result = new Set();
-  if (
-    tags.landuse === "forest" ||
-    tags.natural === "wood" ||
-    ["nature_reserve", "park", "garden", "recreation_ground"].includes(tags.leisure) ||
-    ["grass", "meadow", "recreation_ground"].includes(tags.landuse)
-  ) {
-    result.add("forest");
+function featureForRelation(element, categories) {
+  if (element.type !== "relation") return null;
+  const members = (element.members ?? []).filter((member) => member.type === "way");
+  const pathsForRole = (role) =>
+    members
+      .filter((member) =>
+        role === "inner" ? member.role === "inner" : member.role !== "inner",
+      )
+      .map((member) => member.geometry?.map((value) => [value.lon, value.lat]) ?? [])
+      .filter((coordinates) => coordinates.length >= 2);
+  const outerPaths = pathsForRole("outer");
+
+  const isArea = categories.some((category) =>
+    ["forest", "water", "beach", "urban"].includes(category),
+  );
+  if (!isArea) {
+    const rings = stitchClosedRings(outerPaths);
+    return rings.length ? lineString(rings[0]) : null;
   }
-  if (
-    tags.natural === "water" ||
-    tags.natural === "coastline" ||
-    ["lake", "pond"].includes(tags.water) ||
-    ["river", "stream"].includes(tags.waterway)
-  ) {
-    result.add("water");
-  }
-  if (tags.natural === "beach") result.add("beach");
-  if (["motorway", "trunk"].includes(tags.highway)) result.add("motorway");
-  if (["primary", "secondary"].includes(tags.highway)) result.add("road");
-  
-  const isUnpaved = ["gravel", "ground", "dirt", "unpaved", "grass", "sand", "woodchips", "bark"].includes(tags.surface);
-  if (
-    ["tertiary", "residential", "service", "unclassified", "living_street"].includes(tags.highway) &&
-    !isUnpaved
-  ) {
-    result.add("minorRoad");
-  }
-  if (
-    ["path", "footway", "track"].includes(tags.highway) ||
-    isUnpaved
-  ) {
-    result.add("trail");
-  }
-  if (
-    ["residential", "commercial", "retail", "industrial"].includes(tags.landuse)
-  ) {
-    result.add("urban");
-  }
-  return [...result];
+
+  const polygons = buildMultipolygonCoordinates(
+    outerPaths,
+    pathsForRole("inner"),
+  );
+  return polygons.length ? multiPolygon(polygons) : null;
 }

@@ -5,12 +5,16 @@ import {
 import { destinationPoint, lineFromLatLng } from "./geo.js";
 import { fetchOsmFeatures } from "./overpass.js";
 import { AnalysisWorkerClient } from "./AnalysisWorkerClient.js";
+import { addWalkableWayToGraph } from "./routingGraph.js";
+import { haversineDistance, runAStar } from "./pathfinding.js";
+import { buildIntersectionCrossoverPaths } from "./crossover.js";
+import { pruneDeadEnds } from "./graphPruning.js";
+import { addBeachWalkingToGraph } from "./beachRouting.js";
 
 const ROUTE_COLORS = ["#ef6c3e", "#35a878", "#4c7fe8", "#b66de0", "#e5aa2f"];
 
 export async function generateHikes(
   settings,
-  routingProvider,
   onProgress,
   signal,
 ) {
@@ -20,7 +24,6 @@ export async function generateHikes(
   try {
     return await generateHikesWithWorker(
       settings,
-      routingProvider,
       worker,
       onProgress,
       signal,
@@ -33,7 +36,6 @@ export async function generateHikes(
 
 async function generateHikesWithWorker(
   settings,
-  routingProvider,
   worker,
   onProgress,
   signal,
@@ -55,7 +57,9 @@ async function generateHikesWithWorker(
   // Bounding box centered on the start point with padding covering target distance
   const searchRadius = Math.max(1000, targetMeters * 0.45);
   const latPadding = searchRadius / 111320;
-  const lngPadding = searchRadius / (111320 * Math.cos((start.lat * Math.PI) / 180));
+  const lngPadding =
+    searchRadius /
+    (111320 * Math.max(Math.cos((start.lat * Math.PI) / 180), 0.2));
   const bbox = [
     start.lng - lngPadding,
     start.lat - latPadding,
@@ -64,6 +68,7 @@ async function generateHikesWithWorker(
   ];
 
   onProgress?.("Fetching local map network from OpenStreetMap...");
+  const overpassStartedAt = performance.now();
   let osmResult;
   try {
     osmResult = await fetchOsmFeatures(bbox, signal);
@@ -71,55 +76,29 @@ async function generateHikesWithWorker(
     if (signal?.aborted) throw error;
     throw new Error(`Failed to fetch map data from OpenStreetMap Overpass API: ${error.message}`, { cause: error });
   }
+  const overpassElapsedMs = Math.round(performance.now() - overpassStartedAt);
 
   const osmFeatures = osmResult.features;
   const elements = osmResult.raw.elements ?? [];
 
   onProgress?.("Building trail network graph...");
+  const graphBuildStartedAt = performance.now();
   const adjacency = new Map();
   const nodeCoords = new Map();
 
   for (const el of elements) {
-    if (el.type !== "way" || !el.tags || !el.tags.highway) continue;
-    const nodes = el.nodes;
-    const geometry = el.geometry;
-    if (!nodes || !geometry || nodes.length < 2) continue;
-
-    const highway = el.tags.highway;
-    const surface = el.tags.surface;
-
-    // Weight selection based on walkable types
-    let weight = 1.0;
-    if (["motorway", "trunk", "motorway_link", "trunk_link"].includes(highway)) {
-      weight = 50.0;
-    } else if (["primary", "secondary", "primary_link", "secondary_link"].includes(highway)) {
-      weight = 5.0;
-    } else if (["tertiary", "tertiary_link"].includes(highway)) {
-      weight = 3.0;
-    } else if (["residential", "service", "unclassified", "living_street"].includes(highway)) {
-      weight = 2.0;
-    } else if (["path", "footway", "track", "pedestrian", "steps"].includes(highway)) {
-      weight = 1.0;
-      if (["gravel", "ground", "dirt", "unpaved", "grass"].includes(surface)) {
-        weight = 0.8;
-      }
-    }
-
-    for (let i = 0; i < nodes.length; i++) {
-      nodeCoords.set(nodes[i], { lat: geometry[i].lat, lng: geometry[i].lon });
-    }
-
-    for (let i = 1; i < nodes.length; i++) {
-      const u = nodes[i - 1];
-      const v = nodes[i];
-      const coordU = nodeCoords.get(u);
-      const coordV = nodeCoords.get(v);
-      const dist = haversineDistance(coordU, coordV);
-
-      addEdge(adjacency, u, v, dist, weight, highway, surface);
-      addEdge(adjacency, v, u, dist, weight, highway, surface);
+    if (el.type === "way") {
+      addWalkableWayToGraph(adjacency, nodeCoords, el, haversineDistance);
     }
   }
+  const beachRouting = settings.preferences.beachWalking
+    ? addBeachWalkingToGraph(
+        adjacency,
+        nodeCoords,
+        elements,
+        haversineDistance,
+      )
+    : { beachCorridorCount: 0, connectorCount: 0 };
 
   if (nodeCoords.size === 0) {
     throw new Error("No streets or trails found in this area. Please select another trailhead.");
@@ -150,6 +129,7 @@ async function generateHikesWithWorker(
 
   const finalSnapGraph = reachableNodeCoords.size > 0 ? reachableNodeCoords : snapGraph;
   const finalSnapAdjacency = reachableAdjacency.size > 0 ? reachableAdjacency : snapAdjacency;
+  const graphBuildElapsedMs = Math.round(performance.now() - graphBuildStartedAt);
 
   // Define 8 directions around the compass
   const directions = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -200,14 +180,17 @@ async function generateHikesWithWorker(
   }
 
   onProgress?.(`Pruning and scoring initial candidates... (${elapsed()}s)`);
+  const initialAnalysisStartedAt = performance.now();
   const initialAnalysis = await worker.analyzeRoutes({
     routes: candidateRoutes,
     existingRoutes: [],
     targetMeters,
     repetitionLimit,
   });
+  let analysisElapsedMs = Math.round(performance.now() - initialAnalysisStartedAt);
 
   const initialPool = [...initialAnalysis.accepted, ...initialAnalysis.fallback];
+  const initialScoringStartedAt = performance.now();
   const scoredInitial = await worker.scoreRoutes({
     routes: initialPool,
     osmFeatures,
@@ -215,6 +198,7 @@ async function generateHikesWithWorker(
     settings,
     repetitionByRoute: initialAnalysis.repetitionByRoute,
   });
+  let scoringElapsedMs = Math.round(performance.now() - initialScoringStartedAt);
 
   // Sort initial candidates by score descending
   const sortedInitial = scoredInitial.selected.sort((a, b) => b.score.total - a.score.total);
@@ -314,12 +298,14 @@ async function generateHikesWithWorker(
   const allCandidates = [...candidateRoutes, ...evolvedCandidates];
 
   onProgress?.(`Filtering and scoring final loops... (${elapsed()}s)`);
+  const finalAnalysisStartedAt = performance.now();
   const finalAnalysis = await worker.analyzeRoutes({
     routes: allCandidates,
     existingRoutes: [],
     targetMeters,
     repetitionLimit,
   });
+  analysisElapsedMs += Math.round(performance.now() - finalAnalysisStartedAt);
 
   const acceptedRoutes = finalAnalysis.accepted;
   const fallbackRoutes = finalAnalysis.fallback;
@@ -342,6 +328,7 @@ async function generateHikesWithWorker(
     usableRoutes.push(...sortedFallbacks.slice(0, remainingCount));
   }
 
+  const finalScoringStartedAt = performance.now();
   const scored = await worker.scoreRoutes({
     routes: usableRoutes,
     osmFeatures,
@@ -349,10 +336,16 @@ async function generateHikesWithWorker(
     settings,
     repetitionByRoute,
   });
+  scoringElapsedMs += Math.round(performance.now() - finalScoringStartedAt);
 
-  let rejectedByDistance = finalAnalysis.rejectedByDistance;
-  let rejectedByRepetition = finalAnalysis.rejectedByRepetition;
-  let rejectedAsDuplicate = finalAnalysis.rejectedAsDuplicate + scored.rejectedAsDuplicate;
+  const rejectedByDistance = finalAnalysis.rejectedByDistance;
+  const rejectedByRepetition = finalAnalysis.rejectedByRepetition;
+  const rejectedAsDuplicate = finalAnalysis.rejectedAsDuplicate + scored.rejectedAsDuplicate;
+  const acceptedRouteIds = new Set(acceptedRoutes.map(({ candidateId }) => candidateId));
+  const fallbackSelectedCount = scored.selected.filter(
+    ({ route }) => !acceptedRouteIds.has(route.candidateId),
+  ).length;
+  const elapsedMs = Math.round(performance.now() - startedAt);
 
   return {
     routes: scored.selected.map((item, index) => ({
@@ -367,30 +360,23 @@ async function generateHikesWithWorker(
       rejectedAsDuplicate,
       searchBatches: 1,
       cleanCandidateCount: acceptedRoutes.length,
+      fallbackSelectedCount,
       searchExhausted: true,
       overpassFeatureCount: osmFeatures.length,
       overpassError: null,
       routingErrors: [],
       initialRoutingElapsedMs,
       evolvedRoutingElapsedMs,
-      routingElapsedMs: Math.round(performance.now() - startedAt),
-      overpassElapsedMs: 0,
-      scoringElapsedMs: Math.round(performance.now() - startedAt),
-      elapsedMs: Math.round(performance.now() - startedAt),
+      routingElapsedMs: initialRoutingElapsedMs + evolvedRoutingElapsedMs,
+      overpassElapsedMs,
+      graphBuildElapsedMs,
+      beachCorridorCount: beachRouting.beachCorridorCount,
+      beachConnectorCount: beachRouting.connectorCount,
+      analysisElapsedMs,
+      scoringElapsedMs,
+      elapsedMs,
     },
   };
-}
-
-function addEdge(adjacency, u, v, distance, weight, highway, surface) {
-  if (!adjacency.has(u)) {
-    adjacency.set(u, new Map());
-  }
-  const neighbors = adjacency.get(u);
-  const cost = distance * weight;
-  const existing = neighbors.get(v);
-  if (!existing || cost < existing.cost) {
-    neighbors.set(v, { distance, weight, cost, highway, surface });
-  }
 }
 
 function snapToNearestNode(nodeCoords, targetCoords, adjacency) {
@@ -424,170 +410,6 @@ function snapToNearestNode(nodeCoords, targetCoords, adjacency) {
   }
 
   return nearestNodeId;
-}
-
-function haversineDistance(p1, p2) {
-  const R = 6371000; // Radius of the earth in m
-  const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
-  const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((p1.lat * Math.PI) / 180) *
-      Math.cos((p2.lat * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-function runAStar(adjacency, nodeCoords, startNode, endNode, traversedEdges = null, repetitionPenalty = 50.0, preferences = null) {
-  const openSet = new PriorityQueue();
-  const cameFrom = new Map();
-  const gScore = new Map();
-  const fScore = new Map();
-
-  gScore.set(startNode, 0);
-  fScore.set(startNode, haversineDistance(nodeCoords.get(startNode), nodeCoords.get(endNode)));
-  openSet.enqueue(startNode, fScore.get(startNode));
-
-  while (!openSet.isEmpty()) {
-    const current = openSet.dequeue();
-    if (current === endNode) {
-      const path = [];
-      let curr = current;
-      while (curr !== undefined) {
-        path.push(curr);
-        curr = cameFrom.get(curr);
-      }
-      return path.reverse();
-    }
-
-    const neighbors = adjacency.get(current);
-    if (!neighbors) continue;
-
-    for (const [neighbor, edge] of neighbors.entries()) {
-      let edgeCost = edge.cost;
-      
-      if (preferences) {
-        let weight = 1.0;
-        const highway = edge.highway || "";
-        const surface = edge.surface || "";
-        
-        if (["motorway", "trunk", "motorway_link", "trunk_link"].includes(highway)) {
-          weight = 50.0 + (preferences.avoidHighways ?? 10) * 10.0;
-        } else if (["primary", "secondary", "primary_link", "secondary_link"].includes(highway)) {
-          weight = 5.0 + (preferences.avoidRoads ?? 8) * 1.5;
-        } else if (["tertiary", "tertiary_link", "residential", "service", "unclassified", "living_street"].includes(highway)) {
-          const isUnpaved = ["gravel", "ground", "dirt", "unpaved", "grass", "sand", "woodchips", "bark"].includes(surface);
-          if (isUnpaved) {
-            weight = 1.0 - (preferences.trail ?? 8) * 0.05;
-          } else {
-            weight = 2.0 + (preferences.avoidMinorRoads ?? 3) * 0.8;
-          }
-        } else if (["path", "footway", "track", "pedestrian", "steps"].includes(highway)) {
-          const isUnpaved = ["gravel", "ground", "dirt", "unpaved", "grass", "sand", "woodchips", "bark"].includes(surface);
-          if (isUnpaved) {
-            weight = 0.8 - (preferences.trail ?? 8) * 0.05;
-          } else {
-            weight = 1.0 - (preferences.trail ?? 8) * 0.03;
-          }
-        }
-        
-        weight = Math.max(0.1, weight);
-        edgeCost = edge.distance * weight;
-      }
-
-      if (traversedEdges) {
-        const edgeKey1 = `${current}-${neighbor}`;
-        const edgeKey2 = `${neighbor}-${current}`;
-        if (traversedEdges.has(edgeKey1) || traversedEdges.has(edgeKey2)) {
-          edgeCost += edge.distance * repetitionPenalty;
-        }
-      }
-
-      const tentativeGScore = gScore.get(current) + edgeCost;
-      if (!gScore.has(neighbor) || tentativeGScore < gScore.get(neighbor)) {
-        cameFrom.set(neighbor, current);
-        gScore.set(neighbor, tentativeGScore);
-        const h = haversineDistance(nodeCoords.get(neighbor), nodeCoords.get(endNode));
-        fScore.set(neighbor, tentativeGScore + h);
-        if (!openSet.contains(neighbor)) {
-          openSet.enqueue(neighbor, fScore.get(neighbor));
-        }
-      }
-    }
-  }
-  return null;
-}
-
-function pruneDeadEnds(adjacency) {
-  const pruned = new Map();
-  for (const [u, neighbors] of adjacency.entries()) {
-    pruned.set(u, new Map(neighbors));
-  }
-
-  const queue = [];
-  for (const [u, neighbors] of pruned.entries()) {
-    if (neighbors.size <= 1) {
-      queue.push(u);
-    }
-  }
-
-  let head = 0;
-  while (head < queue.length) {
-    const u = queue[head++];
-    const neighbors = pruned.get(u);
-    if (!neighbors) continue;
-
-    for (const v of neighbors.keys()) {
-      const neighborMap = pruned.get(v);
-      if (neighborMap) {
-        neighborMap.delete(u);
-        if (neighborMap.size <= 1) {
-          queue.push(v);
-        }
-      }
-    }
-    pruned.delete(u);
-  }
-
-  return pruned;
-}
-
-class PriorityQueue {
-  constructor() {
-    this.elements = [];
-    this.elementSet = new Set();
-  }
-  enqueue(element, priority) {
-    this.elementSet.add(element);
-    const item = { element, priority };
-    let low = 0;
-    let high = this.elements.length;
-    while (low < high) {
-      const mid = (low + high) >> 1;
-      if (this.elements[mid].priority < priority) {
-        low = mid + 1;
-      } else {
-        high = mid;
-      }
-    }
-    this.elements.splice(low, 0, item);
-  }
-  dequeue() {
-    const item = this.elements.shift();
-    if (item) {
-      this.elementSet.delete(item.element);
-      return item.element;
-    }
-    return null;
-  }
-  isEmpty() {
-    return this.elements.length === 0;
-  }
-  contains(element) {
-    return this.elementSet.has(element);
-  }
 }
 
 function mutatePoint(point, maxOffsetMeters) {
@@ -630,6 +452,7 @@ function routeLoop(startNodeId, c1, c2, snapGraph, snapAdjacency, nodeCoords, ad
 
 function buildRouteFromNodePath(nodePath, adjacency, nodeCoords) {
   const coords = nodePath.map((id) => nodeCoords.get(id));
+  if (coords.some((coordinate) => !coordinate)) return null;
 
   let distanceMeters = 0;
   const surfaceMeters = {};
@@ -642,12 +465,11 @@ function buildRouteFromNodePath(nodePath, adjacency, nodeCoords) {
     distanceMeters += dist;
 
     const edge = adjacency.get(u)?.get(v);
-    if (edge) {
-      const highway = edge.highway || "unknown";
-      const surface = edge.surface || "unknown";
-      wayTypeMeters[highway] = (wayTypeMeters[highway] ?? 0) + dist;
-      surfaceMeters[surface] = (surfaceMeters[surface] ?? 0) + dist;
-    }
+    if (!edge) return null;
+    const highway = edge.highway || "unknown";
+    const surface = edge.surface || "unknown";
+    wayTypeMeters[highway] = (wayTypeMeters[highway] ?? 0) + dist;
+    surfaceMeters[surface] = (surfaceMeters[surface] ?? 0) + dist;
   }
 
   const durationSeconds = distanceMeters / 1.25;
@@ -662,8 +484,6 @@ function buildRouteFromNodePath(nodePath, adjacency, nodeCoords) {
     metadata: {
       surfaceMeters,
       wayTypeMeters,
-      ascentMeters: null,
-      descentMeters: null
     }
   };
 }
@@ -671,50 +491,15 @@ function buildRouteFromNodePath(nodePath, adjacency, nodeCoords) {
 function performIntersectionCrossover(routeA, routeB, adjacency, nodeCoords, startNodeId) {
   if (!routeA.nodePath || !routeB.nodePath) return [];
 
-  const pathA = routeA.nodePath;
-  const pathB = routeB.nodePath;
-
-  // Find all shared nodes, excluding the trailhead
-  const setA = new Set(pathA);
-  const sharedNodes = [];
-  
-  for (let idxB = 0; idxB < pathB.length; idxB++) {
-    const node = pathB[idxB];
-    if (node !== startNodeId && setA.has(node)) {
-      const idxA = pathA.indexOf(node);
-      // Ensure the node occurs at valid positions in both (excluding the very ends)
-      if (idxA > 0 && idxA < pathA.length - 1 && idxB > 0 && idxB < pathB.length - 1) {
-        sharedNodes.push({ node, idxA, idxB });
-      }
-    }
-  }
-
-  if (sharedNodes.length === 0) return [];
-
-  // Sort by proximity to midpoints of both paths
-  sharedNodes.sort((x, y) => {
-    const midA = pathA.length / 2;
-    const midB = pathB.length / 2;
-    const distX = Math.abs(x.idxA - midA) + Math.abs(x.idxB - midB);
-    const distY = Math.abs(y.idxA - midA) + Math.abs(y.idxB - midB);
-    return distX - distY;
-  });
-
   const offspring = [];
-  // Use the best 2 intersection points to avoid generating too many similar routes
-  const pointsToUse = sharedNodes.slice(0, 2);
-
-  for (const { idxA, idxB } of pointsToUse) {
-    // Child 1: Route A first half + Route B second half
-    const pathChild1 = [...pathA.slice(0, idxA), ...pathB.slice(idxB)];
-    // Child 2: Route B first half + Route A second half
-    const pathChild2 = [...pathB.slice(0, idxB), ...pathA.slice(idxA)];
-
-    const r1 = buildRouteFromNodePath(pathChild1, adjacency, nodeCoords);
-    const r2 = buildRouteFromNodePath(pathChild2, adjacency, nodeCoords);
-
-    if (r1 && r1.distanceMeters > 0) offspring.push(r1);
-    if (r2 && r2.distanceMeters > 0) offspring.push(r2);
+  const childPaths = buildIntersectionCrossoverPaths(
+    routeA.nodePath,
+    routeB.nodePath,
+    startNodeId,
+  );
+  for (const childPath of childPaths) {
+    const route = buildRouteFromNodePath(childPath, adjacency, nodeCoords);
+    if (route?.distanceMeters > 0) offspring.push(route);
   }
 
   return offspring;
