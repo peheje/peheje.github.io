@@ -10,6 +10,7 @@ import { haversineDistance, runAStar } from "./pathfinding.js";
 import { buildIntersectionCrossoverPaths } from "./crossover.js";
 import { pruneDeadEnds } from "./graphPruning.js";
 import { addBeachWalkingToGraph } from "./beachRouting.js";
+import { removeImmediateBacktracks } from "./pathCleanup.js";
 
 const ROUTE_COLORS = ["#ef6c3e", "#35a878", "#4c7fe8", "#b66de0", "#e5aa2f"];
 
@@ -451,16 +452,18 @@ function routeLoop(startNodeId, c1, c2, snapGraph, snapAdjacency, nodeCoords, ad
 }
 
 function buildRouteFromNodePath(nodePath, adjacency, nodeCoords) {
-  const coords = nodePath.map((id) => nodeCoords.get(id));
+  const cleanedNodePath = removeImmediateBacktracks(nodePath);
+  if (cleanedNodePath.length < 2) return null;
+  const coords = cleanedNodePath.map((id) => nodeCoords.get(id));
   if (coords.some((coordinate) => !coordinate)) return null;
 
   let distanceMeters = 0;
   const surfaceMeters = {};
   const wayTypeMeters = {};
 
-  for (let i = 1; i < nodePath.length; i++) {
-    const u = nodePath[i - 1];
-    const v = nodePath[i];
+  for (let i = 1; i < cleanedNodePath.length; i++) {
+    const u = cleanedNodePath[i - 1];
+    const v = cleanedNodePath[i];
     const dist = haversineDistance(nodeCoords.get(u), nodeCoords.get(v));
     distanceMeters += dist;
 
@@ -476,7 +479,7 @@ function buildRouteFromNodePath(nodePath, adjacency, nodeCoords) {
   const geometry = lineFromLatLng(coords);
 
   return {
-    nodePath,
+    nodePath: cleanedNodePath,
     coordinates: coords,
     geometry,
     distanceMeters,
