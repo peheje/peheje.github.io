@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <title>GenTrail Beta</title>
     <script src="js/theme-init.js"></script>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="css/gentrail.css">
@@ -15,6 +17,10 @@
     <main class="app-shell">
         <div class="gentrail-app">
             <aside class="sidebar">
+                <div class="beta-notice" role="note">
+                    <strong>Private beta</strong>
+                    <span>Routes are suggestions. Check access, tides, terrain, and local conditions before walking.</span>
+                </div>
                 <div class="control-section">
                     <div class="section-heading">
                         <span>01 / Route</span>
@@ -134,6 +140,10 @@
                     </div>
                     <div class="info-message display-none" id="info-message"></div>
                     <div class="route-list" id="route-list"></div>
+                    <div class="beta-report">
+                        <button type="button" class="beta-report__button" id="btn-beta-report">Copy route problem report</button>
+                        <small>Copies the selected route, settings, trailhead, and generation diagnostics.</small>
+                    </div>
                     
                     <details class="debug-panel" id="debug-panel" style="margin-top: 15px;">
                         <summary>Generation Debug</summary>

@@ -96,6 +96,7 @@ let preferences = {
 };
 let routes = [];
 let selectedRouteId = undefined;
+let latestDebugData = null;
 let loading = false;
 let currentController = null;
 let map = null;
@@ -118,6 +119,7 @@ const resultsSection = document.getElementById("results-section");
 const infoMessage = document.getElementById("info-message");
 const routeList = document.getElementById("route-list");
 const debugContent = document.getElementById("debug-content");
+const btnBetaReport = document.getElementById("btn-beta-report");
 const mapPrompt = document.getElementById("map-prompt");
 
 // Setup map
@@ -322,6 +324,7 @@ async function runGeneration() {
 }
 
 function renderResults(debugData) {
+  latestDebugData = debugData;
   resultsSection.classList.remove("display-none");
   routeList.innerHTML = "";
 
@@ -361,6 +364,46 @@ function renderResults(debugData) {
   // Render Debug JSON
   debugContent.textContent = JSON.stringify(debugData, null, 2);
 }
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.opacity = "0";
+  document.body.appendChild(textArea);
+  textArea.select();
+  const copied = document.execCommand("copy");
+  textArea.remove();
+  if (!copied) throw new Error("Clipboard access is unavailable");
+}
+
+btnBetaReport.addEventListener("click", async () => {
+  const selected = routes.find(({ route }) => route.candidateId === selectedRouteId);
+  const report = {
+    generatedAt: new Date().toISOString(),
+    page: window.location.href,
+    trailhead: start,
+    settings: { targetDistanceKm, candidateCount, preferences },
+    selectedRoute: selected ?? null,
+    generationDebug: latestDebugData,
+  };
+  const originalText = btnBetaReport.textContent;
+
+  try {
+    await copyText(JSON.stringify(report, null, 2));
+    btnBetaReport.textContent = "Copied — send it to Peter";
+  } catch (error) {
+    btnBetaReport.textContent = "Could not copy report";
+    console.error("Could not copy beta report:", error);
+  } finally {
+    setTimeout(() => { btnBetaReport.textContent = originalText; }, 2500);
+  }
+});
 
 function buildRouteCard(scoredRoute, index) {
   const { route, score, color } = scoredRoute;

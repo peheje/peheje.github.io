@@ -28,6 +28,27 @@
   scrollbar-color: #b4c1b7 transparent;
 }
 
+.beta-notice {
+  display: grid;
+  gap: 4px;
+  padding: 13px 24px;
+  border-bottom: 1px solid color-mix(in srgb, #ef6c3e 35%, var(--line));
+  background: color-mix(in srgb, #ef6c3e 9%, var(--bg-card));
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.beta-notice strong {
+  color: #c64d24;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.beta-notice span {
+  color: var(--muted);
+}
+
 .map-shell {
   position: relative;
   border-radius: 18px;
@@ -515,6 +536,35 @@
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--bg);
+}
+
+.beta-report {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.beta-report__button {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.beta-report__button:hover {
+  border-color: #ef6c3e;
+}
+
+.beta-report small {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
 }
 
 .debug-panel summary {
