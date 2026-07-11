@@ -5,19 +5,35 @@ import SunCalc from "../lib/suncalc.js";
 const DEFAULT_LOC = {
   lat: 59.9133,
   lon: 10.7390,
-  name: "Oslo, Norge"
+  name: "Oslo, Norge",
+  timeZone: "Europe/Oslo"
 };
 
 // Caching parameters
 const CACHE_PREFIX = "peheje_weather_";
 const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
+const TIME_ZONE_CACHE_PREFIX = "peheje_weather_timezone_";
+const GEOCODING_URL = "https://nominatim.openstreetmap.org";
+const MAX_FORECAST_CACHE_ENTRIES = 12;
 
 let currentLoc = { ...DEFAULT_LOC };
 let forecastData = null;
 let tideData = null;
 let activeTab = 0; // 0 for Today, 1 for Tomorrow, 2-6 for future days
 let hoverHour = null; // Currently hovered hour on the canvas (0-23)
-let savedRadarSrc = "";
+let radarSource = "";
+let radarIsInViewport = false;
+let radarObserver = null;
+let forecastDrawFrame = null;
+let clockTimer = null;
+let weatherLoadId = 0;
+let weatherLoadController = null;
+let tideLoadController = null;
+let searchController = null;
+let searchRequestId = 0;
+let lastSearchAt = 0;
+let locationIntentId = 0;
+const geocodeCache = new Map();
 
 let globalLimits = {
   uvMax: 10,
@@ -81,9 +97,9 @@ const WEATHER_SYMBOLS = {
 };
 
 function getWeatherInfo(symbolCode) {
-  if (!symbolCode) return { emoji: "☀️", desc: "Clear Sky" };
+  if (!symbolCode) return { emoji: "❔", desc: "Forecast unavailable" };
   const cleanCode = symbolCode.split("_")[0];
-  return WEATHER_SYMBOLS[cleanCode] || { emoji: "⛅", desc: cleanCode.replace(/([A-Z])/g, ' $1') };
+  return WEATHER_SYMBOLS[cleanCode] || { emoji: "❔", desc: `Unrecognised forecast (${cleanCode})` };
 }
 
 function getWindDirectionLabel(deg) {
@@ -92,12 +108,87 @@ function getWindDirectionLabel(deg) {
   return directions[val % 16];
 }
 
-// Helper to format local YYYY-MM-DD
-function getLocalDateString(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function getLocationTimeZone() {
+  return currentLoc.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+function getZonedParts(date, timeZone = getLocationTimeZone()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day),
+    hour: Number(values.hour),
+    minute: Number(values.minute),
+    second: Number(values.second)
+  };
+}
+
+// Helper to format selected-location YYYY-MM-DD.
+function getLocationDateString(date, timeZone = getLocationTimeZone()) {
+  const { year, month, day } = getZonedParts(date, timeZone);
+  const monthText = String(month).padStart(2, "0");
+  const dayText = String(day).padStart(2, "0");
+  return `${year}-${monthText}-${dayText}`;
+}
+
+function getTimeZoneOffset(date, timeZone) {
+  const parts = getZonedParts(date, timeZone);
+  const zonedUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return zonedUtc - date.getTime();
+}
+
+// Convert a wall-clock time in an IANA timezone to an instant. A second pass
+// accounts for an offset change around daylight-saving transitions.
+function zonedDateTimeToDate(year, month, day, hour = 12, minute = 0, timeZone = getLocationTimeZone()) {
+  const wallClock = Date.UTC(year, month - 1, day, hour, minute, 0);
+  let result = new Date(wallClock - getTimeZoneOffset(new Date(wallClock), timeZone));
+  result = new Date(wallClock - getTimeZoneOffset(result, timeZone));
+  return result;
+}
+
+function getLocationDayDate(dayIndex, hour = 12, minute = 0) {
+  const now = getZonedParts(new Date());
+  const dayAnchor = new Date(Date.UTC(now.year, now.month - 1, now.day + dayIndex));
+  return zonedDateTimeToDate(
+    dayAnchor.getUTCFullYear(),
+    dayAnchor.getUTCMonth() + 1,
+    dayAnchor.getUTCDate(),
+    hour,
+    minute
+  );
+}
+
+function getLocationHour(date) {
+  return getZonedParts(date).hour;
+}
+
+async function resolveTimeZone(lat, lon, signal) {
+  const cacheKey = `${TIME_ZONE_CACHE_PREFIX}${lat.toFixed(2)}_${lon.toFixed(2)}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) return cached;
+
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&timezone=auto&forecast_days=1`;
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw new Error(`Timezone service returned status ${response.status}`);
+  }
+  const data = await response.json();
+  if (!data.timezone) {
+    throw new Error("Timezone service did not return a timezone");
+  }
+  localStorage.setItem(cacheKey, data.timezone);
+  return data.timezone;
 }
 
 // Show/hide spinner & dashboard
@@ -124,13 +215,87 @@ function showError(msg) {
   }
 }
 
+function isHappyDOM() {
+  return window.happyDOM || (navigator && navigator.userAgent && /happy-dom|happydom/i.test(navigator.userAgent));
+}
+
+function updateRadarResource() {
+  if (isHappyDOM()) return;
+  const radarIframe = document.getElementById("radar-iframe");
+  const radarCard = document.querySelector(".graph-card[data-key='radar']");
+  if (!radarIframe) return;
+
+  const shouldLoad = radarSource && document.visibilityState === "visible" &&
+    radarIsInViewport && !radarCard?.classList.contains("minimized");
+  if (shouldLoad) {
+    if (radarIframe.src !== radarSource) radarIframe.src = radarSource;
+  } else if (radarIframe.getAttribute("src")) {
+    radarIframe.src = "";
+  }
+}
+
+function setupRadarLifecycle() {
+  if (isHappyDOM() || !("IntersectionObserver" in window)) {
+    radarIsInViewport = true;
+    return;
+  }
+  const radarCard = document.querySelector(".graph-card[data-key='radar']");
+  if (!radarCard) return;
+  radarObserver = new IntersectionObserver(entries => {
+    radarIsInViewport = entries.some(entry => entry.isIntersecting);
+    updateRadarResource();
+  }, { threshold: 0.1 });
+  radarObserver.observe(radarCard);
+}
+
+function scheduleForecastDraw() {
+  if (forecastDrawFrame || !forecastData) return;
+  forecastDrawFrame = window.requestAnimationFrame(() => {
+    forecastDrawFrame = null;
+    drawForecastCurves();
+  });
+}
+
+function getForecastExpiresAt(data) {
+  return data.expiresAt || (data.lastUpdated || 0) + CACHE_EXPIRY_MS;
+}
+
+function isForecastStale(data) {
+  return !data?.lastUpdated || Date.now() >= getForecastExpiresAt(data);
+}
+
+function refreshForecastIfStale() {
+  if (document.visibilityState === "visible" && forecastData && isForecastStale(forecastData)) {
+    loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true, currentLoc.isGps, false, locationIntentId);
+  }
+}
+
+function scheduleClockTick() {
+  if (clockTimer) clearTimeout(clockTimer);
+  if (document.visibilityState !== "visible") return;
+
+  const delay = 60 * 1000 - (Date.now() % (60 * 1000)) + 25;
+  clockTimer = setTimeout(() => {
+    if (document.visibilityState === "visible" && forecastData) {
+      updateDashboardUI(forecastData, false);
+      scheduleForecastDraw();
+      refreshForecastIfStale();
+    }
+    scheduleClockTick();
+  }, delay);
+}
+
 // Load location from LocalStorage
 function loadStoredLocation() {
   const stored = localStorage.getItem("weather_location");
   if (stored) {
     try {
-      currentLoc = JSON.parse(stored);
-      return;
+      const parsed = JSON.parse(stored);
+      if (Number.isFinite(parsed.lat) && Number.isFinite(parsed.lon) && typeof parsed.name === "string") {
+        currentLoc = { ...DEFAULT_LOC, ...parsed };
+        return;
+      }
+      console.warn("Stored location has invalid coordinates");
     } catch (err) {
       console.warn("Stored location parsing error:", err);
     }
@@ -144,17 +309,76 @@ function saveLocation(loc) {
   localStorage.setItem("weather_location", JSON.stringify(loc));
 }
 
+function resetWeatherStorage() {
+  Object.keys(localStorage).forEach(key => {
+    if (key === "weather_location" || key.startsWith(CACHE_PREFIX) || key.startsWith("weather_graphs_")) {
+      localStorage.removeItem(key);
+    }
+  });
+}
+
+function isForecastCacheKey(key) {
+  return key.startsWith(CACHE_PREFIX) &&
+    (key.startsWith(`${CACHE_PREFIX}tide_`) || /^peheje_weather_-?\d/.test(key));
+}
+
+function pruneForecastCache(keepKey, maximumEntries = MAX_FORECAST_CACHE_ENTRIES) {
+  const entries = Object.keys(localStorage)
+    .filter(isForecastCacheKey)
+    .map(key => {
+      try {
+        return { key, timestamp: JSON.parse(localStorage.getItem(key)).timestamp || 0 };
+      } catch {
+        return { key, timestamp: 0 };
+      }
+    })
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+  entries.slice(maximumEntries).forEach(({ key }) => {
+    if (key !== keepKey) localStorage.removeItem(key);
+  });
+}
+
+function saveForecastCache(cacheKey, cacheData) {
+  try {
+    pruneForecastCache(cacheKey, MAX_FORECAST_CACHE_ENTRIES - 1);
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    return true;
+  } catch (err) {
+    console.warn("Weather cache is full; evicting older entries", err);
+    try {
+      pruneForecastCache(cacheKey, 1);
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      return true;
+    } catch (retryErr) {
+      console.warn("Unable to save weather cache", retryErr);
+      return false;
+    }
+  }
+}
+
+function getResponseExpiresAt(response, timestamp) {
+  const cacheControl = response.headers?.get?.("cache-control") || "";
+  const maxAge = cacheControl.match(/max-age=(\d+)/i);
+  if (maxAge) return timestamp + Number(maxAge[1]) * 1000;
+
+  const expiresHeader = response.headers?.get?.("expires");
+  const expiresAt = expiresHeader ? Date.parse(expiresHeader) : NaN;
+  return Number.isFinite(expiresAt) && expiresAt > timestamp ? expiresAt : timestamp + CACHE_EXPIRY_MS;
+}
+
 // Fetch forecast from api.met.no with local caching
-async function fetchWeather(lat, lon, forceRefresh = false) {
+async function fetchWeather(lat, lon, forceRefresh = false, signal) {
   const cacheKey = `${CACHE_PREFIX}${lat.toFixed(3)}_${lon.toFixed(3)}`;
   const cached = localStorage.getItem(cacheKey);
 
   if (cached && !forceRefresh) {
     try {
       const parsed = JSON.parse(cached);
-      const age = Date.now() - parsed.timestamp;
-      if (age < CACHE_EXPIRY_MS) {
+      const expiresAt = parsed.expiresAt || parsed.timestamp + CACHE_EXPIRY_MS;
+      if (Date.now() < expiresAt) {
         parsed.data.lastUpdated = parsed.timestamp;
+        parsed.data.expiresAt = expiresAt;
         return parsed.data;
       }
     } catch (err) {
@@ -168,17 +392,38 @@ async function fetchWeather(lat, lon, forceRefresh = false) {
 
   // Fetch from MET Norway LocationforecastComplete
   const url = `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`;
-  const response = await fetch(url);
-  
-  if (!window.location) {
-    throw new Error("Window unloaded");
-  }
+  let data;
+  let expiresAt;
+  try {
+    const response = await fetch(url, { signal });
+    
+    if (!window.location) {
+      throw new Error("Window unloaded");
+    }
 
-  if (!response.ok) {
-    throw new Error(`MET Norway API returned status ${response.status}`);
-  }
+    if (!response.ok) {
+      throw new Error(`MET Norway API returned status ${response.status}`);
+    }
 
-  const data = await response.json();
+    data = await response.json();
+    expiresAt = getResponseExpiresAt(response, Date.now());
+  } catch (err) {
+    if (err.name === "AbortError") throw err;
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.data?.properties?.timeseries) {
+          parsed.data.lastUpdated = parsed.timestamp;
+          parsed.data.expiresAt = parsed.expiresAt || parsed.timestamp + CACHE_EXPIRY_MS;
+          parsed.data.isStale = true;
+          return parsed.data;
+        }
+      } catch (cacheErr) {
+        console.warn("Cached forecast fallback parsing error:", cacheErr);
+      }
+    }
+    throw err;
+  }
 
   // Merge timeseries from old cache if available to preserve history of today's past hours
   if (cached) {
@@ -186,20 +431,16 @@ async function fetchWeather(lat, lon, forceRefresh = false) {
       const parsed = JSON.parse(cached);
       const oldTimeseries = parsed.data?.properties?.timeseries || [];
       const newTimeseries = data.properties?.timeseries || [];
-
-      const timeMap = new Map();
-      oldTimeseries.forEach(item => {
-        timeMap.set(item.time, item);
-      });
-      newTimeseries.forEach(item => {
-        timeMap.set(item.time, item);
-      });
-
-      const mergedList = Array.from(timeMap.values()).sort((a, b) => new Date(a.time) - new Date(b.time));
-
-      // Keep only entries from the last 30 hours to prevent cache bloat
+      const earliestNewTime = Math.min(...newTimeseries.map(item => new Date(item.time).getTime()));
       const minTime = Date.now() - 30 * 60 * 60 * 1000;
-      data.properties.timeseries = mergedList.filter(item => new Date(item.time).getTime() >= minTime);
+      // Preserve only historical points that the new response cannot contain.
+      // Keeping old future points makes an expired forecast look current.
+      const historicalPoints = oldTimeseries.filter(item => {
+        const time = new Date(item.time).getTime();
+        return time >= minTime && time < earliestNewTime;
+      });
+      data.properties.timeseries = [...historicalPoints, ...newTimeseries]
+        .sort((a, b) => new Date(a.time) - new Date(b.time));
     } catch (err) {
       console.warn("Error merging cached forecast timeseries:", err);
     }
@@ -208,16 +449,18 @@ async function fetchWeather(lat, lon, forceRefresh = false) {
   // Save to cache
   const cacheData = {
     timestamp: Date.now(),
+    expiresAt,
     data: data
   };
-  localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+  saveForecastCache(cacheKey, cacheData);
 
   data.lastUpdated = cacheData.timestamp;
+  data.expiresAt = expiresAt;
   return data;
 }
 
 // Fetch tide data from Open-Meteo Marine API with local caching
-async function fetchTideData(lat, lon) {
+async function fetchTideData(lat, lon, signal) {
   const cacheKey = `${CACHE_PREFIX}tide_${lat.toFixed(3)}_${lon.toFixed(3)}`;
   const cached = localStorage.getItem(cacheKey);
 
@@ -238,7 +481,7 @@ async function fetchTideData(lat, lon) {
   }
 
   const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=sea_level_height_msl`;
-  const response = await fetch(url);
+  const response = await fetch(url, { signal });
 
   if (!window.location) {
     throw new Error("Window unloaded");
@@ -253,25 +496,24 @@ async function fetchTideData(lat, lon) {
     timestamp: Date.now(),
     data: data
   };
-  localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+  saveForecastCache(cacheKey, cacheData);
   return data;
 }
 
 // Get the weather timeseries data grouped for Today, Tomorrow, or future days
 function getDailyTimeseriesRaw(timeseries, dayIndex) {
-  const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() + dayIndex);
-  const targetStr = getLocalDateString(targetDate);
+  const targetStr = getLocationDateString(getLocationDayDate(dayIndex));
 
   const hoursData = Array.from({ length: 24 }, (_, i) => ({
     hour: i,
     uv: 0,
     temp: null,
     symbol: null,
-    rain: 0,
-    rainMax: 0,
-    rainMin: 0,
+    rain: null,
+    rainMax: null,
+    rainMin: null,
     rainProb: null,
+    rainIntervalHours: null,
     clouds: 0,
     cloudsLow: 0,
     cloudsMid: 0,
@@ -282,20 +524,25 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
 
   timeseries.forEach(item => {
     const itemDate = new Date(item.time);
-    const dateStr = getLocalDateString(itemDate);
+    const dateStr = getLocationDateString(itemDate);
     if (dateStr === targetStr) {
-      const hr = itemDate.getHours();
+      const hr = getLocationHour(itemDate);
       const details = item.data.instant.details;
       if (details) {
         hoursData[hr].uv = details.ultraviolet_index_clear_sky || 0;
         hoursData[hr].temp = details.air_temperature;
         hoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || item.data.next_6_hours?.summary?.symbol_code || null;
         
-        const rainDetails = item.data.next_1_hours?.details || item.data.next_6_hours?.details;
-        hoursData[hr].rain = rainDetails?.precipitation_amount || 0;
-        hoursData[hr].rainMax = rainDetails?.precipitation_amount_max || rainDetails?.precipitation_amount || 0;
-        hoursData[hr].rainMin = rainDetails?.precipitation_amount_min || rainDetails?.precipitation_amount || 0;
-        hoursData[hr].rainProb = rainDetails?.probability_of_precipitation !== undefined ? rainDetails.probability_of_precipitation : null;
+        const oneHourRain = item.data.next_1_hours?.details;
+        const sixHourRain = item.data.next_6_hours?.details;
+        const rainDetails = oneHourRain || sixHourRain;
+        if (rainDetails?.precipitation_amount !== undefined) {
+          hoursData[hr].rain = rainDetails.precipitation_amount;
+          hoursData[hr].rainMax = rainDetails.precipitation_amount_max ?? rainDetails.precipitation_amount;
+          hoursData[hr].rainMin = rainDetails.precipitation_amount_min ?? rainDetails.precipitation_amount;
+          hoursData[hr].rainProb = rainDetails.probability_of_precipitation ?? null;
+          hoursData[hr].rainIntervalHours = oneHourRain ? 1 : 6;
+        }
 
         hoursData[hr].clouds = details.cloud_area_fraction !== undefined ? details.cloud_area_fraction : 0;
         hoursData[hr].cloudsLow = details.cloud_area_fraction_low !== undefined ? details.cloud_area_fraction_low : 0;
@@ -311,105 +558,46 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
   return hoursData;
 }
 
-function copyHourData(target, source) {
-  target.uv = source.uv;
-  target.temp = source.temp;
-  target.symbol = source.symbol;
-  target.rain = source.rain;
-  target.rainMax = source.rainMax;
-  target.rainMin = source.rainMin;
-  target.rainProb = source.rainProb;
-  target.clouds = source.clouds;
-  target.cloudsLow = source.cloudsLow;
-  target.cloudsMid = source.cloudsMid;
-  target.cloudsHigh = source.cloudsHigh;
-  target.windSpeed = source.windSpeed;
-  target.windDir = source.windDir;
-}
-
 function getDailyTimeseries(timeseries, dayIndex) {
   const hoursData = getDailyTimeseriesRaw(timeseries, dayIndex);
-  const hasData = hoursData.some(h => h.temp !== null);
+  const displayData = [...hoursData];
 
+  // Forecasts often continue at 02:00 after a final 20:00 snapshot. Add one
+  // clearly estimated boundary point so the day chart does not look cut off.
+  // Rain stays unknown: a six-hour total must never be converted to hourly rain.
   if (dayIndex < 6) {
-    const nextDayHoursData = getDailyTimeseriesRaw(timeseries, dayIndex + 1);
-    
-    // Record which hours were originally null
-    const originallyNull = hoursData.map(h => h.temp === null);
-    
-    // Find first available hour in the current day (originally)
-    let currentDayFirstHour = 24;
-    for (let hr = 0; hr < 24; hr++) {
-      if (!originallyNull[hr]) {
-        currentDayFirstHour = hr;
-        break;
-      }
+    const lastPoint = [...hoursData].reverse().find(point => point.temp !== null);
+    const nextDayPoints = getDailyTimeseriesRaw(timeseries, dayIndex + 1);
+    const nextPoint = nextDayPoints.find(point => point.temp !== null);
+    const gapHours = lastPoint && nextPoint ? (24 + nextPoint.hour) - lastPoint.hour : Infinity;
+    if (lastPoint && nextPoint && lastPoint.hour < 23 && gapHours > 1 && gapHours <= 6) {
+      const ratio = (23 - lastPoint.hour) / gapHours;
+      const estimated = {
+        ...lastPoint,
+        hour: 23,
+        uv: lastPoint.uv + (nextPoint.uv - lastPoint.uv) * ratio,
+        temp: lastPoint.temp + (nextPoint.temp - lastPoint.temp) * ratio,
+        rain: null,
+        rainMax: null,
+        rainMin: null,
+        rainProb: null,
+        rainIntervalHours: null,
+        clouds: lastPoint.clouds + (nextPoint.clouds - lastPoint.clouds) * ratio,
+        cloudsLow: lastPoint.cloudsLow + (nextPoint.cloudsLow - lastPoint.cloudsLow) * ratio,
+        cloudsMid: lastPoint.cloudsMid + (nextPoint.cloudsMid - lastPoint.cloudsMid) * ratio,
+        cloudsHigh: lastPoint.cloudsHigh + (nextPoint.cloudsHigh - lastPoint.cloudsHigh) * ratio,
+        windSpeed: lastPoint.windSpeed + (nextPoint.windSpeed - lastPoint.windSpeed) * ratio,
+        isEstimated: true
+      };
+      displayData[23] = estimated;
     }
-
-    // Find last available hour in the current day (originally)
-    let currentDayLastHour = -1;
-    for (let hr = 23; hr >= 0; hr--) {
-      if (!originallyNull[hr]) {
-        currentDayLastHour = hr;
-        break;
-      }
-    }
-
-    // Find first available hour in the next day
-    let nextDayFirstHour = -1;
-    for (let hr = 0; hr < 24; hr++) {
-      if (nextDayHoursData[hr] && nextDayHoursData[hr].temp !== null) {
-        nextDayFirstHour = hr;
-        break;
-      }
-    }
-
-    // Linearly interpolate the trailing missing hours between currentDayLastHour and nextDayFirstHour
-    if (currentDayLastHour !== -1 && nextDayFirstHour !== -1 && currentDayLastHour < 23) {
-      const lastVal = hoursData[currentDayLastHour];
-      const nextVal = nextDayHoursData[nextDayFirstHour];
-      const gapSize = (24 + nextDayFirstHour) - currentDayLastHour;
-
-      for (let hr = currentDayLastHour + 1; hr < 24; hr++) {
-        const step = hr - currentDayLastHour;
-        const ratio = step / gapSize;
-
-        hoursData[hr].temp = lastVal.temp + (nextVal.temp - lastVal.temp) * ratio;
-        hoursData[hr].uv = lastVal.uv + (nextVal.uv - lastVal.uv) * ratio;
-        hoursData[hr].rain = lastVal.rain + (nextVal.rain - lastVal.rain) * ratio;
-        hoursData[hr].rainMax = lastVal.rainMax + (nextVal.rainMax - lastVal.rainMax) * ratio;
-        hoursData[hr].rainMin = lastVal.rainMin + (nextVal.rainMin - lastVal.rainMin) * ratio;
-        hoursData[hr].clouds = lastVal.clouds + (nextVal.clouds - lastVal.clouds) * ratio;
-        hoursData[hr].cloudsLow = lastVal.cloudsLow + (nextVal.cloudsLow - lastVal.cloudsLow) * ratio;
-        hoursData[hr].cloudsMid = lastVal.cloudsMid + (nextVal.cloudsMid - lastVal.cloudsMid) * ratio;
-        hoursData[hr].cloudsHigh = lastVal.cloudsHigh + (nextVal.cloudsHigh - lastVal.cloudsHigh) * ratio;
-        hoursData[hr].windSpeed = lastVal.windSpeed + (nextVal.windSpeed - lastVal.windSpeed) * ratio;
-        hoursData[hr].windDir = lastVal.windDir + (nextVal.windDir - lastVal.windDir) * ratio;
-
-        hoursData[hr].symbol = ratio < 0.5 ? lastVal.symbol : nextVal.symbol;
-        hoursData[hr].rainProb = ratio < 0.5 ? lastVal.rainProb : nextVal.rainProb;
-      }
-    }
-
-    // Fill in past hours (specifically on Today's tab) using Tomorrow's values
-    hoursData.forEach(h => {
-      if (originallyNull[h.hour] && h.hour < currentDayFirstHour) {
-        if (nextDayHoursData[h.hour] && nextDayHoursData[h.hour].temp !== null) {
-          copyHourData(h, nextDayHoursData[h.hour]);
-        }
-      } else if (h.uv === 0 && nextDayHoursData[h.hour] && nextDayHoursData[h.hour].uv > 0) {
-        h.uv = nextDayHoursData[h.hour].uv;
-      }
-    });
   }
 
-  return { data: hoursData, found: hasData };
+  return { data: hoursData, displayData, found: hoursData.some(h => h.temp !== null) };
 }
 
 function getDailyTideSeriesRaw(tideData, dayIndex) {
-  const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() + dayIndex);
-  const targetStr = getLocalDateString(targetDate);
+  const targetStr = getLocationDateString(getLocationDayDate(dayIndex));
 
   const hoursData = Array.from({ length: 24 }, (_, i) => ({
     hour: i,
@@ -425,9 +613,9 @@ function getDailyTideSeriesRaw(tideData, dayIndex) {
 
   for (let i = 0; i < times.length; i++) {
     const itemDate = new Date(times[i] + 'Z');
-    const dateStr = getLocalDateString(itemDate);
+    const dateStr = getLocationDateString(itemDate);
     if (dateStr === targetStr) {
-      const hr = itemDate.getHours();
+      const hr = getLocationHour(itemDate);
       const val = values[i];
       if (val !== null && val !== undefined) {
         hoursData[hr].value = val * 100; // convert meters to centimeters
@@ -440,74 +628,16 @@ function getDailyTideSeriesRaw(tideData, dayIndex) {
 
 function getDailyTideSeries(tideData, dayIndex) {
   const hoursData = getDailyTideSeriesRaw(tideData, dayIndex);
-  const hasData = hoursData.some(h => h.value !== null);
-
-  if (dayIndex < 6) {
-    const nextDayTideData = getDailyTideSeriesRaw(tideData, dayIndex + 1);
-
-    // Record which hours were originally null
-    const originallyNull = hoursData.map(h => h.value === null);
-
-    // Find first available hour in the current day (originally)
-    let currentDayFirstHour = 24;
-    for (let hr = 0; hr < 24; hr++) {
-      if (!originallyNull[hr]) {
-        currentDayFirstHour = hr;
-        break;
-      }
-    }
-
-    // Find last available hour in the current day (originally)
-    let currentDayLastHour = -1;
-    for (let hr = 23; hr >= 0; hr--) {
-      if (!originallyNull[hr]) {
-        currentDayLastHour = hr;
-        break;
-      }
-    }
-
-    // Find first available hour in next day
-    let nextDayFirstHour = -1;
-    for (let hr = 0; hr < 24; hr++) {
-      if (nextDayTideData[hr] && nextDayTideData[hr].value !== null) {
-        nextDayFirstHour = hr;
-        break;
-      }
-    }
-
-    // Linearly interpolate the trailing missing hours between currentDayLastHour and nextDayFirstHour
-    if (currentDayLastHour !== -1 && nextDayFirstHour !== -1 && currentDayLastHour < 23) {
-      const lastVal = hoursData[currentDayLastHour].value;
-      const nextVal = nextDayTideData[nextDayFirstHour].value;
-      const gapSize = (24 + nextDayFirstHour) - currentDayLastHour;
-
-      for (let hr = currentDayLastHour + 1; hr < 24; hr++) {
-        const step = hr - currentDayLastHour;
-        const ratio = step / gapSize;
-        hoursData[hr].value = lastVal + (nextVal - lastVal) * ratio;
-      }
-    }
-
-    // Fill in past hours (if any are null) using next day's values
-    hoursData.forEach(h => {
-      if (originallyNull[h.hour] && h.hour < currentDayFirstHour) {
-        if (nextDayTideData[h.hour] && nextDayTideData[h.hour].value !== null) {
-          h.value = nextDayTideData[h.hour].value;
-        }
-      }
-    });
-  }
-
-  return { data: hoursData, found: hasData };
+  return { data: hoursData, found: hoursData.some(h => h.value !== null) };
 }
 
 // Helper to get formatted day name and date
 function getDayNameAndDate(i) {
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const d = new Date();
-  d.setDate(d.getDate() + i);
-  const dayName = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[d.getDay()]);
-  const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
+  const parts = getZonedParts(getLocationDayDate(i));
+  const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+  const dayName = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[weekday]);
+  const dateStr = `${parts.day}/${parts.month}`;
   return `${dayName} ${dateStr}`;
 }
 
@@ -594,11 +724,10 @@ function renderDayTabs() {
   if (dayTabsContainer) {
     let tabsHtml = "";
     for (let i = 0; i < 7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      
-      const dayName = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[d.getDay()]);
-      const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
+      const parts = getZonedParts(getLocationDayDate(i));
+      const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+      const dayName = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[weekday]);
+      const dateStr = `${parts.day}/${parts.month}`;
       const text = `${dayName} ${dateStr}`;
 
       const activeClass = (i === activeTab) ? " active" : "";
@@ -641,8 +770,10 @@ function calculateGlobalLimits(timeseries) {
     }
 
     const rainDetails = item.data.next_1_hours?.details || item.data.next_6_hours?.details;
-    const rain = rainDetails?.precipitation_amount_max || rainDetails?.precipitation_amount || 0;
-    if (rain > maxRain) maxRain = rain;
+    if (rainDetails?.precipitation_amount !== undefined) {
+      const rain = rainDetails.precipitation_amount_max ?? rainDetails.precipitation_amount;
+      if (rain > maxRain) maxRain = rain;
+    }
   });
 
   if (minTemp === Infinity) minTemp = 0;
@@ -657,23 +788,25 @@ function calculateGlobalLimits(timeseries) {
   };
 }
 
-// Update widgets UI with the current hourly forecast
-function updateDashboardUI(data) {
+// Update widgets UI with the current hourly forecast. The minute clock update
+// only needs the summary and cursor; tabs and layout are rebuilt after loads.
+function updateDashboardUI(data, fullRender = true) {
   const timeseries = data.properties.timeseries;
   
-  // Calculate global limits across all days
-  calculateGlobalLimits(timeseries);
+  if (fullRender) {
+    calculateGlobalLimits(timeseries);
+  }
   
   // Find current hour forecast
   const now = new Date();
-  const currentHour = now.getHours();
-  const todayStr = getLocalDateString(now);
+  const currentHour = getLocationHour(now);
+  const todayStr = getLocationDateString(now);
 
   let currentForecast = null;
 
   for (const item of timeseries) {
     const itemDate = new Date(item.time);
-    if (getLocalDateString(itemDate) === todayStr && itemDate.getHours() === currentHour) {
+    if (getLocationDateString(itemDate) === todayStr && getLocationHour(itemDate) === currentHour) {
       currentForecast = item;
       break;
     }
@@ -692,7 +825,7 @@ function updateDashboardUI(data) {
     let nextForecast = null;
     for (const item of timeseries) {
       const itemDate = new Date(item.time);
-      if (getLocalDateString(itemDate) === todayStr && itemDate.getHours() === nextHour) {
+      if (getLocationDateString(itemDate) === todayStr && getLocationHour(itemDate) === nextHour) {
         nextForecast = item;
         break;
       }
@@ -732,49 +865,42 @@ function updateDashboardUI(data) {
     tempValue.textContent = `${tempVal.toFixed(1)}\u00B0C`;
     weatherDesc.textContent = weather.desc;
 
-    windValue.textContent = details.wind_speed ? `${details.wind_speed.toFixed(1)} m/s` : "-- m/s";
+    windValue.textContent = Number.isFinite(details.wind_speed) ? `${details.wind_speed.toFixed(1)} m/s` : "-- m/s";
     
-    const precip = currentForecast.data.next_1_hours?.details?.precipitation_amount || 0;
-    precipValue.textContent = `${precip.toFixed(1)} mm`;
+    const precip = currentForecast.data.next_1_hours?.details?.precipitation_amount;
+    precipValue.textContent = precip === undefined ? "-- mm" : `${precip.toFixed(1)} mm`;
   }
 
-  // Calculate Max UV Today
-  const todayData = getDailyTimeseries(timeseries, 0).data;
-  let maxUV = 0;
-  let maxUVHour = 12;
+  if (fullRender) {
+    // Calculate Max UV Today
+    const todayData = getDailyTimeseries(timeseries, 0).data;
+    let maxUV = 0;
+    let maxUVHour = 12;
 
-  todayData.forEach(h => {
-    if (h.uv > maxUV) {
-      maxUV = h.uv;
-      maxUVHour = h.hour;
-    }
-  });
+    todayData.forEach(h => {
+      if (h.uv > maxUV) {
+        maxUV = h.uv;
+        maxUVHour = h.hour;
+      }
+    });
 
-  document.getElementById("uv-max").textContent = maxUV.toFixed(1);
-  document.getElementById("uv-max-time").textContent = `${String(maxUVHour).padStart(2, '0')}:00`;
+    document.getElementById("uv-max").textContent = maxUV.toFixed(1);
+    document.getElementById("uv-max-time").textContent = `${String(maxUVHour).padStart(2, '0')}:00`;
 
+    renderDayTabs();
+    drawForecastCurves();
+    updateHeaderArrows();
+    updateHeaderDates();
 
-
-  // Draw forecast day selection tabs
-  renderDayTabs();
-
-  // Draw forecast canvases
-  drawForecastCurves();
-
-  // Sync header navigation arrows
-  updateHeaderArrows();
-
-  // Sync header navigation dates
-  updateHeaderDates();
-
-  // Update last-updated timestamp
-  if (data.lastUpdated) {
-    const lastUpdatedEl = document.getElementById("last-updated");
-    if (lastUpdatedEl) {
-      const date = new Date(data.lastUpdated);
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      lastUpdatedEl.textContent = `Updated: ${hours}:${minutes}`;
+    if (data.lastUpdated) {
+      const lastUpdatedEl = document.getElementById("last-updated");
+      if (lastUpdatedEl) {
+        const date = new Date(data.lastUpdated);
+        const { hour, minute } = getZonedParts(date);
+        const hours = String(hour).padStart(2, '0');
+        const minutes = String(minute).padStart(2, '0');
+        lastUpdatedEl.textContent = `Updated: ${hours}:${minutes}`;
+      }
     }
   }
 }
@@ -784,7 +910,7 @@ function drawForecastCurves() {
   if (!forecastData) return;
 
   const timeseries = forecastData.properties.timeseries;
-  const { data: dayPoints, found } = getDailyTimeseries(timeseries, activeTab);
+  const { displayData: dayPoints, found } = getDailyTimeseries(timeseries, activeTab);
   if (!found) return;
 
   drawSingleCurve(uvCanvas, "uv", dayPoints);
@@ -802,7 +928,9 @@ function drawForecastCurves() {
 function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   if (!canvas) return;
 
-  const dpr = window.devicePixelRatio || 1;
+  // A 2x cap keeps seven simultaneous canvases from consuming excessive RAM
+  // and battery on high-density mobile displays.
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const rect = canvas.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return;
   const newWidth = Math.floor(rect.width * dpr);
@@ -844,8 +972,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     ctx.font = "12px sans-serif";
     ctx.textBaseline = "middle";
     ctx.textAlign = "center";
-    ctx.fillText("Tide data is only available for coastal locations", W / 2, H / 2 - 10);
-    ctx.fillText(`No tide data for ${currentLoc.name}`, W / 2, H / 2 + 10);
+    ctx.fillText("Forecast sea-level data is unavailable for this location", W / 2, H / 2 - 10);
+    ctx.fillText("This model is not a local tide table", W / 2, H / 2 + 10);
     ctx.restore();
     return;
   }
@@ -892,8 +1020,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       gridLevels.push(val);
     }
   } else if (paramType === "rain") {
-    const maxVal = globalLimits ? globalLimits.rainMax : Math.max(...dayPoints.map(p => p.rain), 0);
-    let step = 0.5;
+    const knownRain = dayPoints.map(p => p.rain).filter(value => value !== null);
+    const maxVal = globalLimits ? globalLimits.rainMax : Math.max(...knownRain, 0);
+    let step;
     if (maxVal > 20) {
       step = 10;
       maxScaleY = Math.ceil(maxVal / 10) * 10;
@@ -916,7 +1045,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   } else if (paramType === "wind") {
     const maxVal = (globalLimits && globalLimits.windMax !== undefined) ? globalLimits.windMax : Math.max(...dayPoints.map(p => p.windSpeed), 0);
     minScaleY = 0;
-    let step = 2;
+    let step;
     if (maxVal > 20) {
       step = 5;
       maxScaleY = Math.ceil(maxVal / 5) * 5;
@@ -1016,7 +1145,11 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   ctx.restore();
 
   // Build coordinate points, filtering out entries that do not have forecast data (like past hours, or missing intermediate hours on later days)
-  const points = dayPoints.filter(p => (paramType === "tide" ? p.value !== null : p.temp !== null)).map(p => {
+  const points = dayPoints.filter(p => {
+    if (paramType === "tide") return p.value !== null;
+    if (paramType === "rain") return p.rain !== null;
+    return p.temp !== null;
+  }).map(p => {
     let val = 0;
     if (paramType === "uv") val = p.uv;
     else if (paramType === "temp") val = p.temp;
@@ -1035,6 +1168,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       rainMax: p.rainMax,
       rainMin: p.rainMin,
       rainProb: p.rainProb,
+      rainIntervalHours: p.rainIntervalHours,
       clouds: p.clouds,
       cloudsLow: p.cloudsLow,
       cloudsMid: p.cloudsMid,
@@ -1043,11 +1177,25 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       windDir: p.windDir,
       hour: p.hour,
       symbol: p.symbol,
-      tideValue: p.value
+      tideValue: p.value,
+      isEstimated: p.isEstimated === true
     };
   });
 
   if (points.length === 0) return;
+
+  // Keep source points distinct from the short dotted connectors below. The
+  // connector helps read a six-hour forecast cadence without claiming that
+  // MET supplied hourly values in between.
+  const segments = [];
+  points.forEach(point => {
+    const previous = segments.at(-1)?.at(-1);
+    if (!previous || point.hour !== previous.hour + 1) {
+      segments.push([point]);
+    } else {
+      segments.at(-1).push(point);
+    }
+  });
 
   // Clip content area horizontally (between paddingL and W - paddingR)
   ctx.save();
@@ -1058,7 +1206,6 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   if (paramType === "rain") {
     // ---- Draw Precipitation Bar Chart ----
     ctx.save();
-    const barW = Math.max(3, Math.floor((graphW / 24) * 0.65));
     
     // Bar gradient fill
     const barGrad = ctx.createLinearGradient(0, paddingT, 0, H - paddingB);
@@ -1073,9 +1220,12 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       const y0 = getY(0);
       const y1 = p.y;
       const barH = y0 - y1;
+      const intervalHours = p.rainIntervalHours || 1;
+      const barW = Math.max(3, Math.abs(getX(p.hour + intervalHours) - getX(p.hour)) * 0.85);
+      const barX = p.x + 1;
       if (barH > 0.5) {
-        ctx.fillRect(p.x - barW / 2, y1, barW, barH);
-        ctx.strokeRect(p.x - barW / 2, y1, barW, barH);
+        ctx.fillRect(barX, y1, barW, barH);
+        ctx.strokeRect(barX, y1, barW, barH);
       }
 
       // Draw uncertainty error bars (whiskers) if rainMax is greater than rain
@@ -1089,21 +1239,21 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         
         // Vertical line
         ctx.beginPath();
-        ctx.moveTo(p.x, yMin);
-        ctx.lineTo(p.x, yMax);
+        ctx.moveTo(barX + barW / 2, yMin);
+        ctx.lineTo(barX + barW / 2, yMax);
         ctx.stroke();
 
         // Top horizontal cap
         ctx.beginPath();
-        ctx.moveTo(p.x - 3, yMax);
-        ctx.lineTo(p.x + 3, yMax);
+        ctx.moveTo(barX + barW / 2 - 3, yMax);
+        ctx.lineTo(barX + barW / 2 + 3, yMax);
         ctx.stroke();
 
         // Bottom horizontal cap (only if not at baseline)
         if (yMin < y0 - 1) {
           ctx.beginPath();
-          ctx.moveTo(p.x - 3, yMin);
-          ctx.lineTo(p.x + 3, yMin);
+          ctx.moveTo(barX + barW / 2 - 3, yMin);
+          ctx.lineTo(barX + barW / 2 + 3, yMin);
           ctx.stroke();
         }
         ctx.restore();
@@ -1133,21 +1283,22 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     }
     ctx.fillStyle = fillGrad;
 
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, H - paddingB);
-    ctx.lineTo(points[0].x, points[0].y);
-
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i];
-      const p1 = points[i + 1];
-      const xc = (p0.x + p1.x) / 2;
-      const yc = (p0.y + p1.y) / 2;
-      ctx.quadraticCurveTo(p0.x, p0.y, xc, yc);
-    }
-    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
-    ctx.lineTo(points[points.length - 1].x, H - paddingB);
-    ctx.closePath();
-    ctx.fill();
+    segments.filter(segment => segment.length > 1).forEach(segment => {
+      ctx.beginPath();
+      ctx.moveTo(segment[0].x, H - paddingB);
+      ctx.lineTo(segment[0].x, segment[0].y);
+      for (let i = 0; i < segment.length - 1; i++) {
+        const p0 = segment[i];
+        const p1 = segment[i + 1];
+        const xc = (p0.x + p1.x) / 2;
+        const yc = (p0.y + p1.y) / 2;
+        ctx.quadraticCurveTo(p0.x, p0.y, xc, yc);
+      }
+      ctx.lineTo(segment.at(-1).x, segment.at(-1).y);
+      ctx.lineTo(segment.at(-1).x, H - paddingB);
+      ctx.closePath();
+      ctx.fill();
+    });
     ctx.restore();
 
     // 4. Draw curve line stroke
@@ -1176,31 +1327,64 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i];
-      const p1 = points[i + 1];
-      const xc = (p0.x + p1.x) / 2;
-      const yc = (p0.y + p1.y) / 2;
-      ctx.quadraticCurveTo(p0.x, p0.y, xc, yc);
+    segments.forEach(segment => {
+      ctx.beginPath();
+      ctx.moveTo(segment[0].x, segment[0].y);
+      for (let i = 0; i < segment.length - 1; i++) {
+        const p0 = segment[i];
+        const p1 = segment[i + 1];
+        const xc = (p0.x + p1.x) / 2;
+        const yc = (p0.y + p1.y) / 2;
+        ctx.quadraticCurveTo(p0.x, p0.y, xc, yc);
+      }
+      if (segment.length > 1) {
+        ctx.lineTo(segment.at(-1).x, segment.at(-1).y);
+        ctx.stroke();
+      }
+    });
+
+    // Forecasts commonly become six-hourly farther into the future. Connect
+    // nearby source points with a dotted line, but never create hourly values
+    // or use this representation for precipitation totals.
+    if (paramType !== "tide") {
+      points.slice(0, -1).forEach((point, index) => {
+        const nextPoint = points[index + 1];
+        const gapHours = nextPoint.hour - point.hour;
+        if (gapHours > 1 && gapHours <= 6) {
+          ctx.save();
+          ctx.setLineDash([6, 5]);
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(point.x, point.y);
+          ctx.lineTo(nextPoint.x, nextPoint.y);
+          ctx.stroke();
+          ctx.restore();
+        }
+      });
     }
-    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
-    ctx.stroke();
+
+    // Small circles identify the actual provider-supplied forecast snapshots.
+    ctx.save();
+    ctx.fillStyle = lineGrad;
+    points.filter(point => !point.isEstimated).forEach(point => {
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 2.5, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+    ctx.restore();
     ctx.restore();
 
     // Draw sunrise and sunset lines on the UV curve
     if (paramType === "uv") {
       try {
-        const targetDate = new Date();
-        targetDate.setDate(targetDate.getDate() + activeTab);
+        const targetDate = getLocationDayDate(activeTab);
         const sunTimes = SunCalc.getTimes(targetDate, currentLoc.lat, currentLoc.lon);
         const sunrise = sunTimes.sunrise;
         const sunset = sunTimes.sunset;
 
         if (sunrise && !isNaN(sunrise.getTime())) {
-          const sunriseHour = sunrise.getHours() + sunrise.getMinutes() / 60 + sunrise.getSeconds() / 3600;
+          const sunriseParts = getZonedParts(sunrise);
+          const sunriseHour = sunriseParts.hour + sunriseParts.minute / 60 + sunriseParts.second / 3600;
           const xSunrise = getX(sunriseHour);
           if (xSunrise >= paddingL && xSunrise <= W - paddingR) {
             ctx.save();
@@ -1216,17 +1400,19 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
             ctx.save();
             ctx.fillStyle = textColor;
             ctx.font = "bold 9px sans-serif";
-            ctx.textAlign = "center";
+            const sunriseLabelX = xSunrise < paddingL + 28 ? paddingL + 4 : xSunrise;
+            ctx.textAlign = xSunrise < paddingL + 28 ? "left" : "center";
             ctx.textBaseline = "top";
-            const timeStr = `${String(sunrise.getHours()).padStart(2, '0')}:${String(sunrise.getMinutes()).padStart(2, '0')}`;
-            ctx.fillText("Sunrise", xSunrise, paddingT + 5);
-            ctx.fillText(timeStr, xSunrise, paddingT + 17);
+            const timeStr = `${String(sunriseParts.hour).padStart(2, '0')}:${String(sunriseParts.minute).padStart(2, '0')}`;
+            ctx.fillText("Sunrise", sunriseLabelX, paddingT + 5);
+            ctx.fillText(timeStr, sunriseLabelX, paddingT + 17);
             ctx.restore();
           }
         }
 
         if (sunset && !isNaN(sunset.getTime())) {
-          const sunsetHour = sunset.getHours() + sunset.getMinutes() / 60 + sunset.getSeconds() / 3600;
+          const sunsetParts = getZonedParts(sunset);
+          const sunsetHour = sunsetParts.hour + sunsetParts.minute / 60 + sunsetParts.second / 3600;
           const xSunset = getX(sunsetHour);
           if (xSunset >= paddingL && xSunset <= W - paddingR) {
             ctx.save();
@@ -1242,11 +1428,12 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
             ctx.save();
             ctx.fillStyle = textColor;
             ctx.font = "bold 9px sans-serif";
-            ctx.textAlign = "center";
+            const sunsetLabelX = xSunset > W - paddingR - 28 ? W - paddingR - 4 : xSunset;
+            ctx.textAlign = xSunset > W - paddingR - 28 ? "right" : "center";
             ctx.textBaseline = "top";
-            const timeStr = `${String(sunset.getHours()).padStart(2, '0')}:${String(sunset.getMinutes()).padStart(2, '0')}`;
-            ctx.fillText("Sunset", xSunset, paddingT + 5);
-            ctx.fillText(timeStr, xSunset, paddingT + 17);
+            const timeStr = `${String(sunsetParts.hour).padStart(2, '0')}:${String(sunsetParts.minute).padStart(2, '0')}`;
+            ctx.fillText("Sunset", sunsetLabelX, paddingT + 5);
+            ctx.fillText(timeStr, sunsetLabelX, paddingT + 17);
             ctx.restore();
           }
         }
@@ -1296,7 +1483,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   // 5. Current hour vertical line indicator (shows the current minute via linear interpolation)
   const now = new Date();
   if (activeTab === 0) {
-    const currentTimeDec = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+    const nowParts = getZonedParts(now);
+    const currentTimeDec = nowParts.hour + nowParts.minute / 60 + nowParts.second / 3600;
     const h0 = Math.floor(currentTimeDec);
     const h1 = Math.min(23, h0 + 1);
     
@@ -1381,7 +1569,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         hour: hoverHour,
         symbol: p0.symbol,
         rainProb: hpRainProb,
-        rainMax: hpRainMax
+        rainMax: hpRainMax,
+        rainIntervalHours: p0.rainIntervalHours,
+        isEstimated: p0.isEstimated
       };
 
       // Dotted hover line
@@ -1430,7 +1620,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       } else if (paramType === "rain") {
         boxColor = "#38d4ff";
         tooltipLines.push(`Time: ${timeStr}`);
-        tooltipLines.push(`Rain: ${hp.rain !== null ? hp.rain.toFixed(1) : "0.0"} mm`);
+        const intervalLabel = hp.rainIntervalHours === 6 ? "next 6h" : "next hour";
+        tooltipLines.push(`Rain (${intervalLabel}): ${hp.rain !== null ? hp.rain.toFixed(1) : "--"} mm`);
         if (hp.rainProb !== null && hp.rainProb !== undefined) {
           tooltipLines.push(`Chance: ${hp.rainProb}%`);
         }
@@ -1445,7 +1636,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       } else if (paramType === "tide") {
         boxColor = "#00b4d8";
         tooltipLines.push(`Time: ${timeStr}`);
-        tooltipLines.push(`Tide Level: ${hp.tideValue !== null ? hp.tideValue.toFixed(1) : "--"} cm`);
+        tooltipLines.push(`Forecast sea level: ${hp.tideValue !== null ? hp.tideValue.toFixed(1) : "--"} cm`);
       } else if (paramType === "clouds") {
         boxColor = "#38b2ff";
         tooltipLines.push(`Time: ${timeStr}`);
@@ -1453,6 +1644,10 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         tooltipLines.push(`Low Clouds: ${hp.cloudsLow.toFixed(0)}%`);
         tooltipLines.push(`Mid Clouds: ${hp.cloudsMid.toFixed(0)}%`);
         tooltipLines.push(`High Clouds: ${hp.cloudsHigh.toFixed(0)}%`);
+      }
+
+      if (hp.isEstimated) {
+        tooltipLines.push("Estimated to day boundary");
       }
 
       ctx.font = "bold 11px sans-serif";
@@ -1511,7 +1706,7 @@ let startTouchDist = null;
 
 function getZoomWindow() {
   const now = new Date();
-  const currentHour = now.getHours();
+  const currentHour = getLocationHour(now);
 
   if (zoomIndex === 0) {
     return { start: 0, end: 23 };
@@ -1642,28 +1837,43 @@ function handleCanvasHover(e) {
 
   if (hoverHour !== hr) {
     hoverHour = hr;
-    drawForecastCurves();
+    scheduleForecastDraw();
   }
 }
 
 function handleCanvasLeave() {
   if (hoverHour !== null) {
     hoverHour = null;
-    drawForecastCurves();
+    scheduleForecastDraw();
   }
 }
 
 // Fetch forecast and refresh page
-async function loadWeatherData(lat, lon, name, silent = false, isGps = false, forceRefresh = false) {
+async function loadWeatherData(lat, lon, name, silent = false, isGps = false, forceRefresh = false, locationIntent = ++locationIntentId) {
+  if (locationIntent !== locationIntentId) return;
+  const loadId = ++weatherLoadId;
+  if (weatherLoadController) weatherLoadController.abort();
+  if (tideLoadController) tideLoadController.abort();
+  const controller = new AbortController();
+  weatherLoadController = controller;
+
   showError("");
   if (!silent) {
     setLoaderState(true);
   }
   try {
-    forecastData = await fetchWeather(lat, lon, forceRefresh);
-    if (!window.location) return;
+    const [nextForecast, timeZone] = await Promise.all([
+      fetchWeather(lat, lon, forceRefresh, controller.signal),
+      resolveTimeZone(lat, lon, controller.signal).catch(err => {
+        console.warn("Timezone lookup failed; using the previous timezone", err);
+        return currentLoc.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      })
+    ]);
+    if (!window.location || loadId !== weatherLoadId || locationIntent !== locationIntentId) return;
+
+    forecastData = nextForecast;
     
-    currentLoc = { lat, lon, name, isGps };
+    currentLoc = { lat, lon, name, isGps, timeZone };
     saveLocation(currentLoc);
 
     locationDisplay.textContent = name;
@@ -1672,33 +1882,33 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false, fo
     }
     coordinatesDisplay.textContent = `(${lat.toFixed(2)}, ${lon.toFixed(2)})`;
 
-    // Update live weather radar map iframe (bypass in Happy DOM testing to prevent network errors)
-    const radarIframe = document.getElementById("radar-iframe");
-    const isHappyDOM = window.happyDOM || (navigator && navigator.userAgent && /happy-dom|happydom/i.test(navigator.userAgent));
-    if (radarIframe && !isHappyDOM) {
-      const srcUrl = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&zoom=8&level=surface&overlay=radar&menu=&message=&marker=true&calendar=now&pressure=&type=map&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
-      if (document.visibilityState === "hidden") {
-        savedRadarSrc = srcUrl;
-        radarIframe.src = "";
-      } else {
-        radarIframe.src = srcUrl;
-        savedRadarSrc = "";
-      }
-    }
+    // Windy is only loaded when its card is visible; otherwise its map/WebGL
+    // animation is kept fully unloaded.
+    radarSource = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&zoom=8&level=surface&overlay=radar&menu=&message=&marker=true&calendar=now&pressure=&type=map&detail=&metricWind=default&metricTemp=default&radarRange=-1`;
+    updateRadarResource();
 
     if (!silent) {
       setLoaderState(false);
     }
     updateDashboardUI(forecastData);
+    if (forecastData.isStale) {
+      showError("Showing the most recently cached forecast because the live forecast service is unavailable.");
+    }
 
     // Fetch tide data independently in the background
     tideData = null;
-    if (!isHappyDOM) {
-      fetchTideData(lat, lon).then(data => {
+    if (!isHappyDOM()) {
+      const tideController = new AbortController();
+      tideLoadController = tideController;
+      fetchTideData(lat, lon, tideController.signal).then(data => {
+        if (tideLoadController === tideController) tideLoadController = null;
+        if (loadId !== weatherLoadId || locationIntent !== locationIntentId) return;
         tideData = data;
         const { data: tidePoints, found: tideFound } = getDailyTideSeries(tideData, activeTab);
         drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
       }).catch(err => {
+        if (tideLoadController === tideController) tideLoadController = null;
+        if (err.name === "AbortError" || loadId !== weatherLoadId || locationIntent !== locationIntentId) return;
         console.warn("Failed to load tide data in background:", err);
         tideData = null;
         drawSingleCurve(tideCanvas, "tide", null, false);
@@ -1708,38 +1918,62 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false, fo
     }
 
   } catch (err) {
-    if (!window.location || err.message === "Window unloaded") return;
+    if (!window.location || err.message === "Window unloaded" || err.name === "AbortError" || loadId !== weatherLoadId || locationIntent !== locationIntentId) return;
     console.error(err);
     showError(`Error loading weather forecast: ${err.message}. Please check connection.`);
     setLoaderState(false);
+  } finally {
+    if (loadId === weatherLoadId) {
+      weatherLoadController = null;
+    }
   }
 }
 
 // Nominatim Geocoding implementation
-let debounceTimeout = null;
-
 async function performSearch() {
   const query = searchInput.value.trim();
   if (!query) return;
 
   if (query === "/reset") {
-    localStorage.clear();
-    document.documentElement.className = "";
-    document.body.className = "";
+    resetWeatherStorage();
     location.reload();
     return;
   }
 
+  const queryKey = query.toLocaleLowerCase();
+  if (geocodeCache.has(queryKey)) {
+    displaySuggestions(geocodeCache.get(queryKey));
+    return;
+  }
+
+  const elapsed = Date.now() - lastSearchAt;
+  if (elapsed < 1000) {
+    showError("Please wait a moment before another city search.");
+    return;
+  }
+
+  if (searchController) searchController.abort();
+  const requestId = ++searchRequestId;
+  const controller = new AbortController();
+  searchController = controller;
+  lastSearchAt = Date.now();
+
   try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`;
-    const response = await fetch(url);
+    const url = `${GEOCODING_URL}/search?q=${encodeURIComponent(query)}&format=json&limit=5`;
+    const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) throw new Error("Search service failed");
     
     const results = await response.json();
+    if (requestId !== searchRequestId) return;
+    geocodeCache.set(queryKey, results);
+    if (geocodeCache.size > 20) geocodeCache.delete(geocodeCache.keys().next().value);
     displaySuggestions(results);
   } catch (err) {
+    if (err.name === "AbortError" || requestId !== searchRequestId) return;
     console.error(err);
     showError("Could not retrieve search suggestions. Please try again.");
+  } finally {
+    if (requestId === searchRequestId) searchController = null;
   }
 }
 
@@ -1747,29 +1981,34 @@ function displaySuggestions(items) {
   suggestionsList.innerHTML = "";
   if (items.length === 0) {
     suggestionsList.style.display = "none";
+    searchInput.setAttribute("aria-expanded", "false");
     return;
   }
 
   items.forEach(item => {
-    const div = document.createElement("div");
-    div.className = "suggestion-item";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "suggestion-item";
+    button.setAttribute("role", "option");
     
     const parts = item.display_name.split(",");
     const shortName = parts.slice(0, 3).join(",");
-    div.textContent = shortName;
+    button.textContent = shortName;
 
-    div.addEventListener("click", () => {
+    button.addEventListener("click", () => {
       const lat = parseFloat(item.lat);
       const lon = parseFloat(item.lon);
       searchInput.value = shortName;
       suggestionsList.style.display = "none";
+      searchInput.setAttribute("aria-expanded", "false");
       loadWeatherData(lat, lon, shortName);
     });
 
-    suggestionsList.append(div);
+    suggestionsList.append(button);
   });
 
   suggestionsList.style.display = "block";
+  searchInput.setAttribute("aria-expanded", "true");
 }
 
 // Geolocation GPS fetcher
@@ -1780,14 +2019,16 @@ function getGPSLocation() {
   }
 
   showError("");
+  const gpsIntent = ++locationIntentId;
   navigator.geolocation.getCurrentPosition(
     async position => {
+      if (gpsIntent !== locationIntentId) return;
       const lat = position.coords.latitude;
       const lon = position.coords.longitude;
       
       let locName = "GPS Location";
       try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`);
+        const response = await fetch(`${GEOCODING_URL}/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`);
         if (response.ok) {
           const data = await response.json();
           const addr = data.address || {};
@@ -1800,16 +2041,19 @@ function getGPSLocation() {
         console.warn("Reverse geocoding failed", err);
       }
       
-      loadWeatherData(lat, lon, locName, false, true);
+      if (gpsIntent === locationIntentId) {
+        loadWeatherData(lat, lon, locName, false, true, false, gpsIntent);
+      }
     },
     err => {
+      if (gpsIntent !== locationIntentId) return;
       console.warn("GPS Location error", err);
       let errMsg = "Could not access location.";
       if (err.code === 1) errMsg = "GPS permission denied.";
       else if (err.code === 2) errMsg = "Position unavailable.";
       showError(errMsg + " Using default location.");
       
-      loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, false, currentLoc.isGps);
+      loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, false, currentLoc.isGps, false, gpsIntent);
     },
     { timeout: 8000 }
   );
@@ -1962,6 +2206,7 @@ function updateHiddenCurvesBar() {
         card.classList.remove("minimized");
         saveMinimizedStates();
         updateHiddenCurvesBar();
+        updateRadarResource();
         drawForecastCurves();
       });
 
@@ -2047,7 +2292,7 @@ function setupHeaderContextMenu() {
         if (didTriggerLongPress) return;
         didTriggerLongPress = true;
         if (navigator.vibrate) {
-          try { navigator.vibrate(50); } catch(err) {}
+          try { navigator.vibrate(50); } catch { /* Vibration is optional. */ }
         }
         handleTrigger(touchStartX, touchStartY);
       }, 600); // 600ms threshold
@@ -2139,6 +2384,7 @@ function showContextMenu(x, y, card) {
     card.classList.toggle("minimized");
     saveMinimizedStates();
     updateHiddenCurvesBar();
+    updateRadarResource();
     drawForecastCurves();
     menu.remove();
   });
@@ -2151,7 +2397,7 @@ function showContextMenu(x, y, card) {
     clouds: "MET Norway",
     uv: "MET Norway",
     wind: "MET Norway",
-    tide: "Open-Meteo",
+    tide: "Open-Meteo Marine (forecast sea level)",
     moon: "Local Calculation",
     radar: "Windy"
   };
@@ -2214,9 +2460,7 @@ function showContextMenu(x, y, card) {
 function initWeatherPage() {
   // Hidden developer reset command via URL parameter
   if (new URLSearchParams(window.location.search).has("reset")) {
-    localStorage.clear();
-    document.documentElement.className = "";
-    document.body.className = "";
+    resetWeatherStorage();
     const url = new URL(window.location.href);
     url.searchParams.delete("reset");
     const isHappyDOM = window.happyDOM || (navigator && navigator.userAgent && /happy-dom|happydom/i.test(navigator.userAgent));
@@ -2232,18 +2476,14 @@ function initWeatherPage() {
   restoreLayoutOrder();
   restoreMinimizedStates();
   setupHeaderContextMenu();
+  setupRadarLifecycle();
 
   // Load last stored location if any
   loadStoredLocation();
 
-  // Detect if page was reloaded (F5) to bypass cache and force update
-  const isReload = !!(
-    (window.performance && window.performance.navigation && window.performance.navigation.type === 1) ||
-    (window.performance && window.performance.getEntriesByType && window.performance.getEntriesByType("navigation")[0] && window.performance.getEntriesByType("navigation")[0].type === "reload")
-  );
-
-  // Initial data load
-  loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, false, currentLoc.isGps, isReload);
+  // Initial data load uses a fresh cache immediately and refreshes only once
+  // the provider's expiry has passed.
+  loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, false, currentLoc.isGps);
 
   // Setup tab switches
   setupTabs();
@@ -2273,34 +2513,25 @@ function initWeatherPage() {
     }
   });
 
-  // Autocomplete auto-triggering on keyup (debounced)
+  // Nominatim's public service does not permit autocomplete. Clear stale
+  // suggestions while the user changes the query; requests happen only after
+  // an explicit Search click or Enter key.
   searchInput.addEventListener("input", () => {
-    clearTimeout(debounceTimeout);
-    const val = searchInput.value.trim();
-    if (val.length < 3) {
-      suggestionsList.style.display = "none";
-      return;
-    }
-    debounceTimeout = setTimeout(performSearch, 400);
+    suggestionsList.style.display = "none";
+    searchInput.setAttribute("aria-expanded", "false");
   });
 
   // Hide suggestions if clicking outside
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".search-container")) {
       suggestionsList.style.display = "none";
+      searchInput.setAttribute("aria-expanded", "false");
     }
   });
 
-  // Redraw canvases on window resize using requestAnimationFrame throttling
-  let resizeTimeout = null;
+  // Redraw canvases on resize, coalesced with hover/theme draw requests.
   window.addEventListener("resize", () => {
-    if (resizeTimeout) {
-      window.cancelAnimationFrame(resizeTimeout);
-    }
-    resizeTimeout = window.requestAnimationFrame(() => {
-      drawForecastCurves();
-      resizeTimeout = null;
-    });
+    scheduleForecastDraw();
   });
 
   // Bind synced mouse/touch event listeners across all canvases
@@ -2318,54 +2549,29 @@ function initWeatherPage() {
 
   // Redraw canvases if active page theme is toggled
   const themeObserver = new MutationObserver(() => {
-    drawForecastCurves();
+    scheduleForecastDraw();
   });
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
 
-  // Periodically check if forecast is stale (every 5 minutes)
+  // Check freshness infrequently. The minute clock below keeps the current
+  // cursor moving without turning it into a network refresh.
   setInterval(() => {
-    if (document.visibilityState === "visible" && forecastData && forecastData.lastUpdated) {
-      const age = Date.now() - forecastData.lastUpdated;
-      if (age >= CACHE_EXPIRY_MS) {
-        loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true, currentLoc.isGps);
-      }
-    }
-  }, 5 * 60 * 1000);
+    refreshForecastIfStale();
+  }, 15 * 60 * 1000);
+  scheduleClockTick();
 
-  // Periodically update the time indicators and dashboard values every 60 seconds (smooth interpolation update)
-  setInterval(() => {
-    if (document.visibilityState === "visible" && forecastData) {
-      updateDashboardUI(forecastData);
-    }
-  }, 60 * 1000);
-
-  // Manage resources and refresh when user returns to the tab
+  // Unload heavy radar work while hidden, then update the time cursor and
+  // refresh only if the stored provider expiry has passed.
   document.addEventListener("visibilitychange", () => {
-    const radarIframe = document.getElementById("radar-iframe");
-    const isHappyDOM = window.happyDOM || (navigator && navigator.userAgent && /happy-dom|happydom/i.test(navigator.userAgent));
-
-    if (document.visibilityState === "hidden") {
-      // Unload Windy iframe in background to eliminate WebGL/animation battery drain
-      if (radarIframe && !isHappyDOM && radarIframe.src) {
-        savedRadarSrc = radarIframe.src;
-        radarIframe.src = "";
+    updateRadarResource();
+    if (document.visibilityState === "visible") {
+      if (forecastData) {
+        updateDashboardUI(forecastData, false);
+        scheduleForecastDraw();
       }
-    } else if (document.visibilityState === "visible") {
-      // Restore radar animations in foreground
-      if (radarIframe && !isHappyDOM && savedRadarSrc) {
-        radarIframe.src = savedRadarSrc;
-        savedRadarSrc = "";
-      }
-
-      if (forecastData && forecastData.lastUpdated) {
-        const age = Date.now() - forecastData.lastUpdated;
-        // Bypasses the cache and immediately forces a refresh if the user has been away 
-        // and returns after 5 minutes or more since the last update.
-        if (age >= 5 * 60 * 1000) {
-          loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, true, currentLoc.isGps, true);
-        }
-      }
+      refreshForecastIfStale();
     }
+    scheduleClockTick();
   });
 }
 
@@ -2379,8 +2585,8 @@ function getMoonPhase(date) {
   const normalizedFraction = phaseFraction < 0 ? phaseFraction + 1 : phaseFraction;
   const age = normalizedFraction * synodicMonth;
   
-  let name = "";
-  let emoji = "";
+  let name;
+  let emoji;
   if (age < 1.38 || age > 28.15) {
     name = "New Moon";
     emoji = "🌑";
@@ -2491,16 +2697,15 @@ function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, ac
   const lightMoonBg = isLightMode ? accentColor : "#fffae8";
   
   // 1. Calculate active date & moon phase details for the main moon display
-  const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() + activeTab);
+  let targetDate;
   if (hoverHour !== null) {
     const hh = Math.floor(hoverHour);
     const mm = Math.round((hoverHour - hh) * 60);
-    targetDate.setHours(hh, mm, 0, 0);
+    targetDate = getLocationDayDate(activeTab, hh, mm);
   } else if (activeTab === 0) {
-    // Keep current hour
+    targetDate = new Date();
   } else {
-    targetDate.setHours(12, 0, 0, 0);
+    targetDate = getLocationDayDate(activeTab, 12, 0);
   }
   
   const mainPhase = getMoonPhase(targetDate);
@@ -2524,15 +2729,12 @@ function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, ac
   ctx.fillText(mainPhase.name, W / 2, 76);
   
   // Sub-stats (Illumination, Age, Next Full Moon)
-  let daysToFull = 0;
-  if (mainPhase.fraction <= 0.5) {
-    daysToFull = (0.5 - mainPhase.fraction) * 29.53059;
-  } else {
-    daysToFull = (1.5 - mainPhase.fraction) * 29.53059;
-  }
+  const daysToFull = mainPhase.fraction <= 0.5
+    ? (0.5 - mainPhase.fraction) * 29.53059
+    : (1.5 - mainPhase.fraction) * 29.53059;
   
   const dateOptions = { month: 'short', day: 'numeric' };
-  const dateStr = targetDate.toLocaleDateString([], dateOptions);
+  const dateStr = targetDate.toLocaleDateString([], { ...dateOptions, timeZone: getLocationTimeZone() });
   let timeStr = dateStr;
   if (hoverHour !== null) {
     const hh = Math.floor(hoverHour);
@@ -2565,9 +2767,7 @@ function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, ac
     const dayOffset = s - 3;
     const targetDayIndex = activeTab + dayOffset;
     
-    const d = new Date();
-    d.setDate(d.getDate() + targetDayIndex);
-    d.setHours(12, 0, 0, 0);
+    const d = getLocationDayDate(targetDayIndex, 12, 0);
     
     daysData.push({
       slot: s,
@@ -2635,16 +2835,16 @@ function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, ac
     
     // Weekday label
     ctx.save();
-    let dayName = "";
+    let dayName;
     if (day.dayIndex === 0) {
       dayName = "Today";
       ctx.fillStyle = textColor;
       ctx.font = `bold ${isCompact ? "8px" : "9px"} sans-serif`;
     } else {
       const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      const d = new Date();
-      d.setDate(d.getDate() + day.dayIndex);
-      dayName = weekdays[d.getDay()];
+      const parts = getZonedParts(getLocationDayDate(day.dayIndex));
+      const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+      dayName = weekdays[weekday];
       
       ctx.fillStyle = isActive ? accentColor : mutedColor;
       ctx.font = `${isActive ? "bold" : "normal"} ${isCompact ? "8px" : "9px"} sans-serif`;

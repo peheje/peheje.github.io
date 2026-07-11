@@ -40,12 +40,19 @@
         }
 
         .suggestion-item {
+            display: block;
+            width: 100%;
             padding: 10px 14px;
             cursor: pointer;
             border-bottom: 1px solid var(--line);
             color: var(--text);
             font-size: 0.9rem;
             transition: background-color 0.15s ease;
+            background: transparent;
+            border-left: none;
+            border-right: none;
+            border-top: none;
+            text-align: left;
         }
 
         .suggestion-item:last-child {
@@ -55,6 +62,16 @@
         .suggestion-item:hover {
             background-color: var(--nav-hover-bg);
             color: var(--accent);
+        }
+
+        .geocoding-attribution {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 0.72rem;
+        }
+
+        .geocoding-attribution a {
+            color: inherit;
         }
 
         .location-info {
@@ -417,6 +434,14 @@
             flex-grow: 1;
         }
 
+        .tide-note {
+            margin: -4px 0 8px;
+            color: var(--muted);
+            font-size: 0.72rem;
+            line-height: 1.35;
+            text-align: center;
+        }
+
         canvas {
             display: block;
             width: 100%;
@@ -588,11 +613,12 @@
         <section class="inline-block margin-bottom-10">
             <div class="search-container">
                 <div class="search-row">
-                    <input type="text" id="city-search" autocomplete="off" placeholder="Search city name (e.g. Oslo, London, Tokyo)..." />
+                    <input type="text" id="city-search" autocomplete="off" placeholder="Enter a city, then press Search (e.g. Oslo, London, Tokyo)" aria-label="City search" aria-controls="suggestions-list" aria-expanded="false" />
                     <button id="search-btn" class="btn-small">Search</button>
                     <button id="location-btn" class="btn-small" title="Use current GPS location">GPS</button>
                 </div>
-                <div id="suggestions-list" class="suggestions-list"></div>
+                <div id="suggestions-list" class="suggestions-list" role="listbox" aria-label="City search results"></div>
+                <p class="geocoding-attribution">Place search © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a></p>
             </div>
             <div class="location-info">
                 <span>Selected: <span id="location-display" class="active-location">Oslo, Norge</span><span id="gps-badge" class="gps-badge">GPS</span> <span id="coordinates-display" style="font-family: monospace; font-size: 0.8rem;">(59.91, 10.74)</span></span>
@@ -682,7 +708,7 @@
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="temp-canvas"></canvas>
+                        <canvas id="temp-canvas" role="img" aria-label="Temperature forecast graph"></canvas>
                     </div>
                 </div>
 
@@ -690,11 +716,11 @@
                 <div class="inline-block graph-card" data-key="precip">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Precipitation Bars (mm)<span class="graph-date"></span></h4>
+                        <h4 class="curve-title">Precipitation (mm; 1h/6h intervals)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="rain-canvas"></canvas>
+                        <canvas id="rain-canvas" role="img" aria-label="Precipitation forecast graph"></canvas>
                     </div>
                 </div>
 
@@ -706,7 +732,7 @@
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="clouds-canvas"></canvas>
+                        <canvas id="clouds-canvas" role="img" aria-label="Cloud cover forecast graph"></canvas>
                     </div>
                 </div>
 
@@ -718,7 +744,7 @@
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="uv-canvas"></canvas>
+                        <canvas id="uv-canvas" role="img" aria-label="UV index forecast graph"></canvas>
                     </div>
                 </div>
 
@@ -730,19 +756,20 @@
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="wind-canvas"></canvas>
+                        <canvas id="wind-canvas" role="img" aria-label="Wind forecast graph"></canvas>
                     </div>
                 </div>
 
-                <!-- Tide Level card -->
+                <!-- Forecast Sea-Level card -->
                 <div class="inline-block graph-card" data-key="tide">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Tide Level (cm)<span class="graph-date"></span></h4>
+                        <h4 class="curve-title">Forecast Sea Level (cm)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
+                    <p class="tide-note">Relative to global mean sea level; modelled values are not suitable for navigation or local tide-table use.</p>
                     <div class="canvas-container">
-                        <canvas id="tide-canvas"></canvas>
+                        <canvas id="tide-canvas" role="img" aria-label="Forecast sea-level graph"></canvas>
                     </div>
                 </div>
 
@@ -754,7 +781,7 @@
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="moon-canvas"></canvas>
+                        <canvas id="moon-canvas" role="img" aria-label="Moon phase and illumination graph"></canvas>
                     </div>
                 </div>
 
@@ -778,7 +805,7 @@
             </div>
             
             <div style="font-size: 0.8rem; color: var(--muted); text-align: center; margin-bottom: 20px;">
-                Swipe graph titles (or use chevrons) to change forecast days. Drag on graphs to synchronously inspect timelines. Right-click or long-press card headers to minimize or reorder.
+                Solid lines and dots are provider forecast snapshots. Dotted lines connect nearby snapshots when forecasts are six-hourly; precipitation totals are never interpolated. Swipe graph titles (or use chevrons) to change forecast days. Drag on graphs to synchronously inspect timelines. Right-click or long-press card headers to minimize or reorder.
             </div>
         </div>
 

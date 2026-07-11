@@ -365,7 +365,7 @@ async function loadLowResCanvasForAlignment(file, direction) {
         scale = targetW / originalH;
         targetH = Math.round(originalW * scale);
         
-        const tempCanvas = new OffscreenCanvas(Math.round(originalW * scale), Math.round(originalH * scale));
+        const tempCanvas = new OffscreenCanvas(targetH, targetW);
         const tempCtx = tempCanvas.getContext("2d");
         tempCtx.drawImage(bitmap, 0, 0, tempCanvas.width, tempCanvas.height);
         
@@ -391,7 +391,9 @@ function getMaxCanvasDimension() {
             const canvas = new OffscreenCanvas(size, size);
             const ctx = canvas.getContext("2d");
             if (ctx) return size;
-        } catch (e) {}
+        } catch {
+            // Try the next smaller canvas size.
+        }
     }
     return 4096;
 }
