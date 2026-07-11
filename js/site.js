@@ -95,17 +95,16 @@ const sites = [
     name: "Contact",
     about: "",
   },
-].filter(
+];
+
+const internalSites = sites.filter(
   (site) =>
+    site.url.startsWith("/") &&
     !(
-      typeof window !== "undefined" &&
-      window.location &&
       window.location.hostname.includes("github.io") &&
       site.url === "/gentrail.html"
     ),
 );
-
-const internalSites = sites.filter((site) => site.url.startsWith("/"));
 const themes = [
   { key: "warm", className: "theme-warm", label: "W", title: "Warm theme" },
   { key: "blue", className: "theme-blue", label: "B", title: "Blue theme" },
