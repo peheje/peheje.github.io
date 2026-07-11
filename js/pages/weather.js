@@ -506,7 +506,7 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
 
   const hoursData = Array.from({ length: 24 }, (_, i) => ({
     hour: i,
-    uv: 0,
+    uv: null,
     temp: null,
     symbol: null,
     rain: null,
@@ -529,7 +529,7 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
       const hr = getLocationHour(itemDate);
       const details = item.data.instant.details;
       if (details) {
-        hoursData[hr].uv = details.ultraviolet_index_clear_sky || 0;
+        hoursData[hr].uv = details.ultraviolet_index_clear_sky !== undefined ? details.ultraviolet_index_clear_sky : null;
         hoursData[hr].temp = details.air_temperature;
         hoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || item.data.next_6_hours?.summary?.symbol_code || null;
         
@@ -575,7 +575,7 @@ function getDailyTimeseries(timeseries, dayIndex) {
       const estimated = {
         ...lastPoint,
         hour: 23,
-        uv: lastPoint.uv + (nextPoint.uv - lastPoint.uv) * ratio,
+        uv: lastPoint.uv !== null && nextPoint.uv !== null ? lastPoint.uv + (nextPoint.uv - lastPoint.uv) * ratio : null,
         temp: lastPoint.temp + (nextPoint.temp - lastPoint.temp) * ratio,
         rain: null,
         rainMax: null,
@@ -590,6 +590,73 @@ function getDailyTimeseries(timeseries, dayIndex) {
         isEstimated: true
       };
       displayData[23] = estimated;
+    }
+  }
+
+  // --- UV Estimation and Interpolation ---
+  const getClearSkyUv = (d, lat, lon) => {
+    const pos = SunCalc.getPosition(d, lat, lon);
+    if (pos.altitude <= 0) return 0;
+    return Math.max(0, Math.pow(Math.sin(pos.altitude), 2.4) * 10);
+  };
+
+  // Find hours with real MET UV data
+  const realUvIndices = [];
+  displayData.forEach((h, i) => {
+    if (h.uv !== null && h.uv !== undefined) {
+      realUvIndices.push(i);
+    }
+  });
+
+  if (realUvIndices.length === 0) {
+    // When a future day has no MET UV data, calculate a clear-sky UV estimate
+    displayData.forEach(h => {
+      const d = getLocationDayDate(dayIndex, h.hour, 30);
+      h.uv = getClearSkyUv(d, currentLoc.lat, currentLoc.lon);
+      h.isUvEstimated = true;
+    });
+  } else {
+    // Fill all missing points with clear-sky fallback initially (for leading/trailing)
+    displayData.forEach(h => {
+      if (h.uv === null) {
+        const d = getLocationDayDate(dayIndex, h.hour, 30);
+        h.uv = getClearSkyUv(d, currentLoc.lat, currentLoc.lon);
+        h.isUvEstimated = true;
+      }
+    });
+
+    // For internal gaps between real UV points, render a smooth/dotted interpolated curve
+    for (let i = 0; i < realUvIndices.length - 1; i++) {
+      const idx1 = realUvIndices[i];
+      const idx2 = realUvIndices[i + 1];
+      if (idx2 - idx1 > 1) {
+        const u1 = displayData[idx1].uv;
+        const u2 = displayData[idx2].uv;
+        
+        const d1 = getLocationDayDate(dayIndex, idx1, 30);
+        const d2 = getLocationDayDate(dayIndex, idx2, 30);
+        const est1 = getClearSkyUv(d1, currentLoc.lat, currentLoc.lon);
+        const est2 = getClearSkyUv(d2, currentLoc.lat, currentLoc.lon);
+
+        for (let j = idx1 + 1; j < idx2; j++) {
+          const dj = getLocationDayDate(dayIndex, j, 30);
+          const est_j = getClearSkyUv(dj, currentLoc.lat, currentLoc.lon);
+          
+          let interpUv;
+          if (est_j > 0 && est1 > 0 && est2 > 0) {
+            const ratio1 = u1 / est1;
+            const ratio2 = u2 / est2;
+            const t = (j - idx1) / (idx2 - idx1);
+            const interpRatio = ratio1 + t * (ratio2 - ratio1);
+            interpUv = est_j * interpRatio;
+          } else {
+            const t = (j - idx1) / (idx2 - idx1);
+            interpUv = u1 + t * (u2 - u1);
+          }
+          displayData[j].uv = Math.max(0, interpUv);
+          displayData[j].isUvEstimated = true;
+        }
+      }
     }
   }
 
@@ -927,6 +994,9 @@ function drawForecastCurves() {
 // Canvas rendering helper for a single curve parameters
 function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   if (!canvas) return;
+  if (window.__weatherTest) {
+    canvas.__testPoints = dayPoints;
+  }
 
   // A 2x cap keeps seven simultaneous canvases from consuming excessive RAM
   // and battery on high-density mobile displays.
@@ -1148,6 +1218,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   const points = dayPoints.filter(p => {
     if (paramType === "tide") return p.value !== null;
     if (paramType === "rain") return p.rain !== null;
+    if (paramType === "uv") return p.uv !== null;
     return p.temp !== null;
   }).map(p => {
     let val = 0;
@@ -1178,7 +1249,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       hour: p.hour,
       symbol: p.symbol,
       tideValue: p.value,
-      isEstimated: p.isEstimated === true
+      isEstimated: p.isEstimated === true,
+      isUvEstimated: p.isUvEstimated === true
     };
   });
 
@@ -1192,6 +1264,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     const previous = segments.at(-1)?.at(-1);
     if (!previous || point.hour !== previous.hour + 1) {
       segments.push([point]);
+    } else if (paramType === "uv" && !!point.isUvEstimated !== !!previous.isUvEstimated) {
+      segments.push([previous, point]);
     } else {
       segments.at(-1).push(point);
     }
@@ -1328,6 +1402,12 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     ctx.lineJoin = "round";
 
     segments.forEach(segment => {
+      ctx.save();
+      if (paramType === "uv" && segment.some(point => point.isUvEstimated)) {
+        ctx.setLineDash([4, 4]);
+      } else {
+        ctx.setLineDash([]);
+      }
       ctx.beginPath();
       ctx.moveTo(segment[0].x, segment[0].y);
       for (let i = 0; i < segment.length - 1; i++) {
@@ -1341,12 +1421,13 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         ctx.lineTo(segment.at(-1).x, segment.at(-1).y);
         ctx.stroke();
       }
+      ctx.restore();
     });
 
     // Forecasts commonly become six-hourly farther into the future. Connect
     // nearby source points with a dotted line, but never create hourly values
     // or use this representation for precipitation totals.
-    if (paramType !== "tide") {
+    if (paramType !== "tide" && paramType !== "uv") {
       points.slice(0, -1).forEach((point, index) => {
         const nextPoint = points[index + 1];
         const gapHours = nextPoint.hour - point.hour;
@@ -1366,7 +1447,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     // Small circles identify the actual provider-supplied forecast snapshots.
     ctx.save();
     ctx.fillStyle = lineGrad;
-    points.filter(point => !point.isEstimated).forEach(point => {
+    points.filter(point => !point.isEstimated && !point.isUvEstimated).forEach(point => {
       ctx.beginPath();
       ctx.arc(point.x, point.y, 2.5, 0, 2 * Math.PI);
       ctx.fill();
@@ -1571,7 +1652,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         rainProb: hpRainProb,
         rainMax: hpRainMax,
         rainIntervalHours: p0.rainIntervalHours,
-        isEstimated: p0.isEstimated
+        isEstimated: p0.isEstimated,
+        isUvEstimated: p0.isUvEstimated
       };
 
       // Dotted hover line
@@ -1648,6 +1730,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
       if (hp.isEstimated) {
         tooltipLines.push("Estimated to day boundary");
+      }
+      if (paramType === "uv" && hp.isUvEstimated) {
+        tooltipLines.push("Modelled clear-sky UV");
       }
 
       ctx.font = "bold 11px sans-serif";
