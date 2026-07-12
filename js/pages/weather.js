@@ -1900,9 +1900,9 @@ function handleTouchMove(e) {
         startTouchDist = dist;
         updateZoomUI();
       }
-    } else if (ratio < 0.8) { // Pinch in -> Zoom out
-      if (zoomIndex > 0) {
-        zoomIndex = 0;
+    } else if (ratio < 0.8) { // Pinch in -> focus the view to 12 hours
+      if (zoomIndex === 0) {
+        zoomIndex = 1;
         startTouchDist = dist;
         updateZoomUI();
       }
