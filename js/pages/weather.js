@@ -1894,9 +1894,9 @@ function handleTouchMove(e) {
     
     const ratio = dist / startTouchDist;
     
-    if (ratio > 1.25) { // Pinch out -> Zoom in
+    if (ratio > 1.25) { // Pinch out -> expand the standard view to 48 hours
       if (zoomIndex === 0) {
-        zoomIndex = 1;
+        zoomIndex = 2;
         startTouchDist = dist;
         updateZoomUI();
       }
