@@ -1,5 +1,6 @@
 import { mountSiteShell } from "../site.js";
 import SunCalc from "../lib/suncalc.js";
+import { createRainMock } from "./weather-rain-mock.js";
 
 // Default location (Oslo, Norway)
 const DEFAULT_LOC = {
@@ -15,6 +16,7 @@ const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 const TIME_ZONE_CACHE_PREFIX = "peheje_weather_timezone_";
 const GEOCODING_URL = "https://nominatim.openstreetmap.org";
 const MAX_FORECAST_CACHE_ENTRIES = 12;
+const rainMock = createRainMock();
 
 let currentLoc = { ...DEFAULT_LOC };
 let forecastData = null;
@@ -34,6 +36,9 @@ let searchRequestId = 0;
 let lastSearchAt = 0;
 let locationIntentId = 0;
 const geocodeCache = new Map();
+const MOON_VIEW_MODES = ["strip", "bars", "calendar"];
+let moonViewMode = localStorage.getItem("weather_moon_view");
+if (!MOON_VIEW_MODES.includes(moonViewMode)) moonViewMode = "strip";
 
 let globalLimits = {
   uvMax: 10,
@@ -57,6 +62,7 @@ const loadingSpinner = document.getElementById("loading-spinner");
 
 const dayTabsContainer = document.getElementById("day-tabs");
 const zoomToggleBtn = document.getElementById("zoom-toggle-btn");
+const moonViewTabs = document.getElementById("moon-view-tabs");
 
 const uvCanvas = document.getElementById("uv-canvas");
 const tempCanvas = document.getElementById("temp-canvas");
@@ -660,7 +666,37 @@ function getDailyTimeseries(timeseries, dayIndex) {
     }
   }
 
+  rainMock?.applyForecast(displayData, dayIndex);
+
   return { data: hoursData, displayData, found: hoursData.some(h => h.temp !== null) };
+}
+
+// Chart hours are normally relative to a single day. Rolling views use this
+// continuous timeline instead, allowing a chart to pass midnight naturally.
+function getContinuousTimeseries(timeseries, finalDayIndex) {
+  const points = [];
+  for (let dayIndex = 0; dayIndex <= finalDayIndex; dayIndex++) {
+    const { displayData } = getDailyTimeseries(timeseries, dayIndex);
+    displayData.forEach(point => {
+      points.push({
+        ...point,
+        hour: dayIndex * 24 + point.hour,
+        localHour: point.hour,
+        dayIndex
+      });
+    });
+  }
+  return points;
+}
+
+function getContinuousTideSeries(finalDayIndex) {
+  const points = [];
+  for (let dayIndex = 0; dayIndex <= finalDayIndex; dayIndex++) {
+    getDailyTideSeries(tideData, dayIndex).data.forEach(point => {
+      points.push({ ...point, hour: dayIndex * 24 + point.hour, localHour: point.hour, dayIndex });
+    });
+  }
+  return points;
 }
 
 function getDailyTideSeriesRaw(tideData, dayIndex) {
@@ -723,7 +759,10 @@ function updateHeaderArrows() {
 
 // Helper to update all graph header date labels
 function updateHeaderDates() {
-  const dateSpan = getDayNameAndDate(activeTab);
+  const { start, end } = getZoomWindow();
+  const dateSpan = zoomIndex === 0
+    ? getDayNameAndDate(activeTab)
+    : `${getDayNameAndDate(Math.floor(start / 24))} → ${getDayNameAndDate(Math.floor(end / 24))}`;
   const dateLabels = document.querySelectorAll(".graph-date");
   dateLabels.forEach(el => {
     el.textContent = ` (${dateSpan})`;
@@ -977,7 +1016,11 @@ function drawForecastCurves() {
   if (!forecastData) return;
 
   const timeseries = forecastData.properties.timeseries;
-  const { displayData: dayPoints, found } = getDailyTimeseries(timeseries, activeTab);
+  const { start, end } = getZoomWindow();
+  const finalDayIndex = Math.max(activeTab, Math.ceil(end / 24));
+  const dayPoints = getContinuousTimeseries(timeseries, finalDayIndex)
+    .filter(point => point.hour >= start && point.hour <= end);
+  const found = dayPoints.some(point => point.temp !== null);
   if (!found) return;
 
   drawSingleCurve(uvCanvas, "uv", dayPoints);
@@ -985,7 +1028,9 @@ function drawForecastCurves() {
   drawSingleCurve(rainCanvas, "rain", dayPoints);
   drawSingleCurve(windCanvas, "wind", dayPoints);
 
-  const { data: tidePoints, found: tideFound } = getDailyTideSeries(tideData, activeTab);
+  const tidePoints = getContinuousTideSeries(finalDayIndex)
+    .filter(point => point.hour >= start && point.hour <= end);
+  const tideFound = tidePoints.some(point => point.value !== null);
   drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
   drawSingleCurve(cloudsCanvas, "clouds", dayPoints);
   drawSingleCurve(moonCanvas, "moon", dayPoints);
@@ -1090,7 +1135,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     }
   } else if (paramType === "rain") {
     const knownRain = dayPoints.map(p => p.rain).filter(value => value !== null);
-    const maxVal = globalLimits ? globalLimits.rainMax : Math.max(...knownRain, 0);
+    const maxVal = rainMock
+      ? Math.max(globalLimits?.rainMax || 0, rainMock.rainScaleMaximum)
+      : (globalLimits ? globalLimits.rainMax : Math.max(...knownRain, 0));
     let step;
     if (maxVal > 20) {
       step = 10;
@@ -1196,12 +1243,13 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   
   let hoursToShow = [];
   if (zoomIndex === 0) {
-    hoursToShow = [0, 4, 8, 12, 16, 20, 23];
-  } else { // 1
+    hoursToShow = [0, 4, 8, 12, 16, 20, 23].map(hour => activeTab * 24 + hour);
+  } else {
     const s = Math.ceil(viewStartHour);
     const e = Math.floor(viewEndHour);
+    const interval = zoomIndex === 2 ? 6 : 2;
     for (let hr = s; hr <= e; hr++) {
-      if (hr % 2 === 0) {
+      if (hr % interval === 0) {
         hoursToShow.push(hr);
       }
     }
@@ -1209,7 +1257,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
   hoursToShow.forEach(hr => {
     const x = getX(hr);
-    ctx.fillText(`${String(hr).padStart(2, '0')}:00`, x, H - paddingB + 8);
+    const localHour = ((hr % 24) + 24) % 24;
+    ctx.fillText(`${String(localHour).padStart(2, '0')}:00`, x, H - paddingB + 8);
   });
   ctx.restore();
 
@@ -1322,13 +1371,12 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         ctx.lineTo(barX + barW / 2 + 3, yMax);
         ctx.stroke();
 
-        // Bottom horizontal cap (only if not at baseline)
-        if (yMin < y0 - 1) {
-          ctx.beginPath();
-          ctx.moveTo(barX + barW / 2 - 3, yMin);
-          ctx.lineTo(barX + barW / 2 + 3, yMin);
-          ctx.stroke();
-        }
+        // Always show the lower cap, including at 0 mm, so the whisker
+        // communicates a complete minimum-to-maximum range.
+        ctx.beginPath();
+        ctx.moveTo(barX + barW / 2 - 3, yMin);
+        ctx.lineTo(barX + barW / 2 + 3, yMin);
+        ctx.stroke();
         ctx.restore();
       }
     });
@@ -1465,7 +1513,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         if (sunrise && !isNaN(sunrise.getTime())) {
           const sunriseParts = getZonedParts(sunrise);
           const sunriseHour = sunriseParts.hour + sunriseParts.minute / 60 + sunriseParts.second / 3600;
-          const xSunrise = getX(sunriseHour);
+          const xSunrise = getX(activeTab * 24 + sunriseHour);
           if (xSunrise >= paddingL && xSunrise <= W - paddingR) {
             ctx.save();
             ctx.strokeStyle = "rgba(234, 179, 8, 0.45)"; // Amber/yellow dashed line
@@ -1493,7 +1541,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         if (sunset && !isNaN(sunset.getTime())) {
           const sunsetParts = getZonedParts(sunset);
           const sunsetHour = sunsetParts.hour + sunsetParts.minute / 60 + sunsetParts.second / 3600;
-          const xSunset = getX(sunsetHour);
+          const xSunset = getX(activeTab * 24 + sunsetHour);
           if (xSunset >= paddingL && xSunset <= W - paddingR) {
             ctx.save();
             ctx.strokeStyle = "rgba(168, 85, 247, 0.45)"; // Purple/dusk dashed line
@@ -1606,9 +1654,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   ctx.restore(); // End horizontal clipping!
 
   // 6. Draw hover tooltip / inspector cursor (interpolated continuously for the hovered minute)
-  if (hoverHour !== null && hoverHour >= 0 && hoverHour <= 23) {
+  if (hoverHour !== null && hoverHour >= viewStartHour && hoverHour <= viewEndHour) {
     const h0 = Math.floor(hoverHour);
-    const h1 = Math.min(23, h0 + 1);
+    const h1 = h0 + 1;
     
     const p0 = points.find(p => p.hour === h0);
     const p1 = points.find(p => p.hour === h1) || p0;
@@ -1630,6 +1678,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       const hpCloudsHigh = p0.cloudsHigh + t * (p1.cloudsHigh - p0.cloudsHigh);
       
       const hpRainProb = p0.rainProb !== null && p1.rainProb !== null ? Math.round(p0.rainProb + t * (p1.rainProb - p0.rainProb)) : p0.rainProb;
+      const hpRainMin = p0.rainMin !== null && p1.rainMin !== null ? p0.rainMin + t * (p1.rainMin - p0.rainMin) : p0.rainMin;
       const hpRainMax = p0.rainMax !== null && p1.rainMax !== null ? p0.rainMax + t * (p1.rainMax - p0.rainMax) : p0.rainMax;
 
       const hp = {
@@ -1649,6 +1698,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         hour: hoverHour,
         symbol: p0.symbol,
         rainProb: hpRainProb,
+        rainMin: hpRainMin,
         rainMax: hpRainMax,
         rainIntervalHours: p0.rainIntervalHours,
         isEstimated: p0.isEstimated,
@@ -1684,43 +1734,47 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       const totalMinutes = Math.round(hp.hour * 60);
       const hh = Math.floor(totalMinutes / 60);
       const mm = totalMinutes % 60;
-      const timeStr = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+      const localHour = ((hh % 24) + 24) % 24;
+      const timeStr = `${String(localHour).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+      const datePrefix = zoomIndex === 0 ? "" : `${getDayNameAndDate(Math.floor(hh / 24))}, `;
       
       if (paramType === "uv") {
         const uvLevel = getUVLevel(hp.uv);
         boxColor = uvLevel.color;
-        tooltipLines.push(`Time: ${timeStr}`);
+        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
         tooltipLines.push(`UV Index: ${hp.uv.toFixed(1)}`);
         tooltipLines.push(`Level: ${uvLevel.label}`);
       } else if (paramType === "temp") {
         const emojiInfo = getWeatherInfo(hp.symbol);
         boxColor = "#ff6b8b";
-        tooltipLines.push(`Time: ${timeStr}`);
+        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
         tooltipLines.push(`Temp: ${hp.temp !== null ? hp.temp.toFixed(1) : "--"}\u00B0C`);
         tooltipLines.push(`Weather: ${emojiInfo.emoji}`);
       } else if (paramType === "rain") {
         boxColor = "#38d4ff";
-        tooltipLines.push(`Time: ${timeStr}`);
+        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
         const intervalLabel = hp.rainIntervalHours === 6 ? "next 6h" : "next hour";
-        tooltipLines.push(`Rain (${intervalLabel}): ${hp.rain !== null ? hp.rain.toFixed(1) : "--"} mm`);
-        if (hp.rainProb !== null && hp.rainProb !== undefined) {
-          tooltipLines.push(`Chance: ${hp.rainProb}%`);
+        tooltipLines.push(`Interval: ${intervalLabel}`);
+        tooltipLines.push(`Expected: ${hp.rain !== null ? hp.rain.toFixed(1) : "--"} mm`);
+        if (hp.rainMax !== null && hp.rainMax !== undefined) {
+          const rainMin = hp.rainMin ?? 0;
+          tooltipLines.push(`Possible range: ${rainMin.toFixed(1)}–${hp.rainMax.toFixed(1)} mm`);
         }
-        if (hp.rainMax !== null && hp.rainMax > hp.rain) {
-          tooltipLines.push(`Max likely: ${hp.rainMax.toFixed(1)} mm`);
+        if (hp.rainProb !== null && hp.rainProb !== undefined) {
+          tooltipLines.push(`Chance of rain: ${hp.rainProb}%`);
         }
       } else if (paramType === "wind") {
         boxColor = "#00f5d4";
-        tooltipLines.push(`Time: ${timeStr}`);
+        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
         tooltipLines.push(`Wind: ${hp.windSpeed.toFixed(1)} m/s`);
         tooltipLines.push(`Direction: ${getWindDirectionLabel(hp.windDir)} (${hp.windDir}\u00B0)`);
       } else if (paramType === "tide") {
         boxColor = "#00b4d8";
-        tooltipLines.push(`Time: ${timeStr}`);
+        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
         tooltipLines.push(`Forecast sea level: ${hp.tideValue !== null ? hp.tideValue.toFixed(1) : "--"} cm`);
       } else if (paramType === "clouds") {
         boxColor = "#38b2ff";
-        tooltipLines.push(`Time: ${timeStr}`);
+        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
         tooltipLines.push(`Total Cloud Cover: ${hp.clouds.toFixed(0)}%`);
         tooltipLines.push(`Low Clouds: ${hp.cloudsLow.toFixed(0)}%`);
         tooltipLines.push(`Mid Clouds: ${hp.cloudsMid.toFixed(0)}%`);
@@ -1773,50 +1827,44 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     }
   }
 
-  // 7. Draw zoom level indicator (drawn when zoomIndex === 1)
-  if (zoomIndex === 1) {
+  // 7. Draw rolling-view indicator.
+  if (zoomIndex > 0) {
     ctx.save();
     ctx.font = "bold 9px sans-serif";
     ctx.fillStyle = accentColor;
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
-    ctx.fillText("🔍 Zoom: Focus View", W - paddingR - 4, paddingT - 18);
+    ctx.fillText(zoomIndex === 1 ? "🔍 Focus: 12 hours" : "🔍 Next 48 hours", W - paddingR - 4, paddingT - 18);
     ctx.restore();
   }
 }
 
-let zoomIndex = 0; // 0 = Full Day, 1 = Focus View
+let zoomIndex = 0; // 0 = Full Day, 1 = 12-hour focus, 2 = next 48 hours
 let startTouchDist = null;
 
 function getZoomWindow() {
   const now = new Date();
-  const currentHour = getLocationHour(now);
+  const nowParts = getZonedParts(now);
+  const currentHour = nowParts.hour + nowParts.minute / 60 + nowParts.second / 3600;
+  const anchor = activeTab * 24 + currentHour;
 
   if (zoomIndex === 0) {
-    return { start: 0, end: 23 };
-  } else { // 1 (Focus View: currentHour - 2 to currentHour + 8)
-    let start = currentHour - 2;
-    let end = currentHour + 8;
-    if (start < 0) {
-      end -= start;
-      start = 0;
-    }
-    if (end > 23) {
-      start -= (end - 23);
-      end = 23;
-    }
-    start = Math.max(0, start);
-    end = Math.min(23, end);
-    return { start, end };
+    return { start: activeTab * 24, end: activeTab * 24 + 23 };
   }
+  if (zoomIndex === 1) {
+    return { start: Math.max(0, anchor - 2), end: anchor + 10 };
+  }
+  return { start: anchor, end: anchor + 48 };
 }
 
 function updateZoomUI() {
   const btn = document.getElementById("zoom-toggle-btn");
   if (btn) {
     if (zoomIndex === 0) btn.textContent = "🔍 Zoom: Full Day";
-    else btn.textContent = "🔍 Zoom: Focus View";
+    else if (zoomIndex === 1) btn.textContent = "🔍 Focus: 12 hours";
+    else btn.textContent = "🔍 Next 48 hours";
   }
+  updateHeaderDates();
   drawForecastCurves();
 }
 
@@ -1853,7 +1901,7 @@ function handleTouchMove(e) {
         updateZoomUI();
       }
     } else if (ratio < 0.8) { // Pinch in -> Zoom out
-      if (zoomIndex === 1) {
+      if (zoomIndex > 0) {
         zoomIndex = 0;
         startTouchDist = dist;
         updateZoomUI();
@@ -1887,7 +1935,7 @@ function handleCanvasWheel(e) {
       updateZoomUI();
     }
   } else if (e.deltaY > 0) { // Scroll down -> Zoom out
-    if (zoomIndex === 1) {
+    if (zoomIndex > 0) {
       zoomIndex = 0;
       updateZoomUI();
     }
@@ -1917,7 +1965,7 @@ function handleCanvasHover(e) {
   if (zoomIndex === 0) {
     hr = Math.round(hr);
   }
-  hr = Math.max(0, Math.min(23, hr));
+  hr = Math.max(viewStartHour, Math.min(viewEndHour, hr));
 
   if (hoverHour !== hr) {
     hoverHour = hr;
@@ -1988,8 +2036,7 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false, fo
         if (tideLoadController === tideController) tideLoadController = null;
         if (loadId !== weatherLoadId || locationIntent !== locationIntentId) return;
         tideData = data;
-        const { data: tidePoints, found: tideFound } = getDailyTideSeries(tideData, activeTab);
-        drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
+        drawForecastCurves();
       }).catch(err => {
         if (tideLoadController === tideController) tideLoadController = null;
         if (err.name === "AbortError" || loadId !== weatherLoadId || locationIntent !== locationIntentId) return;
@@ -2541,6 +2588,23 @@ function showContextMenu(x, y, card) {
 }
 
 // Initialize Page
+function setupMoonViewTabs() {
+  if (!moonViewTabs) return;
+  moonViewTabs.querySelectorAll("[data-moon-view]").forEach(button => {
+    const mode = button.dataset.moonView;
+    button.classList.toggle("active", mode === moonViewMode);
+    button.addEventListener("click", () => {
+      if (!MOON_VIEW_MODES.includes(mode) || mode === moonViewMode) return;
+      moonViewMode = mode;
+      localStorage.setItem("weather_moon_view", moonViewMode);
+      moonViewTabs.querySelectorAll("[data-moon-view]").forEach(tab => {
+        tab.classList.toggle("active", tab.dataset.moonView === moonViewMode);
+      });
+      scheduleForecastDraw();
+    });
+  });
+}
+
 function initWeatherPage() {
   // Hidden developer reset command via URL parameter
   if (new URLSearchParams(window.location.search).has("reset")) {
@@ -2561,6 +2625,7 @@ function initWeatherPage() {
   restoreMinimizedStates();
   setupHeaderContextMenu();
   setupRadarLifecycle();
+  setupMoonViewTabs();
 
   // Load last stored location if any
   loadStoredLocation();
@@ -2584,7 +2649,7 @@ function initWeatherPage() {
   // Zoom toggle button handler
   if (zoomToggleBtn) {
     zoomToggleBtn.addEventListener("click", () => {
-      zoomIndex = 1 - zoomIndex;
+      zoomIndex = (zoomIndex + 1) % 3;
       updateZoomUI();
     });
   }
@@ -2806,166 +2871,216 @@ function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, ac
   if (hoverHour !== null) {
     const hh = Math.floor(hoverHour);
     const mm = Math.round((hoverHour - hh) * 60);
-    targetDate = getLocationDayDate(activeTab, hh, mm);
+    targetDate = getLocationDayDate(Math.floor(hh / 24), hh % 24, mm);
   } else if (activeTab === 0) {
     targetDate = new Date();
   } else {
     targetDate = getLocationDayDate(activeTab, 12, 0);
   }
   
-  const mainPhase = getMoonPhase(targetDate);
-  const isCompact = W < 450;
-  
-  // Main Moon position & size (centered!)
-  const mainMoonRadius = isCompact ? 24 : 28;
-  const mainMoonCx = W / 2;
-  const mainMoonCy = 36;
-  
-  drawMoonGraphic(ctx, mainMoonCx, mainMoonCy, mainMoonRadius, mainPhase.fraction, darkMoonBg, darkMoonBorder, lightMoonBg);
-  
-  // Draw stats centered underneath the main moon
-  ctx.save();
-  ctx.fillStyle = textColor;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  
-  // Title (Phase Name)
-  ctx.font = `bold ${isCompact ? "12px" : "13px"} sans-serif`;
-  ctx.fillText(mainPhase.name, W / 2, 76);
-  
-  // Sub-stats (Illumination, Age, Next Full Moon)
-  const daysToFull = mainPhase.fraction <= 0.5
-    ? (0.5 - mainPhase.fraction) * 29.53059
-    : (1.5 - mainPhase.fraction) * 29.53059;
-  
-  const dateOptions = { month: 'short', day: 'numeric' };
-  const dateStr = targetDate.toLocaleDateString([], { ...dateOptions, timeZone: getLocationTimeZone() });
-  let timeStr = dateStr;
-  if (hoverHour !== null) {
-    const hh = Math.floor(hoverHour);
-    const mm = Math.round((hoverHour - hh) * 60);
-    timeStr = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-  }
-  
-  ctx.font = `${isCompact ? "9px" : "10px"} sans-serif`;
-  ctx.fillStyle = mutedColor;
-  const statsLine = `Illumination: ${(mainPhase.illumination * 100).toFixed(0)}%   •   Age: ${mainPhase.age.toFixed(1)}d   •   Full Moon: in ${daysToFull.toFixed(1)}d   •   Time: ${timeStr}`;
-  ctx.fillText(statsLine, W / 2, 94);
-  
-  // Draw horizontal divider line
-  ctx.beginPath();
-  ctx.moveTo(W * 0.15, 108);
-  ctx.lineTo(W * 0.85, 108);
-  ctx.strokeStyle = isLightMode ? "rgba(0, 0, 0, 0.06)" : "rgba(255, 255, 255, 0.06)";
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.restore();
-  
-  // 2. Render the sliding 7-day trend timeline centered at the bottom
-  const graphStartX = W * 0.12;
-  const graphEndX = W - W * 0.12;
-  const graphWidth = graphEndX - graphStartX;
-  
-  // Collect 7 days of sliding data
-  const daysData = [];
-  for (let s = 0; s < 7; s++) {
-    const dayOffset = s - 3;
-    const targetDayIndex = activeTab + dayOffset;
-    
-    const d = getLocationDayDate(targetDayIndex, 12, 0);
-    
-    daysData.push({
-      slot: s,
-      dayIndex: targetDayIndex,
-      phase: getMoonPhase(d),
-      x: graphStartX + (s / 6) * graphWidth
-    });
-  }
-  
-  // Layout Y geometry (vertical height bounds)
-  const topTextY = 126;
-  const bottomTextY = H - 18;
-  
-  const curveMinY = 144;
-  const curveMaxY = H - 38;
-  const curveH = curveMaxY - curveMinY;
-  const getY = (ill) => curveMinY + (1 - ill) * curveH;
-  
-  // Draw curve connecting the mini moons
-  ctx.save();
-  ctx.beginPath();
-  daysData.forEach((day, idx) => {
-    const y = getY(day.phase.illumination);
-    if (idx === 0) {
-      ctx.moveTo(day.x, y);
-    } else {
-      ctx.lineTo(day.x, y);
-    }
+  const centerDayIndex = hoverHour === null ? activeTab : Math.floor(hoverHour / 24);
+  const days = Array.from({ length: 9 }, (_, slot) => {
+    const offset = slot - 4;
+    const dayIndex = centerDayIndex + offset;
+    const date = offset === 0 ? targetDate : getLocationDayDate(dayIndex, 12, 0);
+    const parts = getZonedParts(date);
+    const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day))
+      .toLocaleDateString("en", { weekday: "short", timeZone: "UTC" });
+    return {
+      slot,
+      offset,
+      dayIndex,
+      date,
+      label: dayIndex === 0 ? "Today" : weekday,
+      phase: getMoonPhase(date)
+    };
   });
-  ctx.strokeStyle = isLightMode ? "rgba(0, 0, 0, 0.15)" : "rgba(255, 255, 255, 0.18)";
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([2, 3]);
+
+  const view = {
+    ctx,
+    W,
+    H,
+    days,
+    isLightMode,
+    textColor,
+    mutedColor,
+    accentColor,
+    darkMoonBg,
+    darkMoonBorder,
+    lightMoonBg,
+    surfaceColor: computedStyle.getPropertyValue("--surface-strong").trim() || "rgba(20, 20, 20, 0.85)"
+  };
+
+  if (moonViewMode === "bars") renderMoonLightBars(view);
+  else if (moonViewMode === "calendar") renderMoonCalendar(view);
+  else renderMoonStrip(view);
+}
+
+function renderMoonViewHeading(ctx, W, selected, textColor, mutedColor) {
+  ctx.save();
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = textColor;
+  ctx.font = "bold 12px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(selected.phase.name, 16, 18);
+  ctx.fillStyle = mutedColor;
+  ctx.font = "9px sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(`${(selected.phase.illumination * 100).toFixed(0)}% illuminated`, W - 16, 18);
+  ctx.restore();
+}
+
+function renderMoonStrip(view) {
+  const { ctx, W, H, days, textColor, mutedColor, accentColor, darkMoonBg, darkMoonBorder, lightMoonBg } = view;
+  const selected = days[4];
+  renderMoonViewHeading(ctx, W, selected, textColor, mutedColor);
+
+  const startX = 25;
+  const endX = W - 25;
+  const width = endX - startX;
+  const moonY = 96;
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.22)";
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.moveTo(startX, moonY);
+  ctx.lineTo(endX, moonY);
   ctx.stroke();
   ctx.restore();
-  
-  // Draw small moons, fixed text labels, and vertical dotted connection lines
-  daysData.forEach(day => {
-    const y = getY(day.phase.illumination);
-    const r = isCompact ? 10 : 12; // Beautifully sized mini-moons
-    const isActive = day.slot === 3;
-    
-    // Vertical dotted alignment line
-    ctx.save();
-    ctx.strokeStyle = isLightMode ? "rgba(0, 0, 0, 0.08)" : "rgba(255, 255, 255, 0.08)";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([1, 2]);
-    ctx.beginPath();
-    ctx.moveTo(day.x, topTextY + 6);
-    ctx.lineTo(day.x, bottomTextY - 6);
-    ctx.stroke();
-    ctx.restore();
-    
-    if (isActive) {
+
+  days.forEach(day => {
+    const x = startX + (day.slot / 8) * width;
+    const selectedDay = day.offset === 0;
+    const radius = selectedDay ? 21 : (W < 450 ? 10 : 12);
+    if (selectedDay) {
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(day.x, y, r + 4, 0, 2 * Math.PI);
       ctx.strokeStyle = accentColor;
       ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, moonY, radius + 4, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
-    
-    // Draw the mini moon
-    drawMoonGraphic(ctx, day.x, y, r, day.phase.fraction, darkMoonBg, darkMoonBorder, lightMoonBg);
-    
-    // Weekday label
+    drawMoonGraphic(ctx, x, moonY, radius, day.phase.fraction, darkMoonBg, darkMoonBorder, lightMoonBg);
+
     ctx.save();
-    let dayName;
-    if (day.dayIndex === 0) {
-      dayName = "Today";
-      ctx.fillStyle = textColor;
-      ctx.font = `bold ${isCompact ? "8px" : "9px"} sans-serif`;
-    } else {
-      const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      const parts = getZonedParts(getLocationDayDate(day.dayIndex));
-      const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
-      dayName = weekdays[weekday];
-      
-      ctx.fillStyle = isActive ? accentColor : mutedColor;
-      ctx.font = `${isActive ? "bold" : "normal"} ${isCompact ? "8px" : "9px"} sans-serif`;
-    }
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(dayName, day.x, topTextY);
-    ctx.restore();
-    
-    // Illumination percentage
-    ctx.save();
+    ctx.fillStyle = selectedDay ? accentColor : mutedColor;
+    ctx.font = `${selectedDay ? "bold" : "normal"} 8px sans-serif`;
+    ctx.fillText(day.label, x, 137);
     ctx.fillStyle = textColor;
-    ctx.font = `${isCompact ? "8px" : "9px"} sans-serif`;
-    ctx.textAlign = "center";
+    ctx.font = "8px sans-serif";
+    ctx.fillText(`${(day.phase.illumination * 100).toFixed(0)}%`, x, 153);
+    ctx.restore();
+  });
+
+  ctx.save();
+  ctx.fillStyle = mutedColor;
+  ctx.font = "9px sans-serif";
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  ctx.fillText("← previous 4 days", 16, H - 18);
+  ctx.textAlign = "right";
+  ctx.fillText("next 4 days →", W - 16, H - 18);
+  ctx.restore();
+}
+
+function renderMoonLightBars(view) {
+  const { ctx, W, H, days, textColor, mutedColor, accentColor } = view;
+  const selected = days[4];
+  renderMoonViewHeading(ctx, W, selected, textColor, mutedColor);
+
+  const left = 36;
+  const right = W - 14;
+  const top = 40;
+  const bottom = H - 32;
+  const plotH = bottom - top;
+  const slotW = (right - left) / days.length;
+
+  [0, 0.5, 1].forEach(level => {
+    const y = bottom - level * plotH;
+    ctx.save();
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.16)";
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.stroke();
+    ctx.fillStyle = mutedColor;
+    ctx.font = "8px sans-serif";
+    ctx.textAlign = "right";
     ctx.textBaseline = "middle";
-    ctx.fillText(`${(day.phase.illumination * 100).toFixed(0)}%`, day.x, bottomTextY);
+    ctx.fillText(`${level * 100}%`, left - 5, y);
+    ctx.restore();
+  });
+
+  days.forEach((day, index) => {
+    const illumination = day.phase.illumination;
+    const barW = Math.max(8, slotW * 0.58);
+    const x = left + index * slotW + (slotW - barW) / 2;
+    const barH = Math.max(2, illumination * plotH);
+    const y = bottom - barH;
+    const selectedDay = day.offset === 0;
+    ctx.save();
+    ctx.fillStyle = selectedDay ? accentColor : "rgba(250, 245, 220, 0.62)";
+    ctx.fillRect(x, y, barW, barH);
+    if (selectedDay) {
+      ctx.strokeStyle = textColor;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, barW, barH);
+    }
+    ctx.fillStyle = textColor;
+    ctx.font = "8px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`${(illumination * 100).toFixed(0)}`, x + barW / 2, Math.max(top + 9, y - 3));
+    ctx.fillStyle = selectedDay ? accentColor : mutedColor;
+    ctx.textBaseline = "top";
+    ctx.fillText(day.label, x + barW / 2, bottom + 7);
+    ctx.restore();
+  });
+}
+
+function renderMoonCalendar(view) {
+  const { ctx, W, H, days, textColor, mutedColor, accentColor, darkMoonBg, darkMoonBorder, lightMoonBg, surfaceColor } = view;
+  const gap = 5;
+  const paddingX = 8;
+  const paddingY = 7;
+  const cellW = (W - paddingX * 2 - gap * 2) / 3;
+  const cellH = (H - paddingY * 2 - gap * 2) / 3;
+
+  days.forEach((day, index) => {
+    const col = index % 3;
+    const row = Math.floor(index / 3);
+    const x = paddingX + col * (cellW + gap);
+    const y = paddingY + row * (cellH + gap);
+    const selectedDay = day.offset === 0;
+
+    ctx.save();
+    ctx.fillStyle = selectedDay ? "rgba(232, 160, 69, 0.12)" : surfaceColor;
+    ctx.strokeStyle = selectedDay ? accentColor : "rgba(148, 163, 184, 0.18)";
+    ctx.lineWidth = selectedDay ? 2 : 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, cellW, cellH, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    const moonX = x + 24;
+    const moonY = y + cellH / 2;
+    drawMoonGraphic(ctx, moonX, moonY, Math.min(13, cellH * 0.24), day.phase.fraction, darkMoonBg, darkMoonBorder, lightMoonBg);
+
+    ctx.save();
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = selectedDay ? accentColor : mutedColor;
+    ctx.font = `${selectedDay ? "bold" : "normal"} 8px sans-serif`;
+    ctx.fillText(day.label, x + 45, y + cellH * 0.34);
+    ctx.fillStyle = textColor;
+    ctx.font = "bold 10px sans-serif";
+    ctx.fillText(`${(day.phase.illumination * 100).toFixed(0)}%`, x + 45, y + cellH * 0.64);
     ctx.restore();
   });
 }
