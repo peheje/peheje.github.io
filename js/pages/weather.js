@@ -998,9 +998,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     canvas.__testPoints = dayPoints;
   }
 
-  // A 2x cap keeps seven simultaneous canvases from consuming excessive RAM
-  // and battery on high-density mobile displays.
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // Use native devicePixelRatio for ultra-sharp canvas rendering on high-density mobile displays.
+  const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return;
   const newWidth = Math.floor(rect.width * dpr);
@@ -2711,9 +2710,7 @@ function getMoonPhase(date) {
 
 // Draw a moon sphere graphic on canvas representing the phase
 function drawMoonGraphic(ctx, cx, cy, R, norm, darkMoonBg, darkMoonBorder, lightMoonBg) {
-  const isWaxing = norm <= 0.5;
-  
-  // 1. Draw full dark background circle
+  // 1. Draw full dark background circle (representing the unlit part of the moon)
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, 2 * Math.PI);
@@ -2724,35 +2721,58 @@ function drawMoonGraphic(ctx, cx, cy, R, norm, darkMoonBg, darkMoonBorder, light
   ctx.stroke();
   ctx.restore();
   
-  // 2. Draw lit side using clipping
+  // 2. Draw lit side using precise geometry paths to prevent transparent shadow overlaps
   ctx.save();
   ctx.beginPath();
-  if (isWaxing) {
-    ctx.rect(cx, cy - R, R + 2, R * 2 + 4);
+  
+  if (norm <= 0.005 || norm >= 0.995) {
+    // New Moon: nothing to draw for the lit portion
+  } else if (norm >= 0.495 && norm <= 0.505) {
+    // Full Moon: draw the complete lit circle
+    ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+    ctx.fillStyle = lightMoonBg;
+    ctx.fill();
   } else {
-    ctx.rect(cx - R - 2, cy - R, R + 2, R * 2 + 4);
-  }
-  ctx.clip();
-  
-  ctx.beginPath();
-  ctx.arc(cx, cy, R, 0, 2 * Math.PI);
-  ctx.fillStyle = lightMoonBg;
-  ctx.fill();
-  ctx.restore();
-  
-  // 3. Draw the terminator ellipse
-  ctx.save();
-  const k = isWaxing ? norm : (1 - norm);
-  const W_term = R * Math.abs(1 - 4 * k);
-  
-  if (W_term > 0.01) {
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, W_term, R, 0, 0, 2 * Math.PI);
-    if (k < 0.25) {
-      ctx.fillStyle = darkMoonBg;
+    const isWaxing = norm < 0.5;
+    if (isWaxing) {
+      // Outer arc: top to bottom along the right side (clockwise)
+      ctx.arc(cx, cy, R, -Math.PI / 2, Math.PI / 2, false);
+      
+      // Terminator arc: bottom to top
+      if (norm < 0.25) {
+        // Waxing Crescent: curves right (anticlockwise)
+        const r_term = R * (1 - 4 * norm);
+        ctx.ellipse(cx, cy, r_term, R, 0, Math.PI / 2, -Math.PI / 2, true);
+      } else if (norm === 0.25) {
+        // First Quarter: straight line
+        ctx.lineTo(cx, cy - R);
+      } else {
+        // Waxing Gibbous: curves left (clockwise)
+        const r_term = R * (4 * norm - 1);
+        ctx.ellipse(cx, cy, r_term, R, 0, Math.PI / 2, -Math.PI / 2, false);
+      }
     } else {
-      ctx.fillStyle = lightMoonBg;
+      const w_norm = norm - 0.5;
+      // Outer arc: top to bottom along the left side (counter-clockwise)
+      ctx.arc(cx, cy, R, -Math.PI / 2, Math.PI / 2, true);
+      
+      // Terminator arc: bottom to top
+      if (w_norm < 0.25) {
+        // Waning Gibbous: curves right (anticlockwise)
+        const r_term = R * (1 - 4 * w_norm);
+        ctx.ellipse(cx, cy, r_term, R, 0, Math.PI / 2, -Math.PI / 2, true);
+      } else if (w_norm === 0.25) {
+        // Third Quarter: straight line
+        ctx.lineTo(cx, cy - R);
+      } else {
+        // Waning Crescent: curves left (clockwise)
+        const r_term = R * (4 * w_norm - 1);
+        ctx.ellipse(cx, cy, r_term, R, 0, Math.PI / 2, -Math.PI / 2, false);
+      }
     }
+    
+    ctx.closePath();
+    ctx.fillStyle = lightMoonBg;
     ctx.fill();
   }
   ctx.restore();
