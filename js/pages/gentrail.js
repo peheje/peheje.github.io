@@ -97,8 +97,10 @@ let preferences = {
 let routes = [];
 let selectedRouteId = undefined;
 let latestDebugData = null;
+let latestGenerationSettings = null;
 let loading = false;
 let currentController = null;
+let generationSequence = 0;
 let map = null;
 let marker = null;
 let routeLayerIds = [];
@@ -187,10 +189,12 @@ function initMap() {
 }
 
 function setStartPoint(coords) {
+  invalidateActiveGeneration();
   start = coords;
   routes = [];
   selectedRouteId = undefined;
   resultsSection.classList.add("display-none");
+  routeList.replaceChildren();
   errorMessage.classList.add("display-none");
 
   // Cache chosen trailhead in LocalStorage
@@ -199,6 +203,17 @@ function setStartPoint(coords) {
   localStorage.removeItem("gentrail-cached-routes");
   localStorage.removeItem("gentrail-cached-debug");
   localStorage.removeItem("gentrail-cached-selected-route-id");
+
+  updateStartDisplay(coords);
+
+  btnGenerate.disabled = false;
+  mapPrompt.classList.add("display-none");
+
+  clearMapRoutes();
+}
+
+function updateStartDisplay(coords, snapDistanceMeters = 0) {
+  start = { lat: coords.lat, lng: coords.lng };
 
   // Update trailhead marker
   if (marker) marker.remove();
@@ -212,13 +227,18 @@ function setStartPoint(coords) {
 
   // Update UI Readout
   startReadout.classList.add("start-readout--set");
-  startStatus.textContent = "Trailhead set";
-  startCoords.textContent = `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`;
-  
-  btnGenerate.disabled = false;
-  mapPrompt.classList.add("display-none");
+  startStatus.textContent = snapDistanceMeters >= 1
+    ? "Trailhead snapped to path"
+    : "Trailhead set";
+  const snapText = snapDistanceMeters >= 1
+    ? ` • ${formatDistance(snapDistanceMeters)} from click`
+    : "";
+  startCoords.textContent = `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}${snapText}`;
+}
 
-  clearMapRoutes();
+function invalidateActiveGeneration() {
+  generationSequence += 1;
+  currentController?.abort();
 }
 
 function clearMapRoutes() {
@@ -269,6 +289,7 @@ btnGenerate.addEventListener("click", () => {
 });
 
 function cancelGeneration() {
+  generationSequence += 1;
   if (currentController) {
     currentController.abort();
   }
@@ -276,6 +297,14 @@ function cancelGeneration() {
 
 async function runGeneration() {
   if (!start) return;
+
+  const generationId = ++generationSequence;
+  const generationSettings = {
+    start: { ...start },
+    targetDistanceKm,
+    candidateCount,
+    preferences: { ...preferences },
+  };
   
   loading = true;
   btnGenerate.classList.add("generate-button--cancel");
@@ -286,20 +315,31 @@ async function runGeneration() {
   resultsSection.classList.add("display-none");
   clearMapRoutes();
 
-  currentController = new AbortController();
+  const controller = new AbortController();
+  currentController = controller;
   try {
     const result = await generateHikesForPage(
-      {
-        start,
-        targetDistanceKm,
-        candidateCount,
-        preferences,
-      },
+      generationSettings,
       (statusText) => {
         progressStatus.textContent = statusText;
       },
-      currentController.signal,
+      controller.signal,
     );
+
+    if (generationId !== generationSequence || controller.signal.aborted) {
+      progressStatus.textContent = "Cancelled";
+      return;
+    }
+
+    latestGenerationSettings = generationSettings;
+    const snappedTrailhead = result.trailhead?.snapped;
+    if (snappedTrailhead) {
+      updateStartDisplay(
+        snappedTrailhead,
+        result.trailhead.snapDistanceMeters,
+      );
+      localStorage.setItem("gentrail-start-coords", JSON.stringify(start));
+    }
 
     routes = result.routes;
     // Cache generated hikes in LocalStorage
@@ -307,19 +347,25 @@ async function runGeneration() {
     localStorage.setItem("gentrail-cached-debug", JSON.stringify(result.debug));
     renderResults(result.debug);
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
+    if (
+      controller.signal.aborted ||
+      (err instanceof DOMException && err.name === "AbortError")
+    ) {
       progressStatus.textContent = "Cancelled";
       return;
     }
+    if (generationId !== generationSequence) return;
     errorMessage.textContent = err.message || "Hike generation failed";
     errorMessage.classList.remove("display-none");
   } finally {
-    loading = false;
-    btnGenerate.classList.remove("generate-button--cancel");
-    btnText.textContent = "Generate hikes";
-    btnArrow.textContent = "→";
-    progressContainer.classList.add("display-none");
-    currentController = null;
+    if (currentController === controller) {
+      loading = false;
+      btnGenerate.classList.remove("generate-button--cancel");
+      btnText.textContent = "Generate hikes";
+      btnArrow.textContent = "→";
+      progressContainer.classList.add("display-none");
+      currentController = null;
+    }
   }
 }
 
@@ -338,6 +384,11 @@ function renderResults(debugData) {
   if (routes.length < candidateCount) {
     resultMessages.push(
       `Found ${routes.length} of ${candidateCount} requested loops with at least ${Math.round(ROUTE_DIVERSITY_MINIMUM_DIFFERENT_FRACTION * 100)}% different paths.`,
+    );
+  }
+  if (debugData?.trailheadSnapDistanceMeters > 250) {
+    resultMessages.push(
+      `Trailhead moved ${formatDistance(debugData.trailheadSnapDistanceMeters)} to the nearest connected path.`,
     );
   }
   if (resultMessages.length) {
@@ -388,7 +439,11 @@ btnBetaReport.addEventListener("click", async () => {
     generatedAt: new Date().toISOString(),
     page: window.location.href,
     trailhead: start,
-    settings: { targetDistanceKm, candidateCount, preferences },
+    settings: latestGenerationSettings ?? {
+      targetDistanceKm,
+      candidateCount,
+      preferences: { ...preferences },
+    },
     selectedRoute: selected ?? null,
     generationDebug: latestDebugData,
   };
@@ -574,6 +629,12 @@ function formatDuration(seconds) {
     return `${hours} h ${minutes} min`;
   }
   return `${minutes} min`;
+}
+
+function formatDistance(meters) {
+  return meters < 1000
+    ? `${Math.round(meters)} m`
+    : `${(meters / 1000).toFixed(1)} km`;
 }
 
 function formatComponentLabel(camelCaseKey) {

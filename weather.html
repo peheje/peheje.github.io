@@ -689,7 +689,7 @@
             <div class="actions weather-actions margin-bottom-10" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span style="font-weight: 700; color: var(--text);">Daily Forecasts</span>
-                    <button id="zoom-toggle-btn" type="button" aria-label="Change forecast time range" style="padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; min-height: 28px; min-width: 125px;">
+                    <button id="zoom-toggle-btn" style="padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; min-height: 28px; min-width: 125px;">
                         🔍 Zoom: Full Day
                     </button>
                 </div>
@@ -704,7 +704,7 @@
                 <div class="inline-block graph-card" data-key="temp">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Temperature (&deg;C)<span class="graph-date"></span></h4>
+                        <h4 class="curve-title">Temperature Curve (&deg;C)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
@@ -716,7 +716,7 @@
                 <div class="inline-block graph-card" data-key="precip">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Precipitation (mm)<span class="graph-date"></span></h4>
+                        <h4 class="curve-title">Precipitation (mm; 1h/6h intervals)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
@@ -728,7 +728,7 @@
                 <div class="inline-block graph-card" data-key="clouds">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Cloud cover (%)<span class="graph-date"></span></h4>
+                        <h4 class="curve-title">Cloud Cover (%)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
@@ -740,7 +740,7 @@
                 <div class="inline-block graph-card" data-key="uv">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">UV index<span class="graph-date"></span></h4>
+                        <h4 class="curve-title">UV Index Curve<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
@@ -752,7 +752,7 @@
                 <div class="inline-block graph-card" data-key="wind">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Wind (m/s)<span class="graph-date"></span></h4>
+                        <h4 class="curve-title">Wind Speed & Direction (m/s)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
@@ -764,10 +764,10 @@
                 <div class="inline-block graph-card" data-key="tide">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Sea level (cm)<span class="graph-date"></span></h4>
+                        <h4 class="curve-title">Forecast Sea Level (cm)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
-                    <p class="tide-note">Modelled sea level combines tides and weather effects, relative to global mean sea level. It is not a local tide table—use official local tide information for navigation or safety decisions.</p>
+                    <p class="tide-note">Relative to global mean sea level; modelled values are not suitable for navigation or local tide-table use.</p>
                     <div class="canvas-container">
                         <canvas id="tide-canvas" role="img" aria-label="Forecast sea-level graph"></canvas>
                     </div>
@@ -777,13 +777,8 @@
                 <div class="inline-block graph-card" data-key="moon">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
-                        <h4 class="curve-title">Moon phase<span class="graph-date"></span></h4>
+                        <h4 class="curve-title">Moon Phase & Illumination<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
-                    </div>
-                    <div id="moon-view-tabs" class="curve-tabs" aria-label="Moon graph style" style="width: fit-content; margin: -2px auto 8px;">
-                        <button type="button" class="curve-tab active" data-moon-view="strip">Moons</button>
-                        <button type="button" class="curve-tab" data-moon-view="bars">Light</button>
-                        <button type="button" class="curve-tab" data-moon-view="calendar">Calendar</button>
                     </div>
                     <div class="canvas-container">
                         <canvas id="moon-canvas" role="img" aria-label="Moon phase and illumination graph"></canvas>
@@ -794,7 +789,7 @@
                 <div class="inline-block graph-card" data-key="radar">
                     <div class="graph-header">
                         <button class="nav-arrow prev-day" aria-label="Previous Day" style="visibility: hidden;">&lsaquo;</button>
-                        <h4 class="curve-title">Radar</h4>
+                        <h4 class="curve-title">Live Weather Radar</h4>
                         <button class="nav-arrow next-day" aria-label="Next Day" style="visibility: hidden;">&rsaquo;</button>
                     </div>
                     <div class="canvas-container" style="height: 300px; overflow: hidden; position: relative;">

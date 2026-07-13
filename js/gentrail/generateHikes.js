@@ -11,6 +11,7 @@ import { buildIntersectionCrossoverPaths } from "./crossover.js";
 import { pruneDeadEnds } from "./graphPruning.js";
 import { addBeachWalkingToGraph } from "./beachRouting.js";
 import { removeImmediateBacktracks } from "./pathCleanup.js";
+import { findNearestRoutingNode } from "./routingSnap.js";
 
 const ROUTE_COLORS = ["#ef6c3e", "#35a878", "#4c7fe8", "#b66de0", "#e5aa2f"];
 
@@ -117,7 +118,16 @@ async function generateHikesWithWorker(
   const snapGraph = prunedNodeCoords.size > 0 ? prunedNodeCoords : nodeCoords;
   const snapAdjacency = prunedNodeCoords.size > 0 ? prunedAdjacency : adjacency;
 
-  const startNodeId = snapToNearestNode(nodeCoords, start, adjacency);
+  const startSnap = findNearestRoutingNode(
+    nodeCoords,
+    start,
+    adjacency,
+    haversineDistance,
+  );
+  const startNodeId = startSnap?.nodeId;
+  if (startNodeId === undefined || startNodeId === null) {
+    throw new Error("Could not find a walkable path near this trailhead.");
+  }
 
   const reachableAdjacency = getReachableSubGraph(snapAdjacency, startNodeId);
   const reachableNodeCoords = new Map();
@@ -353,6 +363,11 @@ async function generateHikesWithWorker(
       ...item,
       color: ROUTE_COLORS[index % ROUTE_COLORS.length],
     })),
+    trailhead: {
+      requested: { ...start },
+      snapped: { ...startSnap.coordinate },
+      snapDistanceMeters: startSnap.distanceMeters,
+    },
     debug: {
       attempted: allCandidates.length,
       routed: allCandidates.length,
@@ -376,41 +391,20 @@ async function generateHikesWithWorker(
       analysisElapsedMs,
       scoringElapsedMs,
       elapsedMs,
+      requestedTrailhead: { ...start },
+      snappedTrailhead: { ...startSnap.coordinate },
+      trailheadSnapDistanceMeters: Math.round(startSnap.distanceMeters),
     },
   };
 }
 
 function snapToNearestNode(nodeCoords, targetCoords, adjacency) {
-  let nearestNodeId = null;
-  let minDistance = Infinity;
-
-  // First pass: try to snap to nodes with degree >= 2 (junctions or continuous paths) to avoid dead-ends
-  if (adjacency) {
-    for (const [nodeId, coords] of nodeCoords.entries()) {
-      const degree = adjacency.get(nodeId)?.size ?? 0;
-      if (degree < 2) continue; // Skip dead-ends
-
-      const dist = haversineDistance(coords, targetCoords);
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearestNodeId = nodeId;
-      }
-    }
-  }
-
-  // Second pass: if no junction node is close, fallback to absolute nearest node
-  if (nearestNodeId === null) {
-    minDistance = Infinity;
-    for (const [nodeId, coords] of nodeCoords.entries()) {
-      const dist = haversineDistance(coords, targetCoords);
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearestNodeId = nodeId;
-      }
-    }
-  }
-
-  return nearestNodeId;
+  return findNearestRoutingNode(
+    nodeCoords,
+    targetCoords,
+    adjacency,
+    haversineDistance,
+  )?.nodeId ?? null;
 }
 
 function mutatePoint(point, maxOffsetMeters) {
