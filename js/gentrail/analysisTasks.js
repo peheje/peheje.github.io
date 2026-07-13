@@ -8,7 +8,7 @@ import {
 import { routesAreTooSimilar } from "./routeDiversity.js";
 import { isSimilarToAcceptedRoute } from "./routeAnalysisPolicy.js";
 
-export function analyzeRoutes(request) {
+export function analyzeRoutes(request, onProgress) {
   console.log(`[Worker] analyzeRoutes: starting analysis for ${request.routes.length} routes...`);
   const accepted = [];
   const fallback = [];
@@ -33,11 +33,13 @@ export function analyzeRoutes(request) {
     ) {
       rejectedByDistance += 1;
       fallback.push(route);
+      onProgress?.({ completed: idx + 1, total: request.routes.length });
       continue;
     }
     if (metrics.repeatedEdgeRatio > request.repetitionLimit) {
       rejectedByRepetition += 1;
       fallback.push(route);
+      onProgress?.({ completed: idx + 1, total: request.routes.length });
       continue;
     }
 
@@ -60,10 +62,12 @@ export function analyzeRoutes(request) {
       if (isDuplicate) {
         rejectedAsDuplicate += 1;
         fallback.push(route);
+        onProgress?.({ completed: idx + 1, total: request.routes.length });
         continue;
       }
     }
     accepted.push(route);
+    onProgress?.({ completed: idx + 1, total: request.routes.length });
   }
 
   console.log(`[Worker] analyzeRoutes: finished. Accepted: ${accepted.length}, Fallback: ${fallback.length}, Rejected distance: ${rejectedByDistance}, repetition: ${rejectedByRepetition}, duplicate: ${rejectedAsDuplicate}`);
@@ -77,7 +81,7 @@ export function analyzeRoutes(request) {
   };
 }
 
-export async function scoreRoutes(request) {
+export async function scoreRoutes(request, onProgress) {
   console.log(`[Worker] scoreRoutes: starting scoring for ${request.routes.length} routes...`);
   const scorer = new DefaultRouteScorer();
   
@@ -100,6 +104,7 @@ export async function scoreRoutes(request) {
     const dtRoute = Math.round(performance.now() - tRoute0);
     console.log(`[Worker] scoreRoutes: scored route ${idx + 1}/${request.routes.length} in ${dtRoute}ms (candidateId: ${route.candidateId})`);
     scored.push({ route, score });
+    onProgress?.({ completed: idx + 1, total: request.routes.length });
   }
 
   scored.sort((first, second) => {

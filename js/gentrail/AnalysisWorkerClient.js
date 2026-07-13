@@ -22,6 +22,11 @@ export class AnalysisWorkerClient {
         return;
       }
 
+      if (event.data.type === "task-progress") {
+        this.pending.get(event.data.id)?.onProgress?.(event.data.progress);
+        return;
+      }
+
       const pending = this.pending.get(event.data.id);
       if (!pending) return;
       this.pending.delete(event.data.id);
@@ -34,15 +39,15 @@ export class AnalysisWorkerClient {
     };
   }
 
-  analyzeRoutes(request) {
+  analyzeRoutes(request, onProgress) {
     return this.send({
       type: "analyze-routes",
       ...request,
-    });
+    }, onProgress);
   }
 
-  scoreRoutes(request) {
-    return this.send({ type: "score-routes", ...request });
+  scoreRoutes(request, onProgress) {
+    return this.send({ type: "score-routes", ...request }, onProgress);
   }
 
   terminate(reason = "Generation cancelled") {
@@ -51,13 +56,13 @@ export class AnalysisWorkerClient {
     this.rejectAll(new DOMException(reason, "AbortError"));
   }
 
-  async send(request) {
+  async send(request, onProgress) {
     if (this.isNode) {
       const { analyzeRoutes, scoreRoutes } = await import("./analysisTasks.js");
       if (request.type === "analyze-routes") {
-        return analyzeRoutes(request);
+        return analyzeRoutes(request, onProgress);
       } else if (request.type === "score-routes") {
-        return await scoreRoutes(request);
+        return await scoreRoutes(request, onProgress);
       }
       throw new Error(`Unknown task type: ${request.type}`);
     }
@@ -67,6 +72,7 @@ export class AnalysisWorkerClient {
       this.pending.set(id, {
         resolve,
         reject,
+        onProgress,
       });
       this.worker.postMessage({ id, request });
     });

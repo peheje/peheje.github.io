@@ -45,6 +45,12 @@ async function generateHikesWithWorker(
 ) {
   const startedAt = performance.now();
   const elapsed = () => ((performance.now() - startedAt) / 1000).toFixed(1);
+  const reportProgress = (status, percent, phase) => {
+    onProgress?.(status, {
+      percent: Math.max(0, Math.min(100, Math.round(percent))),
+      phase,
+    });
+  };
   const targetMeters = settings.targetDistanceKm * 1000;
   const strictRepetitionFiltering = usesStrictRepetitionFiltering(
     settings.preferences.avoidRepetitions,
@@ -70,7 +76,7 @@ async function generateHikesWithWorker(
     start.lat + latPadding,
   ];
 
-  onProgress?.("Fetching local map network from OpenStreetMap...");
+  reportProgress("Fetching local map network from OpenStreetMap...", 4, "fetch");
   const overpassStartedAt = performance.now();
   let osmResult;
   try {
@@ -84,7 +90,7 @@ async function generateHikesWithWorker(
   const osmFeatures = osmResult.features;
   const elements = osmResult.raw.elements ?? [];
 
-  onProgress?.("Building trail network graph...");
+  reportProgress("Building trail network graph...", 12, "graph");
   const graphBuildStartedAt = performance.now();
   const adjacency = new Map();
   const nodeCoords = new Map();
@@ -95,6 +101,11 @@ async function generateHikesWithWorker(
       addWalkableWayToGraph(adjacency, nodeCoords, el, haversineDistance);
     }
     if (elementIndex > 0 && elementIndex % 250 === 0) {
+      reportProgress(
+        `Building trail network graph... ${elementIndex}/${elements.length}`,
+        12 + (elementIndex / Math.max(elements.length, 1)) * 13,
+        "graph",
+      );
       await yieldToBrowser(signal);
     }
   }
@@ -171,7 +182,11 @@ async function generateHikesWithWorker(
     for (let iter = 0; iter < iterations.length; iter++) {
       signal?.throwIfAborted();
       count++;
-      onProgress?.(`Routing initial candidate ${count}/${totalInitial}... (${elapsed()}s)`);
+      reportProgress(
+        `Routing initial candidate ${count}/${totalInitial}... (${elapsed()}s)`,
+        27 + ((count - 1) / totalInitial) * 28,
+        "routing",
+      );
       await yieldToBrowser(signal);
 
       const { rMult, spread } = iterations[iter];
@@ -197,13 +212,19 @@ async function generateHikesWithWorker(
     throw new Error("Could not find any traversable loops. Try moving the starting point closer to roads/trails.");
   }
 
-  onProgress?.(`Pruning and scoring initial candidates... (${elapsed()}s)`);
+  reportProgress(`Analyzing initial candidates... (${elapsed()}s)`, 55, "analysis");
   const initialAnalysisStartedAt = performance.now();
   const initialAnalysis = await worker.analyzeRoutes({
     routes: candidateRoutes,
     existingRoutes: [],
     targetMeters,
     repetitionLimit,
+  }, ({ completed, total }) => {
+    reportProgress(
+      `Analyzing initial candidates ${completed}/${total}... (${elapsed()}s)`,
+      55 + (completed / Math.max(total, 1)) * 5,
+      "analysis",
+    );
   });
   let analysisElapsedMs = Math.round(performance.now() - initialAnalysisStartedAt);
 
@@ -215,6 +236,12 @@ async function generateHikesWithWorker(
     featureDataAvailable: true,
     settings,
     repetitionByRoute: initialAnalysis.repetitionByRoute,
+  }, ({ completed, total }) => {
+    reportProgress(
+      `Scoring initial candidates ${completed}/${total}... (${elapsed()}s)`,
+      60 + (completed / Math.max(total, 1)) * 10,
+      "scoring",
+    );
   });
   let scoringElapsedMs = Math.round(performance.now() - initialScoringStartedAt);
 
@@ -237,7 +264,11 @@ async function generateHikesWithWorker(
     for (let m = 0; m < 2; m++) {
       signal?.throwIfAborted();
       evCount++;
-      onProgress?.(`Evolving candidate ${evCount}/${totalEvolved}... (${elapsed()}s)`);
+      reportProgress(
+        `Evolving candidate ${evCount}/${totalEvolved}... (${elapsed()}s)`,
+        70 + ((evCount - 1) / Math.max(totalEvolved, 1)) * 12,
+        "evolution",
+      );
       await yieldToBrowser(signal);
 
       const mutC1 = mutatePoint(seed.c1, 250);
@@ -272,7 +303,11 @@ async function generateHikesWithWorker(
       if (intersectionOffspring.length > 0) {
         intersectionOffspring.forEach((crossRoute, idx) => {
           evCount++;
-          onProgress?.(`Evolving candidate (intersection) ${evCount}... (${elapsed()}s)`);
+          reportProgress(
+            `Evolving candidate ${evCount}/${totalEvolved}... (${elapsed()}s)`,
+            70 + (evCount / Math.max(totalEvolved, 1)) * 12,
+            "evolution",
+          );
           evolvedCandidates.push({
             ...crossRoute,
             candidateId: `evolved-cross-intersection-${i}-${j}-${idx}-${Date.now()}`,
@@ -284,7 +319,11 @@ async function generateHikesWithWorker(
         // Fallback to geometry-based crossover if no intersection found
         // Crossover 1: seed C1 + partner C2
         evCount++;
-        onProgress?.(`Evolving candidate (geom fallback 1) ${evCount}... (${elapsed()}s)`);
+        reportProgress(
+          `Evolving candidate ${evCount}/${totalEvolved}... (${elapsed()}s)`,
+          70 + (evCount / Math.max(totalEvolved, 1)) * 12,
+          "evolution",
+        );
 
         const crossRoute1 = routeLoop(startNodeId, seed.c1, partner.c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency, settings.preferences);
         if (crossRoute1) {
@@ -298,7 +337,11 @@ async function generateHikesWithWorker(
 
         // Crossover 2: partner C1 + seed C2
         evCount++;
-        onProgress?.(`Evolving candidate (geom fallback 2) ${evCount}... (${elapsed()}s)`);
+        reportProgress(
+          `Evolving candidate ${evCount}/${totalEvolved}... (${elapsed()}s)`,
+          70 + (evCount / Math.max(totalEvolved, 1)) * 12,
+          "evolution",
+        );
 
         const crossRoute2 = routeLoop(startNodeId, partner.c1, seed.c2, finalSnapGraph, finalSnapAdjacency, nodeCoords, adjacency, settings.preferences);
         if (crossRoute2) {
@@ -317,7 +360,7 @@ async function generateHikesWithWorker(
   // Combine and run final selection
   const allCandidates = [...candidateRoutes, ...evolvedCandidates];
 
-  onProgress?.(`Filtering and scoring final loops... (${elapsed()}s)`);
+  reportProgress(`Filtering final loops... (${elapsed()}s)`, 82, "analysis");
   const finalAnalysisStartedAt = performance.now();
   const finalAnalysis = await worker.analyzeRoutes({
     routes: allCandidates,
@@ -325,6 +368,12 @@ async function generateHikesWithWorker(
     targetMeters,
     repetitionLimit,
     filterSimilar: false,
+  }, ({ completed, total }) => {
+    reportProgress(
+      `Filtering final loops ${completed}/${total}... (${elapsed()}s)`,
+      82 + (completed / Math.max(total, 1)) * 5,
+      "analysis",
+    );
   });
   analysisElapsedMs += Math.round(performance.now() - finalAnalysisStartedAt);
 
@@ -356,6 +405,12 @@ async function generateHikesWithWorker(
     featureDataAvailable: true,
     settings,
     repetitionByRoute,
+  }, ({ completed, total }) => {
+    reportProgress(
+      `Scoring final loops ${completed}/${total}... (${elapsed()}s)`,
+      87 + (completed / Math.max(total, 1)) * 11,
+      "scoring",
+    );
   });
   scoringElapsedMs += Math.round(performance.now() - finalScoringStartedAt);
 
@@ -367,6 +422,7 @@ async function generateHikesWithWorker(
     ({ route }) => !acceptedRouteIds.has(route.candidateId),
   ).length;
   const elapsedMs = Math.round(performance.now() - startedAt);
+  reportProgress("Finalizing route options...", 100, "complete");
 
   return {
     routes: scored.selected.map((item, index) => ({

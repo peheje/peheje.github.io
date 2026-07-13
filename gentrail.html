@@ -127,8 +127,22 @@
                         <span aria-hidden="true" id="btn-arrow">→</span>
                     </button>
                     <div class="progress display-none" id="progress-container">
-                        <span></span>
-                        <p id="progress-status"></p>
+                        <div class="progress__status-row">
+                            <span class="progress__spinner" aria-hidden="true"></span>
+                            <p id="progress-status" aria-live="polite"></p>
+                            <output id="progress-percent">0%</output>
+                        </div>
+                        <div
+                            class="progress__track"
+                            id="progress-bar"
+                            role="progressbar"
+                            aria-labelledby="progress-status"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow="0"
+                        >
+                            <span class="progress__fill" id="progress-fill"></span>
+                        </div>
                     </div>
                     <div class="error-message display-none" id="error-message"></div>
                 </div>

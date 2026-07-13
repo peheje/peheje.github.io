@@ -116,6 +116,9 @@ const btnText = document.getElementById("btn-text");
 const btnArrow = document.getElementById("btn-arrow");
 const progressContainer = document.getElementById("progress-container");
 const progressStatus = document.getElementById("progress-status");
+const progressBar = document.getElementById("progress-bar");
+const progressFill = document.getElementById("progress-fill");
+const progressPercent = document.getElementById("progress-percent");
 const errorMessage = document.getElementById("error-message");
 const resultsSection = document.getElementById("results-section");
 const infoMessage = document.getElementById("info-message");
@@ -312,6 +315,7 @@ async function runGeneration() {
   btnArrow.textContent = "×";
   errorMessage.classList.add("display-none");
   progressContainer.classList.remove("display-none");
+  updateGenerationProgress("Preparing route generation...", 0);
   resultsSection.classList.add("display-none");
   clearMapRoutes();
 
@@ -320,8 +324,8 @@ async function runGeneration() {
   try {
     const result = await generateHikesForPage(
       generationSettings,
-      (statusText) => {
-        progressStatus.textContent = statusText;
+      (statusText, progress) => {
+        updateGenerationProgress(statusText, progress?.percent);
       },
       controller.signal,
     );
@@ -367,6 +371,17 @@ async function runGeneration() {
       currentController = null;
     }
   }
+}
+
+function updateGenerationProgress(statusText, percent) {
+  progressStatus.textContent = statusText;
+  if (!Number.isFinite(percent)) return;
+
+  const boundedPercent = Math.max(0, Math.min(100, Math.round(percent)));
+  progressFill.style.width = `${boundedPercent}%`;
+  progressPercent.value = `${boundedPercent}%`;
+  progressPercent.textContent = `${boundedPercent}%`;
+  progressBar.setAttribute("aria-valuenow", String(boundedPercent));
 }
 
 function renderResults(debugData) {

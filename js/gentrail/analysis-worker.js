@@ -27,10 +27,13 @@ self.onmessage = async (event) => {
   console.log(`Task ${request.type} started (id: ${id}). Number of routes: ${request.routes?.length ?? 0}`);
   const start = performance.now();
   try {
+    const reportProgress = (progress) => {
+      self.postMessage({ type: "task-progress", id, progress });
+    };
     const result =
       request.type === "analyze-routes"
-        ? analyzeRoutes(request)
-        : await scoreRoutes(request);
+        ? analyzeRoutes(request, reportProgress)
+        : await scoreRoutes(request, reportProgress);
     console.log(`Task ${request.type} finished successfully in ${Math.round(performance.now() - start)}ms`);
     self.postMessage({ id, ok: true, result });
   } catch (error) {

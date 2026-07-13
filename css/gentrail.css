@@ -349,15 +349,21 @@
 }
 
 .progress {
-  display: flex;
-  align-items: center;
-  gap: 9px;
+  display: grid;
+  gap: 8px;
   margin-top: 12px;
   color: var(--muted);
   font-size: 10px;
 }
 
-.progress span {
+.progress__status-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.progress__spinner {
   width: 12px;
   height: 12px;
   border: 2px solid var(--line);
@@ -367,7 +373,34 @@
 }
 
 .progress p {
+  overflow: hidden;
   margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress output {
+  color: var(--text);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+
+.progress__track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 75%, transparent);
+}
+
+.progress__fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #e5aa2f);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 35%, transparent);
+  transition: width 220ms ease-out;
 }
 
 .error-message {
