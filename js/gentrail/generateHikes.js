@@ -12,6 +12,7 @@ import { pruneDeadEnds } from "./graphPruning.js";
 import { addBeachWalkingToGraph } from "./beachRouting.js";
 import { removeImmediateBacktracks } from "./pathCleanup.js";
 import { findNearestRoutingNode } from "./routingSnap.js";
+import { yieldToBrowser } from "./cooperativeYield.js";
 
 const ROUTE_COLORS = ["#ef6c3e", "#35a878", "#4c7fe8", "#b66de0", "#e5aa2f"];
 
@@ -88,9 +89,13 @@ async function generateHikesWithWorker(
   const adjacency = new Map();
   const nodeCoords = new Map();
 
-  for (const el of elements) {
+  for (let elementIndex = 0; elementIndex < elements.length; elementIndex += 1) {
+    const el = elements[elementIndex];
     if (el.type === "way") {
       addWalkableWayToGraph(adjacency, nodeCoords, el, haversineDistance);
+    }
+    if (elementIndex > 0 && elementIndex % 250 === 0) {
+      await yieldToBrowser(signal);
     }
   }
   const beachRouting = settings.preferences.beachWalking
@@ -101,6 +106,7 @@ async function generateHikesWithWorker(
         haversineDistance,
       )
     : { beachCorridorCount: 0, connectorCount: 0 };
+  await yieldToBrowser(signal);
 
   if (nodeCoords.size === 0) {
     throw new Error("No streets or trails found in this area. Please select another trailhead.");
@@ -166,6 +172,7 @@ async function generateHikesWithWorker(
       signal?.throwIfAborted();
       count++;
       onProgress?.(`Routing initial candidate ${count}/${totalInitial}... (${elapsed()}s)`);
+      await yieldToBrowser(signal);
 
       const { rMult, spread } = iterations[iter];
       const R = baseR * rMult;
@@ -231,6 +238,7 @@ async function generateHikesWithWorker(
       signal?.throwIfAborted();
       evCount++;
       onProgress?.(`Evolving candidate ${evCount}/${totalEvolved}... (${elapsed()}s)`);
+      await yieldToBrowser(signal);
 
       const mutC1 = mutatePoint(seed.c1, 250);
       const mutC2 = mutatePoint(seed.c2, 250);
@@ -251,6 +259,7 @@ async function generateHikesWithWorker(
       if (!partner.c1 || !partner.c2) continue;
 
       signal?.throwIfAborted();
+      await yieldToBrowser(signal);
       
       const intersectionOffspring = performIntersectionCrossover(
         seed,
@@ -315,6 +324,7 @@ async function generateHikesWithWorker(
     existingRoutes: [],
     targetMeters,
     repetitionLimit,
+    filterSimilar: false,
   });
   analysisElapsedMs += Math.round(performance.now() - finalAnalysisStartedAt);
 

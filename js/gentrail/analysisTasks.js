@@ -6,6 +6,7 @@ import {
   selectDistinctScoredRoutes,
 } from "./routeSelection.js";
 import { routesAreTooSimilar } from "./routeDiversity.js";
+import { isSimilarToAcceptedRoute } from "./routeAnalysisPolicy.js";
 
 export function analyzeRoutes(request) {
   console.log(`[Worker] analyzeRoutes: starting analysis for ${request.routes.length} routes...`);
@@ -40,19 +41,27 @@ export function analyzeRoutes(request) {
       continue;
     }
 
-    const tSim0 = performance.now();
-    const isDuplicate = [...request.existingRoutes, ...accepted].some((existing) =>
-      routesExactlyMatch(existing, route) || routesAreTooSimilar(existing, route),
-    );
-    const dtSim = Math.round(performance.now() - tSim0);
-    if (dtSim > 100) {
-      console.warn(`[Worker] analyzeRoutes: route diversity check for route ${idx} took ${dtSim}ms`);
-    }
+    if (request.filterSimilar !== false) {
+      const tSim0 = performance.now();
+      const isDuplicate = isSimilarToAcceptedRoute(
+        route,
+        request.existingRoutes,
+        accepted,
+        request.filterSimilar,
+        (existing, candidate) =>
+          routesExactlyMatch(existing, candidate) ||
+          routesAreTooSimilar(existing, candidate),
+      );
+      const dtSim = Math.round(performance.now() - tSim0);
+      if (dtSim > 100) {
+        console.warn(`[Worker] analyzeRoutes: route diversity check for route ${idx} took ${dtSim}ms`);
+      }
 
-    if (isDuplicate) {
-      rejectedAsDuplicate += 1;
-      fallback.push(route);
-      continue;
+      if (isDuplicate) {
+        rejectedAsDuplicate += 1;
+        fallback.push(route);
+        continue;
+      }
     }
     accepted.push(route);
   }

@@ -22,6 +22,19 @@ const UNPAVED_SURFACES = new Set([
   "bark",
 ]);
 
+const ROAD_TYPES_BY_CATEGORY = {
+  motorway: new Set(["motorway", "motorway_link", "trunk", "trunk_link"]),
+  road: new Set(["primary", "primary_link", "secondary", "secondary_link"]),
+  minorRoad: new Set([
+    "tertiary",
+    "tertiary_link",
+    "residential",
+    "service",
+    "unclassified",
+    "living_street",
+  ]),
+};
+
 export function trailMetadataMetrics(route) {
   const trailWayMeters = sumMatching(
     route.metadata.wayTypeMeters,
@@ -37,6 +50,13 @@ export function trailMetadataMetrics(route) {
       Math.max(route.distanceMeters, 1),
   );
   return { ratio, trailWayMeters, unpavedMeters };
+}
+
+export function roadMetadataMeters(route, category) {
+  return sumMatching(
+    route.metadata?.wayTypeMeters ?? {},
+    ROAD_TYPES_BY_CATEGORY[category] ?? new Set(),
+  );
 }
 
 function sumMatching(values, accepted) {

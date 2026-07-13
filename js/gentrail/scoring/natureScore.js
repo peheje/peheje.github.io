@@ -9,6 +9,7 @@ export function scoreFeatureProximity(
   rewardDistanceMeters,
   featureDistances,
   coverageWeight = 0,
+  spatialIndex = null,
 ) {
   const matches = features.filter((feature) => feature.category === category);
   if (!matches.length) {
@@ -36,6 +37,7 @@ export function scoreFeatureProximity(
           features,
           category,
           Math.min(100, rewardDistanceMeters),
+          spatialIndex,
         )
       : 0;
   const value = Math.round(

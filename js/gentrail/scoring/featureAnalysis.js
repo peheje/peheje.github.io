@@ -23,7 +23,7 @@ export function buildSpatialIndex(features) {
 }
 
 export function analyzeFeatureDistances(route, features, spatialIndex) {
-  const samples = sampleLine(route.geometry, 500);
+  const samples = sampleLine(route.geometry, 100);
   const result = new Map();
 
   // Initialize all features with Infinity distance
@@ -33,7 +33,7 @@ export function analyzeFeatureDistances(route, features, spatialIndex) {
 
   if (spatialIndex) {
     const closeFeatures = new Set();
-    const maxSearchDistance = 400; // Beach Proximity Limit
+    const maxSearchDistance = 450; // Beach proximity plus sampling tolerance.
 
     for (const sample of samples) {
       const [lng, lat] = sample.geometry.coordinates;
@@ -80,7 +80,7 @@ export function routeCoverageNearCategory(
 ) {
   const matches = features.filter((feature) => feature.category === category);
   if (!matches.length) return 0;
-  const samples = sampleLine(route.geometry, 400);
+  const samples = sampleLine(route.geometry, 100);
 
   let coveredCount = 0;
 

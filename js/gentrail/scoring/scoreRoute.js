@@ -7,6 +7,7 @@ import { analyzeFeatureDistances } from "./featureAnalysis.js";
 import { scoreRepetitionPenalty } from "./repetitionPenalty.js";
 import { scoreUrbanPenalty } from "./urbanPenalty.js";
 import { SCORING_WEIGHTS } from "../config.js";
+import { countsTowardRouteVariety } from "./varietyScore.js";
 
 export class DefaultRouteScorer {
   async score(route, context) {
@@ -23,6 +24,7 @@ export class DefaultRouteScorer {
         250,
         featureDistances,
         0.85,
+        context.spatialIndex,
       ),
       waterScore: scoreFeatureProximity(
         route,
@@ -40,6 +42,7 @@ export class DefaultRouteScorer {
         400,
         featureDistances,
         0.75,
+        context.spatialIndex,
       ),
       gravelTrailScore: scoreTrail(route, osmFeatures, featureDistances),
       roadPenalty: scoreRoadPenalty(
@@ -155,7 +158,7 @@ function varietyScore(features, featureDistances) {
     features
       .filter(
         (feature) =>
-          !["urban", "road", "motorway"].includes(feature.category) &&
+          countsTowardRouteVariety(feature.category) &&
           (featureDistances.get(feature) ?? Infinity) < 190,
       )
       .map((feature) => feature.category),
