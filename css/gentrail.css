@@ -73,28 +73,43 @@
 }
 
 .maplibregl-ctrl-group {
-  border: 1px solid var(--line) !important;
-  box-shadow: var(--shadow-md) !important;
-  background: var(--bg-card) !important;
-  border-radius: 6px !important;
+  display: grid;
+  gap: 6px;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
 }
 
 .maplibregl-ctrl-group button {
-  width: 24px !important;
-  height: 24px !important;
+  width: 32px !important;
+  height: 32px !important;
   min-width: 0 !important;
   min-height: 0 !important;
   padding: 0 !important;
-  border: none !important;
+  border: 1px solid transparent !important;
+  border-radius: 50% !important;
   box-shadow: none !important;
   background-color: transparent !important;
   color: var(--text) !important;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.maplibregl-ctrl-group button:hover,
+.maplibregl-ctrl-group button:focus-visible {
+  border-color: color-mix(in srgb, var(--text) 40%, transparent) !important;
+  background-color: color-mix(in srgb, var(--bg-card) 35%, transparent) !important;
+}
+
+.maplibregl-ctrl-group button:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px;
 }
 
 .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-  width: 24px !important;
-  height: 24px !important;
-  background-size: 16px 16px !important;
+  width: 32px !important;
+  height: 32px !important;
+  background-size: 18px 18px !important;
 }
 
 .control-section,
