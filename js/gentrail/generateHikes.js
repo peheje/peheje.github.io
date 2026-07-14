@@ -80,10 +80,12 @@ async function generateHikesWithWorker(
   const overpassStartedAt = performance.now();
   let osmResult;
   try {
-    osmResult = await fetchOsmFeatures(bbox, signal, ({ attempt, total, endpoint }) => {
+    osmResult = await fetchOsmFeatures(bbox, signal, ({ attempt, total, endpoint, responded }) => {
       const hostname = new URL(endpoint).hostname;
       reportProgress(
-        attempt === 1
+        responded
+          ? `Map server ${attempt}/${total} is responding — downloading local map data...`
+          : attempt === 1
           ? `Contacting map server 1/${total} (${hostname})...`
           : `Previous map server unavailable — trying ${attempt}/${total} (${hostname})...`,
         3 + attempt,
