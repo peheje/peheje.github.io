@@ -31,18 +31,19 @@ function formatDays(totalDays) {
   return `${totalDays} days (${weeksText} and ${daysText})`;
 }
 
-function formatHoursBetween(durationMs) {
-  const totalMinutes = Math.round(Math.abs(durationMs) / 60000);
+function formatDuration(totalDays) {
+  const totalMinutes = Math.round(totalDays * 24 * 60);
   const days = Math.floor(totalMinutes / (24 * 60));
   const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
   const minutes = totalMinutes % 60;
-  const parts = [];
+  const daysText = formatDays(days);
+  let timeText = "";
+  if (hours === 0 && minutes !== 0) timeText = `${minutes} minutes`;
+  if (hours !== 0 && minutes === 0) timeText = `${hours} hours`;
+  if (hours !== 0 && minutes !== 0) timeText = `${hours} hours ${minutes} minutes`;
 
-  if (days) parts.push(`${days} ${days === 1 ? "day" : "days"}`);
-  if (hours) parts.push(`${hours} ${hours === 1 ? "hour" : "hours"}`);
-  if (minutes || parts.length === 0) parts.push(`${minutes} ${minutes === 1 ? "minute" : "minutes"}`);
-
-  return `${(durationMs / 3600000).toFixed(2)} hours (${parts.join(", ")})`;
+  if (daysText === "None") return timeText || "None";
+  return timeText ? `${daysText} ${timeText}` : daysText;
 }
 
 function makeDate(year, monthIndex, day) {
@@ -160,6 +161,42 @@ function collectDays(start, stop) {
   return { reverse, daysCount, weekendCount, monthRatio };
 }
 
+function collectTime(start, stop) {
+  const reverse = start > stop;
+  const from = reverse ? stop : start;
+  const end = reverse ? start : stop;
+  // Preserve the original Fable calculator's inclusive-date convention: an
+  // end time of midnight includes the whole final calendar day.
+  const to = end.getHours() === 0 && end.getMinutes() === 0
+    ? new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1)
+    : end;
+  let cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  let totalDays = 0;
+  let weekendDays = 0;
+  let monthRatio = 0;
+
+  while (cursor < to) {
+    const dayEnd = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+    const overlapStart = cursor < from ? from : cursor;
+    const overlapEnd = dayEnd > to ? to : dayEnd;
+    const overlapDurationMs = overlapEnd - overlapStart;
+
+    if (overlapDurationMs > 0) {
+      const fraction = overlapDurationMs / (24 * 60 * 60 * 1000);
+      totalDays += fraction;
+      if (isWeekend(cursor)) {
+        weekendDays += fraction;
+      }
+      const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+      monthRatio += fraction / daysInMonth;
+    }
+
+    cursor = dayEnd;
+  }
+
+  return { reverse, totalDays, weekendDays, monthRatio };
+}
+
 function addChangeCooldown(input, callback, cooldownMs) {
   let timerId = 0;
 
@@ -184,8 +221,6 @@ function initDaysPage() {
   const addDaysButton = document.getElementById("add-days-btn");
   const errorElement = document.getElementById("error");
   const totalDurationElement = document.getElementById("total-duration");
-  const hoursBetweenRow = document.getElementById("hours-between-row");
-  const hoursBetweenElement = document.getElementById("hours-between");
   const weekendDaysElement = document.getElementById("weekend-days");
   const monthsElement = document.getElementById("months");
   const yearsElement = document.getElementById("years");
@@ -200,7 +235,6 @@ function initDaysPage() {
     const includeTimes = includeTimesInput.checked;
     startTimeField.hidden = !includeTimes;
     endTimeField.hidden = !includeTimes;
-    hoursBetweenRow.hidden = !includeTimes;
   }
 
   updateTimeFields();
@@ -234,7 +268,6 @@ function initDaysPage() {
     if (!start || !end || !validate()) {
       errorElement.textContent = includeTimesInput.checked ? "Error in date or time" : "Error in date";
       totalDurationElement.textContent = "-";
-      hoursBetweenElement.textContent = "-";
       weekendDaysElement.textContent = "-";
       monthsElement.textContent = "-";
       yearsElement.textContent = "-";
@@ -248,11 +281,17 @@ function initDaysPage() {
 
     errorElement.textContent = "";
 
+    if (startTimestamp && endTimestamp) {
+      const result = collectTime(startTimestamp, endTimestamp);
+      totalDurationElement.textContent = `${result.reverse ? "-" : ""}${formatDuration(result.totalDays)}`;
+      weekendDaysElement.textContent = formatDuration(result.weekendDays);
+      monthsElement.textContent = formatMonth(result.monthRatio);
+      yearsElement.textContent = `${result.reverse ? "-" : ""}${formatYear(result.monthRatio)}`;
+      return;
+    }
+
     const result = collectDays(start, end);
     totalDurationElement.textContent = `${result.reverse ? "-" : ""}${formatDays(result.daysCount)}`;
-    if (startTimestamp && endTimestamp) {
-      hoursBetweenElement.textContent = formatHoursBetween(endTimestamp - startTimestamp);
-    }
     weekendDaysElement.textContent = formatDays(result.weekendCount);
     monthsElement.textContent = formatMonth(result.monthRatio);
     yearsElement.textContent = `${result.reverse ? "-" : ""}${formatYear(result.monthRatio)}`;
