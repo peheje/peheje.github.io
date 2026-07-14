@@ -1019,7 +1019,7 @@ function drawForecastCurves() {
   const { start, end } = getZoomWindow();
   const finalDayIndex = Math.max(activeTab, Math.ceil(end / 24));
   const dayPoints = getContinuousTimeseries(timeseries, finalDayIndex)
-    .filter(point => point.hour >= start && point.hour <= end);
+    .filter(point => point.hour >= Math.floor(start) && point.hour <= end);
   const found = dayPoints.some(point => point.temp !== null);
   if (!found) return;
 
@@ -1029,7 +1029,7 @@ function drawForecastCurves() {
   drawSingleCurve(windCanvas, "wind", dayPoints);
 
   const tidePoints = getContinuousTideSeries(finalDayIndex)
-    .filter(point => point.hour >= start && point.hour <= end);
+    .filter(point => point.hour >= Math.floor(start) && point.hour <= end);
   const tideFound = tidePoints.some(point => point.value !== null);
   drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
   drawSingleCurve(cloudsCanvas, "clouds", dayPoints);
@@ -1615,15 +1615,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     const currentTimeDec = nowParts.hour + nowParts.minute / 60 + nowParts.second / 3600;
     const h0 = Math.floor(currentTimeDec);
     const h1 = Math.min(23, h0 + 1);
-    
-    const p0 = points.find(p => p.hour === h0);
-    const p1 = points.find(p => p.hour === h1) || p0;
-    
-    if (p0) {
-      const t = currentTimeDec - h0;
-      const curX = p0.x + t * (p1.x - p0.x);
-      const curY = p0.y + t * (p1.y - p0.y);
+    const curX = getX(currentTimeDec);
 
+    if (currentTimeDec >= viewStartHour && currentTimeDec <= viewEndHour) {
       ctx.save();
       ctx.strokeStyle = paramType === "rain" ? "rgba(56, 178, 255, 0.7)" : accentColor;
       ctx.lineWidth = 1;
@@ -1633,6 +1627,14 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       ctx.lineTo(curX, H - paddingB);
       ctx.stroke();
       ctx.restore();
+    }
+
+    const p0 = points.find(p => p.hour === h0);
+    const p1 = points.find(p => p.hour === h1) || p0;
+
+    if (p0) {
+      const t = currentTimeDec - h0;
+      const curY = p0.y + t * (p1.y - p0.y);
 
       ctx.save();
       ctx.fillStyle = paramType === "rain" ? "rgba(56, 178, 255, 0.25)" : "rgba(232, 160, 69, 0.3)";
@@ -1841,6 +1843,21 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
 let zoomIndex = 0; // 0 = Full Day, 1 = 12-hour focus, 2 = next 48 hours
 let startTouchDist = null;
+const ZOOM_LEVELS_BY_RANGE = [1, 0, 2]; // 12 hours, full day, 48 hours
+
+function stepZoom(towardLongerRange) {
+  const currentLevel = ZOOM_LEVELS_BY_RANGE.indexOf(zoomIndex);
+  const nextLevel = Math.max(
+    0,
+    Math.min(ZOOM_LEVELS_BY_RANGE.length - 1, currentLevel + (towardLongerRange ? 1 : -1))
+  );
+  const nextZoomIndex = ZOOM_LEVELS_BY_RANGE[nextLevel];
+  if (nextZoomIndex === zoomIndex) return false;
+
+  zoomIndex = nextZoomIndex;
+  updateZoomUI();
+  return true;
+}
 
 function getZoomWindow() {
   const now = new Date();
@@ -1894,17 +1911,13 @@ function handleTouchMove(e) {
     
     const ratio = dist / startTouchDist;
     
-    if (ratio > 1.25) { // Pinch out -> Zoom in
-      if (zoomIndex === 0) {
-        zoomIndex = 1;
+    if (ratio > 1.25) { // Fingers spread apart -> move one level toward 12 hours
+      if (stepZoom(false)) {
         startTouchDist = dist;
-        updateZoomUI();
       }
-    } else if (ratio < 0.8) { // Pinch in -> Zoom out
-      if (zoomIndex > 0) {
-        zoomIndex = 0;
+    } else if (ratio < 0.8) { // Fingers pinch together -> move one level toward 48 hours
+      if (stepZoom(true)) {
         startTouchDist = dist;
-        updateZoomUI();
       }
     }
   } else if (e.touches.length === 1) {
@@ -1929,16 +1942,10 @@ function handleCanvasWheel(e) {
   
   e.preventDefault();
   
-  if (e.deltaY < 0) { // Scroll up -> Zoom in
-    if (zoomIndex === 0) {
-      zoomIndex = 1;
-      updateZoomUI();
-    }
-  } else if (e.deltaY > 0) { // Scroll down -> Zoom out
-    if (zoomIndex > 0) {
-      zoomIndex = 0;
-      updateZoomUI();
-    }
+  if (e.deltaY < 0) { // Scroll up -> shorter time range
+    stepZoom(false);
+  } else if (e.deltaY > 0) { // Scroll down -> longer time range
+    stepZoom(true);
   }
   
   handleCanvasHover(e);

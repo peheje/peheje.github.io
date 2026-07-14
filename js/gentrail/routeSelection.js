@@ -11,7 +11,11 @@ export function selectDistinctScoredRoutes(
   const compatibility = buildCompatibilityMatrix(scoredRoutes, routesConflict);
   let selectedIndexes = [];
   for (let targetSize = Math.min(maximumRoutes, scoredRoutes.length); targetSize > 0; targetSize -= 1) {
-    const combination = findCombination(compatibility, targetSize);
+    const combination = findBestCombination(
+      compatibility,
+      scoredRoutes,
+      targetSize,
+    );
     if (combination) {
       selectedIndexes = combination;
       break;
@@ -38,21 +42,53 @@ function buildCompatibilityMatrix(scoredRoutes, routesConflict) {
   );
 }
 
-function findCombination(compatibility, targetSize) {
+function findBestCombination(compatibility, scoredRoutes, targetSize) {
   const chosen = [];
-  const visit = (startIndex) => {
-    if (chosen.length === targetSize) return [...chosen];
+  const scores = scoredRoutes.map(({ score }) =>
+    Number.isFinite(score?.total) ? score.total : 0,
+  );
+  const optimisticScores = buildOptimisticScores(scores, targetSize);
+  let bestCombination = null;
+  let bestScore = -Infinity;
+
+  const visit = (startIndex, currentScore) => {
+    if (chosen.length === targetSize) {
+      if (currentScore > bestScore) {
+        bestScore = currentScore;
+        bestCombination = [...chosen];
+      }
+      return;
+    }
     const needed = targetSize - chosen.length;
+    const optimisticRemainder = optimisticScores[startIndex]?.[needed] ?? -Infinity;
+    if (currentScore + optimisticRemainder <= bestScore) return;
+
     for (let index = startIndex; index <= compatibility.length - needed; index += 1) {
       if (!chosen.every((selected) => compatibility[selected][index])) continue;
       chosen.push(index);
-      const result = visit(index + 1);
-      if (result) return result;
+      visit(index + 1, currentScore + scores[index]);
       chosen.pop();
     }
-    return null;
   };
-  return visit(0);
+  visit(0, 0);
+  return bestCombination;
+}
+
+function buildOptimisticScores(scores, maximumCount) {
+  const result = Array.from({ length: scores.length + 1 }, () =>
+    Array(maximumCount + 1).fill(-Infinity),
+  );
+  result[scores.length][0] = 0;
+  for (let index = scores.length - 1; index >= 0; index -= 1) {
+    result[index][0] = 0;
+    for (let count = 1; count <= maximumCount; count += 1) {
+      result[index][count] = Math.max(
+        result[index + 1][count],
+        scores[index] + result[index + 1][count - 1],
+      );
+    }
+  }
+  return result;
 }
 
 function routeIdentity(route) {

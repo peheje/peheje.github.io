@@ -80,7 +80,16 @@ async function generateHikesWithWorker(
   const overpassStartedAt = performance.now();
   let osmResult;
   try {
-    osmResult = await fetchOsmFeatures(bbox, signal);
+    osmResult = await fetchOsmFeatures(bbox, signal, ({ attempt, total, endpoint }) => {
+      const hostname = new URL(endpoint).hostname;
+      reportProgress(
+        attempt === 1
+          ? `Contacting map server 1/${total} (${hostname})...`
+          : `Previous map server unavailable — trying ${attempt}/${total} (${hostname})...`,
+        3 + attempt,
+        "fetch",
+      );
+    });
   } catch (error) {
     if (signal?.aborted) throw error;
     throw new Error(`Failed to fetch map data from OpenStreetMap Overpass API: ${error.message}`, { cause: error });

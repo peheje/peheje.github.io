@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>GenTrail — code archaeology</title>
+  <style>
+    :root {
+      --ink: #f4f0e7;
+      --muted: #a9b0a6;
+      --paper: #10231f;
+      --paper-2: #17322b;
+      --paper-3: #21463a;
+      --line: rgba(244, 240, 231, .16);
+      --lime: #d7ee7b;
+      --orange: #f08a58;
+      --blue: #83b8f2;
+      --violet: #b7a1ef;
+      --shadow: 0 24px 70px rgba(0, 0, 0, .3);
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #091410; color: var(--ink); }
+    body { font-family: var(--sans); overflow: hidden; }
+    button { font: inherit; }
+
+    .deck {
+      position: relative;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 85% 12%, rgba(215, 238, 123, .12), transparent 30rem),
+        radial-gradient(circle at 10% 92%, rgba(240, 138, 88, .09), transparent 28rem),
+        var(--paper);
+    }
+
+    .deck::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .17;
+      background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+    }
+
+    .slide {
+      display: none;
+      position: relative;
+      width: min(100vw, 1440px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: clamp(42px, 6vw, 88px) clamp(28px, 7vw, 112px) 84px;
+      isolation: isolate;
+    }
+    .slide.active { display: block; animation: enter .35s ease-out both; }
+    @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    .topline, .footerline { display: flex; align-items: center; justify-content: space-between; gap: 20px; color: var(--muted); font: 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .topline { margin-bottom: clamp(30px, 5vh, 66px); }
+    .topline .mark { color: var(--lime); }
+    .footerline { position: absolute; left: clamp(28px, 7vw, 112px); right: clamp(28px, 7vw, 112px); bottom: 28px; }
+    .footerline .rule { flex: 1; height: 1px; background: var(--line); }
+
+    h1, h2, h3, p { margin: 0; }
+    h1 { max-width: 930px; font-size: clamp(48px, 8.8vw, 134px); line-height: .9; letter-spacing: -.075em; font-weight: 800; }
+    h2 { max-width: 900px; font-size: clamp(34px, 5.3vw, 78px); line-height: .96; letter-spacing: -.055em; font-weight: 760; }
+    h3 { font-size: clamp(19px, 2vw, 28px); line-height: 1.05; letter-spacing: -.03em; }
+    .lede { max-width: 720px; margin-top: 30px; color: var(--muted); font-size: clamp(17px, 2vw, 26px); line-height: 1.35; }
+    .eyebrow { margin-bottom: 16px; color: var(--lime); font: 12px var(--mono); letter-spacing: .16em; text-transform: uppercase; }
+    .accent { color: var(--lime); }
+    .orange { color: var(--orange); }
+    .blue { color: var(--blue); }
+    .violet { color: var(--violet); }
+    .tiny { color: var(--muted); font: 11px/1.45 var(--mono); }
+
+    .hero { display: grid; grid-template-columns: 1.08fr .92fr; align-items: center; gap: 5vw; min-height: 70vh; }
+    .hero-note { border-left: 2px solid var(--orange); padding-left: 24px; max-width: 390px; }
+    .hero-note strong { display: block; margin-bottom: 12px; font-size: 22px; }
+    .hero-note p { color: var(--muted); line-height: 1.55; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 38px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 38px; }
+    .card { border: 1px solid var(--line); background: rgba(23, 50, 43, .72); padding: 22px; border-radius: 2px; box-shadow: var(--shadow); }
+    .card h3 { margin-bottom: 12px; }
+    .card p, .card li { color: var(--muted); font-size: 15px; line-height: 1.5; }
+    .card ul { margin: 12px 0 0; padding-left: 18px; }
+    .tag { display: inline-flex; align-items: center; padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--lime); font: 11px var(--mono); }
+
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 11px; align-items: stretch; margin-top: 48px; }
+    .flow-step { position: relative; min-height: 156px; padding: 18px; border: 1px solid var(--line); background: var(--paper-2); }
+    .flow-step:not(:last-child)::after { content: "→"; position: absolute; right: -18px; top: 50%; z-index: 2; color: var(--lime); font: 24px var(--mono); transform: translateY(-50%); }
+    .flow-step b { display: block; margin-bottom: 12px; color: var(--lime); font: 12px var(--mono); }
+    .flow-step strong { display: block; margin-bottom: 8px; font-size: 19px; }
+    .flow-step span { color: var(--muted); font: 12px/1.45 var(--mono); }
+    .caption { margin-top: 18px; color: var(--muted); font: 12px var(--mono); }
+
+    .architecture { display: grid; grid-template-columns: 1.15fr .85fr; gap: 22px; margin-top: 34px; align-items: stretch; }
+    .browser-shell { border: 1px solid var(--line); background: #0b1915; box-shadow: var(--shadow); }
+    .browser-bar { display: flex; gap: 7px; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font: 11px var(--mono); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); }
+    .dot:nth-child(2) { background: var(--lime); }.dot:nth-child(3) { background: var(--blue); }
+    .browser-body { display: grid; grid-template-columns: 150px 1fr; min-height: 320px; }
+    .sidebar-mini { padding: 18px; border-right: 1px solid var(--line); }
+    .sidebar-mini div { height: 8px; margin-bottom: 14px; background: var(--paper-3); }
+    .sidebar-mini div:nth-child(2) { width: 80%; background: var(--orange); }.sidebar-mini div:nth-child(4) { width: 65%; background: var(--lime); }
+    .map-mini { position: relative; overflow: hidden; background: #173b34; }
+    .map-mini::before, .map-mini::after { content: ""; position: absolute; width: 130%; height: 2px; background: rgba(131,184,242,.58); transform: rotate(-23deg); top: 40%; left: -12%; box-shadow: 0 64px rgba(131,184,242,.3), 0 -58px rgba(131,184,242,.22); }
+    .map-mini::after { width: 68%; top: 55%; left: 19%; height: 5px; background: var(--orange); transform: rotate(26deg); box-shadow: 0 0 0 2px rgba(240,138,88,.22); }
+    .map-pin { position: absolute; left: 49%; top: 51%; width: 16px; height: 16px; border: 4px solid var(--lime); border-radius: 50%; box-shadow: 0 0 0 9px rgba(215,238,123,.15); }
+    .topology { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .service { border: 1px solid var(--line); padding: 17px; background: rgba(23,50,43,.72); }
+    .service .label { display: block; margin-bottom: 8px; color: var(--muted); font: 11px var(--mono); text-transform: uppercase; letter-spacing: .12em; }
+    .service strong { font-size: 19px; }
+    .service p { margin-top: 7px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .service.external { border-color: rgba(131,184,242,.45); }.service.worker { border-color: rgba(215,238,123,.45); }
+
+    .code { overflow: auto; margin: 22px 0 0; padding: 18px; border-left: 2px solid var(--lime); background: #091410; color: #dbe8d4; font: 12px/1.65 var(--mono); white-space: pre-wrap; }
+    .code .kw { color: var(--violet); }.code .fn { color: var(--blue); }.code .str { color: var(--orange); }.code .cm { color: #6d8177; }
+    .code-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 30px; }
+
+    .query-layout { display: grid; grid-template-columns: .82fr 1.18fr; gap: 24px; margin-top: 38px; }
+    .query-box { border: 1px solid var(--line); background: #091410; padding: 20px; }
+    .query-box pre { margin: 0; color: #cfe5cb; font: 12px/1.65 var(--mono); white-space: pre-wrap; }
+    .feature-list { display: grid; gap: 10px; }
+    .feature { display: flex; align-items: center; gap: 13px; padding: 15px; border: 1px solid var(--line); background: var(--paper-2); }
+    .feature i { width: 11px; height: 11px; display: block; border-radius: 50%; background: var(--lime); }.feature:nth-child(2) i { background: var(--blue); }.feature:nth-child(3) i { background: var(--orange); }.feature:nth-child(4) i { background: var(--violet); }.feature:nth-child(5) i { background: #e5aa2f; }
+    .feature strong { display: block; font-size: 16px; }.feature span { color: var(--muted); font: 11px var(--mono); }
+
+    .graph-stage { position: relative; min-height: 310px; margin-top: 34px; border: 1px solid var(--line); overflow: hidden; background: #0b1915; }
+    .graph-stage svg { width: 100%; height: 310px; display: block; }
+    .graph-note { position: absolute; max-width: 215px; padding: 13px; border: 1px solid var(--line); background: rgba(16,35,31,.92); font: 11px/1.5 var(--mono); }
+    .graph-note.one { left: 18px; top: 18px; }.graph-note.two { right: 18px; bottom: 18px; border-color: rgba(240,138,88,.5); }
+    .graph-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+    .fact { padding: 14px; border-top: 2px solid var(--lime); background: var(--paper-2); }.fact:nth-child(2) { border-color: var(--blue); }.fact:nth-child(3) { border-color: var(--orange); }.fact:nth-child(4) { border-color: var(--violet); }
+    .fact b { display: block; font-size: 24px; letter-spacing: -.04em; }.fact span { color: var(--muted); font: 11px/1.4 var(--mono); }
+
+    .candidate { display: grid; grid-template-columns: 1fr .94fr; gap: 24px; margin-top: 36px; align-items: center; }
+    .loop-board { position: relative; min-height: 340px; border: 1px solid var(--line); background: #0b1915; }
+    .loop-board svg { width: 100%; height: 340px; }.legend { position: absolute; left: 17px; bottom: 15px; color: var(--muted); font: 11px var(--mono); }
+    .candidate-copy { display: grid; gap: 12px; }.candidate-copy .metric { padding: 17px; border: 1px solid var(--line); background: var(--paper-2); }.metric b { color: var(--lime); font: 30px var(--mono); }.metric strong { display: block; margin: 2px 0 4px; font-size: 18px; }.metric span { color: var(--muted); font-size: 13px; line-height: 1.4; }
+
+    .score-layout { display: grid; grid-template-columns: .92fr 1.08fr; gap: 28px; margin-top: 38px; align-items: start; }
+    .score-formula { border: 1px solid var(--line); background: #091410; padding: 24px; font: 15px/1.8 var(--mono); }.score-formula .big { display: block; margin-bottom: 16px; color: var(--lime); font-size: 21px; }.score-formula em { color: var(--orange); font-style: normal; }.score-formula small { display: block; margin-top: 15px; color: var(--muted); font: 11px/1.5 var(--mono); }
+    .weight-table { width: 100%; border-collapse: collapse; font-size: 13px; }.weight-table th, .weight-table td { padding: 11px 9px; border-bottom: 1px solid var(--line); text-align: left; }.weight-table th { color: var(--muted); font: 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; }.weight-table td:last-child { color: var(--lime); text-align: right; font-family: var(--mono); }.weight-table .negative td:last-child { color: var(--orange); }
+
+    .funnel { display: grid; gap: 10px; margin-top: 34px; }.funnel-row { display: grid; grid-template-columns: 140px 1fr 90px; gap: 15px; align-items: center; }.funnel-row label { color: var(--muted); font: 11px var(--mono); text-transform: uppercase; }.bar { height: 30px; background: var(--paper-2); border: 1px solid var(--line); }.bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--lime), #87bd6e); }.funnel-row:nth-child(2) .bar i { background: linear-gradient(90deg, var(--blue), #6b89c5); }.funnel-row:nth-child(3) .bar i { background: linear-gradient(90deg, var(--orange), #c75f4b); }.funnel-row:nth-child(4) .bar i { background: linear-gradient(90deg, var(--violet), #8264b6); }.funnel-row output { color: var(--ink); font: 12px var(--mono); text-align: right; }
+    .selection-note { margin-top: 28px; padding: 18px 20px; border-left: 2px solid var(--orange); background: rgba(240,138,88,.08); color: var(--muted); line-height: 1.5; }.selection-note strong { color: var(--ink); }
+
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 38px; }.split .card { min-height: 230px; }.good { border-top: 3px solid var(--lime); }.watch { border-top: 3px solid var(--orange); }.card .file { display: block; margin-top: 18px; color: var(--lime); font: 11px var(--mono); }
+    .file-map { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 32px; }.file-map .card { padding: 16px; }.file-map .file { margin-top: 0; margin-bottom: 8px; }.file-map p { font-size: 12px; }
+
+    .closing { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: end; min-height: 67vh; }.closing h2 { max-width: 720px; }.closing .card { align-self: center; }.closing ul { margin: 0; padding-left: 20px; }.closing li { margin: 11px 0; color: var(--muted); line-height: 1.45; }.closing li::marker { color: var(--lime); }
+
+    .controls { position: fixed; right: 28px; bottom: 25px; z-index: 10; display: flex; align-items: center; gap: 9px; }
+    .controls button { width: 36px; height: 32px; cursor: pointer; border: 1px solid var(--line); background: rgba(23,50,43,.9); color: var(--ink); }.controls button:hover { border-color: var(--lime); color: var(--lime); }
+    .dots { display: flex; gap: 5px; align-items: center; margin-right: 8px; }.dots button { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: var(--muted); opacity: .45; }.dots button.active { background: var(--lime); opacity: 1; transform: scale(1.4); }
+    .progress { position: fixed; z-index: 11; top: 0; left: 0; height: 3px; width: 100%; background: rgba(255,255,255,.08); }.progress i { display: block; height: 100%; width: 0; background: var(--lime); transition: width .25s ease; }
+    .hint { position: fixed; left: 28px; bottom: 29px; z-index: 10; color: var(--muted); font: 10px var(--mono); letter-spacing: .06em; }
+
+    @media (max-width: 850px) {
+      body { overflow: auto; }
+      .slide { min-height: 100svh; padding-bottom: 100px; }
+      .hero, .architecture, .query-layout, .candidate, .score-layout, .closing { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; gap: 8px; }.flow-step { min-height: 0; }.flow-step:not(:last-child)::after { content: "↓"; right: 15px; top: auto; bottom: -22px; transform: none; }
+      .grid-3, .file-map { grid-template-columns: 1fr; }.grid-2, .split { grid-template-columns: 1fr; }.graph-facts { grid-template-columns: 1fr 1fr; }
+      .browser-body { min-height: 230px; }.footerline { position: relative; left: auto; right: auto; margin-top: 24px; }.hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck" aria-live="polite">
+    <div class="progress"><i id="progressBar"></i></div>
+
+    <section class="slide active" data-title="The vibe">
+      <div class="topline"><span class="mark">GENTRAIL / 01</span><span>code archaeology</span></div>
+      <div class="hero">
+        <div>
+          <div class="eyebrow">A browser-only trail loop generator</div>
+          <h1>Turn OSM spaghetti into a <span class="accent">good enough</span> walk.</h1>
+          <p class="lede">A seasoned programmer’s tour of the GenTrail codebase: its mental model, the algorithmic pipeline, and the places where rapid iteration is still visible in the grain of the system.</p>
+        </div>
+        <aside class="hero-note">
+          <strong>Scope</strong>
+          <p>Only <span class="accent">gentrail</span> inside <span class="tiny">peheje_fable/public</span>. No tour of the rest of the site.</p>
+          <p style="margin-top:18px" class="tiny">Open with ← / → or click the controls. Press Home / End to jump.</p>
+        </aside>
+      </div>
+      <div class="footerline"><span>peheje_fable</span><span class="rule"></span><span>01 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="Mental model">
+      <div class="topline"><span class="mark">GENTRAIL / 02</span><span>mental model</span></div>
+      <div class="eyebrow">The one-sentence architecture</div>
+      <h2>It is an <span class="accent">evolutionary search</span> wrapped around ordinary routing.</h2>
+      <p class="lede">The app does not “invent” paths. It samples plausible loop shapes, asks A* to realize them on the mapped pedestrian network, then scores and de-duplicates the results.</p>
+      <div class="flow">
+        <div class="flow-step"><b>01 / input</b><strong>Trailhead + taste</strong><span>distance, forest, trail, water, road aversion</span></div>
+        <div class="flow-step"><b>02 / world</b><strong>OSM snapshot</strong><span>Overpass features + walkable ways</span></div>
+        <div class="flow-step"><b>03 / search</b><strong>Candidate loops</strong><span>A* over weighted graph; then mutate / crossover</span></div>
+        <div class="flow-step"><b>04 / judge</b><strong>Score + filter</strong><span>shape, nature, roads, repetition, variety</span></div>
+        <div class="flow-step"><b>05 / output</b><strong>3–5 options</strong><span>map lines, cards, warnings, GPX</span></div>
+      </div>
+      <p class="caption">The key design move: route generation and route evaluation are separate phases.</p>
+      <div class="footerline"><span>the useful abstraction</span><span class="rule"></span><span>02 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="Runtime topology">
+      <div class="topline"><span class="mark">GENTRAIL / 03</span><span>runtime topology</span></div>
+      <div class="eyebrow">No backend, no bundle, still a pipeline</div>
+      <h2>Three actors: <span class="blue">the browser UI</span>, <span class="accent">a worker</span>, and <span class="orange">public map services</span>.</h2>
+      <div class="architecture">
+        <div class="browser-shell">
+          <div class="browser-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span style="margin-left:7px">/gentrail.html</span></div>
+          <div class="browser-body"><div class="sidebar-mini"><div></div><div></div><div></div><div></div><div></div><div></div></div><div class="map-mini"><span class="map-pin"></span></div></div>
+          <div class="caption" style="padding:0 16px 16px">MapLibre renders the surface; <span class="tiny">pages/gentrail.js</span> owns UI state, progress, caching, and GPX.</div>
+        </div>
+        <div class="topology">
+          <div class="service external"><span class="label">external / read-only</span><strong>Overpass API</strong><p>Fetches local OSM geometry and tags. Four endpoints are tried in sequence.</p></div>
+          <div class="service worker"><span class="label">module worker</span><strong>analysis-worker.js</strong><p>Runs repetition analysis and weighted score calculations away from the UI thread.</p></div>
+          <div class="service"><span class="label">browser cache</span><strong>localStorage</strong><p>Remembers trailhead, distance, selected route, and the last generated result.</p></div>
+        </div>
+      </div>
+      <div class="footerline"><span>native ES modules</span><span class="rule"></span><span>03 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="Input contract">
+      <div class="topline"><span class="mark">GENTRAIL / 04</span><span>input contract</span></div>
+      <div class="eyebrow">The page is a thin orchestration layer</div>
+      <h2>Preferences become one plain <span class="accent">generationSettings</span> object.</h2>
+      <div class="code-grid">
+        <div>
+          <pre class="code"><span class="kw">const</span> generationSettings = {
+  start: { ...start },
+  targetDistanceKm,
+  candidateCount,
+  preferences: { ...preferences },
+};
+
+<span class="kw">await</span> <span class="fn">generateHikes</span>(
+  generationSettings,
+  onProgress,
+  controller.signal,
+); <span class="cm">// cancelable</span></pre>
+          <p class="caption"><span class="tiny">public/js/pages/gentrail.js</span> — state lives close to the controls.</p>
+        </div>
+        <div class="grid-3" style="margin-top:0; grid-template-columns:1fr 1fr">
+          <div class="card"><span class="tag">shape</span><h3 style="margin-top:14px">3 km</h3><p>Target distance; clamped to 1–40 km.</p></div>
+          <div class="card"><span class="tag">variety</span><h3 style="margin-top:14px">3 loops</h3><p>Requested result count; 3, 4, or 5.</p></div>
+          <div class="card"><span class="tag">positive</span><h3 style="margin-top:14px">forest 7</h3><p>Nature and path preferences bias traversal cost and score.</p></div>
+          <div class="card"><span class="tag">negative</span><h3 style="margin-top:14px">roads 8</h3><p>Road, highway, minor-road, and repetition aversion add cost.</p></div>
+        </div>
+      </div>
+      <div class="footerline"><span>one object crosses the boundary</span><span class="rule"></span><span>04 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="OSM ingestion">
+      <div class="topline"><span class="mark">GENTRAIL / 05</span><span>OSM ingestion</span></div>
+      <div class="eyebrow">Fetch once, classify twice</div>
+      <h2>Overpass supplies a local <span class="blue">map snapshot</span>; GenTrail turns tags into two kinds of truth.</h2>
+      <div class="query-layout">
+        <div class="query-box"><pre>[out:json][timeout:25];
+(
+  way["landuse"~"forest|grass|meadow"](...);
+  way["natural"~"wood|water|beach"](...);
+  way["highway"~"...paths + roads..."](...);
+  relation["type"~"multipolygon|boundary"](...);
+);
+out geom;</pre><p class="caption">The box is centered on the clicked trailhead. Radius is <span class="accent">max(1 km, target × .45)</span>.</p></div>
+        <div class="feature-list">
+          <div class="feature"><i></i><div><strong>Routing graph inputs</strong><span>highway, surface, access, oneway:foot</span></div></div>
+          <div class="feature"><i></i><div><strong>Forest / water / beach</strong><span>areas, lines, nodes, multipolygons</span></div></div>
+          <div class="feature"><i></i><div><strong>Road penalties</strong><span>motorway, road, minorRoad</span></div></div>
+          <div class="feature"><i></i><div><strong>Urban context</strong><span>residential, commercial, retail, industrial</span></div></div>
+          <div class="feature"><i></i><div><strong>Trail signal</strong><span>path / track / footway + unpaved surfaces</span></div></div>
+        </div>
+      </div>
+      <p class="caption">The same raw elements feed graph construction and spatial scoring; this is why metadata survives on every route edge.</p>
+      <div class="footerline"><span>public/js/gentrail/overpass.js</span><span class="rule"></span><span>05 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="Graph construction">
+      <div class="topline"><span class="mark">GENTRAIL / 06</span><span>graph construction</span></div>
+      <div class="eyebrow">Where geography becomes computable</div>
+      <h2>OSM ways become a <span class="accent">directed, weighted graph</span> with a few pragmatic cleanups.</h2>
+      <div class="graph-stage">
+        <svg viewBox="0 0 1000 310" role="img" aria-label="A directed weighted trail graph diagram">
+          <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#d7ee7b"/></marker></defs>
+          <g stroke="#41665b" stroke-width="2" fill="none" marker-end="url(#arrow)">
+            <path d="M120 214 L240 130 L390 178 L520 82 L690 132 L840 70"/><path d="M240 130 L320 260 L520 82"/><path d="M390 178 L510 260 L690 132"/><path d="M520 82 L590 230 L840 70"/><path d="M120 214 L320 260 L510 260 L840 70"/>
+          </g>
+          <g stroke="#f08a58" stroke-width="5" fill="none" opacity=".9"><path d="M120 214 L240 130 L390 178 L510 260 L320 260 L120 214"/></g>
+          <g fill="#d7ee7b" stroke="#10231f" stroke-width="4"><circle cx="120" cy="214" r="8"/><circle cx="240" cy="130" r="8"/><circle cx="390" cy="178" r="8"/><circle cx="520" cy="82" r="8"/><circle cx="690" cy="132" r="8"/><circle cx="840" cy="70" r="8"/><circle cx="320" cy="260" r="8"/><circle cx="510" cy="260" r="8"/><circle cx="590" cy="230" r="8"/></g>
+          <g fill="#a9b0a6" font-family="monospace" font-size="12"><text x="104" y="240">start</text><text x="218" y="111">junction</text><text x="804" y="49">dead end</text><text x="551" y="253">beach corridor</text></g>
+        </svg>
+        <div class="graph-note one">Walkability is tag-aware: explicit foot access wins; restricted access and motorways drop out.</div>
+        <div class="graph-note two">The orange loop is favored because its traversal cost avoids repeated edges and hostile road classes.</div>
+      </div>
+      <div class="graph-facts"><div class="fact"><b>A*</b><span>binary min-heap priority queue</span></div><div class="fact"><b>× 50</b><span>temporary penalty for a reused edge</span></div><div class="fact"><b>≤ 35 m</b><span>beach-to-network connector tolerance</span></div><div class="fact"><b>1 pass</b><span>dead-end pruning before snapping</span></div></div>
+      <div class="footerline"><span>routingGraph · pathfinding · beachRouting</span><span class="rule"></span><span>06 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="Candidate factory">
+      <div class="topline"><span class="mark">GENTRAIL / 07</span><span>candidate factory</span></div>
+      <div class="eyebrow">The search has a shape before it has a path</div>
+      <h2>Start with <span class="orange">24 geometric prompts</span>, then let the graph answer.</h2>
+      <div class="candidate">
+        <div class="loop-board">
+          <svg viewBox="0 0 700 340" role="img" aria-label="Triangular loop candidate diagram">
+            <defs><marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#f08a58"/></marker></defs>
+            <circle cx="345" cy="170" r="105" fill="none" stroke="#42675a" stroke-dasharray="5 7"/>
+            <path d="M345 170 L456 84 L535 207 L345 170" fill="rgba(240,138,88,.10)" stroke="#f08a58" stroke-width="4" marker-end="url(#arrow2)"/>
+            <path d="M345 170 L455 95 L527 207 L345 170" fill="none" stroke="#d7ee7b" stroke-width="1.5" stroke-dasharray="3 6"/>
+            <circle cx="345" cy="170" r="11" fill="#d7ee7b"/><circle cx="456" cy="84" r="8" fill="#83b8f2"/><circle cx="535" cy="207" r="8" fill="#b7a1ef"/>
+            <g fill="#f4f0e7" font-family="monospace" font-size="13"><text x="316" y="202">trailhead</text><text x="458" y="69">C1</text><text x="541" y="225">C2</text><text x="116" y="68">8 bearings</text><text x="116" y="89">× 3 radii</text></g>
+          </svg>
+          <div class="legend">routeLoop(start → C1 → C2 → start) · each leg is an A* search</div>
+        </div>
+        <div class="candidate-copy">
+          <div class="metric"><b>24</b><strong>initial attempts</strong><span>Eight compass bearings at 0°…315°, with radius multipliers .7×, 1.0×, and 1.4×.</span></div>
+          <div class="metric"><b>top 4</b><strong>seed routes</strong><span>Score the first pool, keep the leaders, then mutate each pair of control points by up to 250 m.</span></div>
+          <div class="metric"><b>+ crossover</b><strong>evolution without a GA framework</strong><span>Intersect seed node paths where possible; otherwise splice their control points and re-route.</span></div>
+        </div>
+      </div>
+      <div class="footerline"><span>generateHikes.js</span><span class="rule"></span><span>07 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="Scoring">
+      <div class="topline"><span class="mark">GENTRAIL / 08</span><span>scoring</span></div>
+      <div class="eyebrow">A hand-tuned objective function</div>
+      <h2>A route is a bundle of explanations, not just a number.</h2>
+      <div class="score-layout">
+        <div class="score-formula"><span class="big">total = <em>positive context</em> − <em>preference-weighted penalties</em></span><div>distance match <span class="accent">14</span></div><div>loop quality <span class="accent">29</span></div><div>forest / water / beach / trail</div><div>variety <span class="accent">8</span></div><div>roads / highways / urban / repetition <span class="orange">−</span></div><small>Score is capped at 0–100. High repetition preference can impose an additional ceiling, so a pretty route cannot hide severe backtracking.</small></div>
+        <div class="card" style="padding:10px 18px 8px"><table class="weight-table"><thead><tr><th>component</th><th>evidence</th><th>weight</th></tr></thead><tbody><tr><td>Loop quality</td><td>unique samples + spread + direction</td><td>29</td></tr><tr><td>Distance</td><td>target deviation</td><td>14</td></tr><tr><td>Trail signal</td><td>OSM way + surface metadata</td><td>4 + 1.3×</td></tr><tr><td>Forest</td><td>proximity + coverage</td><td>4 + 1.4×</td></tr><tr><td>Variety</td><td>nearby non-urban feature types</td><td>8</td></tr><tr class="negative"><td>Repetition</td><td>sampled edge traversals</td><td>−2.2×</td></tr><tr class="negative"><td>Major roads</td><td>nearby + actually used</td><td>−.95×</td></tr></tbody></table></div>
+      </div>
+      <p class="caption">Scoring runs in <span class="tiny">analysisTasks.js</span>; the breakdown is rendered into each result card so the heuristic remains inspectable.</p>
+      <div class="footerline"><span>scoreRoute.js + featureAnalysis.js</span><span class="rule"></span><span>08 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="Selection">
+      <div class="topline"><span class="mark">GENTRAIL / 09</span><span>selection</span></div>
+      <div class="eyebrow">Quality is not enough; options must differ</div>
+      <h2>The last mile is a <span class="accent">compatibility problem</span>.</h2>
+      <div class="funnel">
+        <div class="funnel-row"><label>all candidates</label><div class="bar"><i style="width:100%"></i></div><output>~40–50</output></div>
+        <div class="funnel-row"><label>clean loops</label><div class="bar"><i style="width:72%"></i></div><output>distance / repeat</output></div>
+        <div class="funnel-row"><label>scored</label><div class="bar"><i style="width:47%"></i></div><output>ranked</output></div>
+        <div class="funnel-row"><label>shown</label><div class="bar"><i style="width:18%"></i></div><output>3–5</output></div>
+      </div>
+      <div class="grid-3">
+        <div class="card"><span class="tag">exact duplicate</span><h3 style="margin-top:15px">Canonical identity</h3><p>Forward and reverse node paths collapse to one identity.</p></div>
+        <div class="card"><span class="tag">too similar</span><h3 style="margin-top:15px">Shared edge ratio</h3><p>Two routes conflict when more than half of the shorter route is shared.</p></div>
+        <div class="card"><span class="tag">fallback</span><h3 style="margin-top:15px">Best effort</h3><p>If strict filtering cannot fill the requested count, relaxed candidates can still be selected and disclosed.</p></div>
+      </div>
+      <div class="selection-note"><strong>Product stance in one line:</strong> return a small, varied menu when the map allows it; explain when it does not. That is why the UI can say “Found 2 of 3 requested loops”.</div>
+      <div class="footerline"><span>routeDiversity · routeSelection · repetitionPolicy</span><span class="rule"></span><span>09 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="Concurrency">
+      <div class="topline"><span class="mark">GENTRAIL / 10</span><span>concurrency + UX</span></div>
+      <div class="eyebrow">The main thread owns the conversation</div>
+      <h2>Generation is cooperative; analysis is offloaded; cancellation is real.</h2>
+      <div class="grid-2">
+        <div class="card"><span class="tag">main thread</span><h3 style="margin-top:15px">Generate, report, render</h3><ul><li>Fetch Overpass data and build the graph.</li><li>Yield with a zero-timeout during long loops.</li><li>Stream phase progress from 0 → 100%.</li><li>Abort the active controller on cancel or new trailhead.</li></ul></div>
+        <div class="card"><span class="tag">module worker</span><h3 style="margin-top:15px">Analyze, score, explain</h3><ul><li>Repetition metrics and spatial indexing.</li><li>Route scoring with per-component explanations.</li><li>Progress messages and console logs cross the worker boundary.</li><li>Node fallback imports the same tasks for unit tests.</li></ul></div>
+      </div>
+      <pre class="code"><span class="kw">const</span> controller = <span class="kw">new</span> <span class="fn">AbortController</span>();
+currentController = controller;
+<span class="kw">try</span> {
+  <span class="kw">const</span> result = <span class="kw">await</span> <span class="fn">generateHikes</span>(settings, reportProgress, controller.signal);
+} <span class="kw">finally</span> {
+  worker.terminate(<span class="str">"Generation finished"</span>);
+}</pre>
+      <p class="caption">The UI is designed for “I changed my mind” — not only for the happy path.</p>
+      <div class="footerline"><span>AnalysisWorkerClient.js + cooperativeYield.js</span><span class="rule"></span><span>10 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="Vibe-coded seams">
+      <div class="topline"><span class="mark">GENTRAIL / 11</span><span>reading the vibe</span></div>
+      <div class="eyebrow">What rapid iteration left behind</div>
+      <h2>It is surprisingly coherent — and the seams are visible in useful places.</h2>
+      <div class="split">
+        <div class="card good"><span class="tag">strengths</span><h3 style="margin-top:15px">Fast feedback became real structure</h3><ul><li>Feature modules are small and named after decisions.</li><li>Debug telemetry records timings, counts, fallbacks, and snap distance.</li><li>Unit tests cover A*, graph cleanup, crossover, metadata, and selection.</li><li>The score breakdown makes subjective heuristics legible.</li></ul><span class="file">scripts/test-unit.mjs · scripts/benchmark-gentrail.mjs</span></div>
+        <div class="card watch"><span class="tag">seams</span><h3 style="margin-top:15px">Where an engineer should look twice</h3><ul><li>Heuristics are duplicated across traversal cost and scoring; behavior is tuned, not derived.</li><li>Random mutation plus <span class="tiny">Date.now()</span> IDs make runs hard to reproduce exactly.</li><li>Public Overpass and CDN imports are runtime dependencies, not pinned data services.</li><li>“Fallback” is a first-class product path, which means strictness needs careful observability.</li></ul><span class="file">generateHikes.js · pathfinding.js · overpass.js</span></div>
+      </div>
+      <p class="caption">“Vibe-coded” here means an evolving system whose design is encoded in names, constants, fallbacks, and telemetry more than in a single formal spec.</p>
+      <div class="footerline"><span>be curious, not reverent</span><span class="rule"></span><span>11 / 12</span></div>
+    </section>
+
+    <section class="slide" data-title="Change map">
+      <div class="topline"><span class="mark">GENTRAIL / 12</span><span>how to change it safely</span></div>
+      <div class="closing">
+        <div><div class="eyebrow">A practical handoff</div><h2>Change one layer at a time; keep the diagnostics on.</h2><p class="lede">The project is small enough to understand end-to-end. That is its superpower: the whole product loop is visible in a handful of files.</p></div>
+        <div class="card"><ul><li><span class="accent">New OSM semantics?</span> Start in <span class="tiny">osmQuery.js</span>, <span class="tiny">overpass.js</span>, and <span class="tiny">trailMetadata.js</span>.</li><li><span class="accent">New route behavior?</span> Touch graph costs, A*, or candidate creation in isolation.</li><li><span class="accent">New taste?</span> Add a score component and its explanation before changing selection.</li><li><span class="accent">New guarantee?</span> Add a unit test around the smallest pure module first.</li><li><span class="accent">New performance issue?</span> Read the debug timings and benchmark the queue before guessing.</li></ul></div>
+      </div>
+      <div class="file-map"><div class="card"><span class="file">pages/gentrail.js</span><p>UI state + map + cache</p></div><div class="card"><span class="file">generateHikes.js</span><p>orchestration + evolution</p></div><div class="card"><span class="file">analysisTasks.js</span><p>analysis + score pipeline</p></div><div class="card"><span class="file">scoring/*</span><p>explainable heuristics</p></div><div class="card"><span class="file">routingGraph.js</span><p>OSM to graph</p></div><div class="card"><span class="file">test-unit.mjs</span><p>behavioral contract</p></div></div>
+      <div class="footerline"><span>now you have the map</span><span class="rule"></span><span>12 / 12</span></div>
+    </section>
+  </main>
+
+  <div class="hint">← → navigate · H home · E end</div>
+  <nav class="controls" aria-label="Slide controls"><div class="dots" id="dots"></div><button id="prev" type="button" aria-label="Previous slide">←</button><button id="next" type="button" aria-label="Next slide">→</button></nav>
+
+  <script>
+    (() => {
+      const slides = [...document.querySelectorAll('.slide')];
+      const dots = document.getElementById('dots');
+      const progressBar = document.getElementById('progressBar');
+      let index = 0;
+
+      slides.forEach((slide, slideIndex) => {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.title = slide.dataset.title || `Slide ${slideIndex + 1}`;
+        dot.setAttribute('aria-label', `Go to slide ${slideIndex + 1}: ${dot.title}`);
+        dot.addEventListener('click', () => go(slideIndex));
+        dots.appendChild(dot);
+      });
+
+      function go(nextIndex) {
+        index = (nextIndex + slides.length) % slides.length;
+        slides.forEach((slide, i) => slide.classList.toggle('active', i === index));
+        [...dots.children].forEach((dot, i) => dot.classList.toggle('active', i === index));
+        progressBar.style.width = `${((index + 1) / slides.length) * 100}%`;
+        document.title = `GenTrail — ${slides[index].dataset.title || 'code archaeology'}`;
+      }
+
+      document.getElementById('prev').addEventListener('click', () => go(index - 1));
+      document.getElementById('next').addEventListener('click', () => go(index + 1));
+      document.addEventListener('keydown', (event) => {
+        if (['ArrowRight', 'PageDown', ' '].includes(event.key)) { event.preventDefault(); go(index + 1); }
+        if (['ArrowLeft', 'PageUp'].includes(event.key)) { event.preventDefault(); go(index - 1); }
+        if (event.key.toLowerCase() === 'h' || event.key === 'Home') { event.preventDefault(); go(0); }
+        if (event.key.toLowerCase() === 'e' || event.key === 'End') { event.preventDefault(); go(slides.length - 1); }
+      });
+
+      let touchStartX = null;
+      document.addEventListener('touchstart', (event) => { touchStartX = event.changedTouches[0].screenX; }, { passive: true });
+      document.addEventListener('touchend', (event) => {
+        if (touchStartX === null) return;
+        const delta = event.changedTouches[0].screenX - touchStartX;
+        if (Math.abs(delta) > 45) go(index + (delta < 0 ? 1 : -1));
+        touchStartX = null;
+      }, { passive: true });
+      go(0);
+    })();
+  </script>
+</body>
+</html>

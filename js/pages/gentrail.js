@@ -1,9 +1,14 @@
 import { mountSiteShell } from "../site.js";
 import { ROUTE_DIVERSITY_MINIMUM_DIFFERENT_FRACTION } from "../gentrail/config.js";
 
-const generateHikesForPage =
-  globalThis.__gentrailTestOverrides?.generateHikes ??
-  (await import("../gentrail/generateHikes.js")).generateHikes;
+const testGenerateHikes = globalThis.__gentrailTestOverrides?.generateHikes;
+let generateHikesModulePromise = null;
+
+async function getGenerateHikes() {
+  if (testGenerateHikes) return testGenerateHikes;
+  generateHikesModulePromise ??= import("../gentrail/generateHikes.js");
+  return (await generateHikesModulePromise).generateHikes;
+}
 
 // Mount standard site shell
 mountSiteShell();
@@ -81,10 +86,11 @@ function initDebugVisibility() {
 initDebugVisibility();
 
 // State variables
-let start = null;
-let targetDistanceKm = parseFloat(localStorage.getItem("gentrail-target-distance")) || 3;
-let candidateCount = 3;
-let preferences = {
+const GENERATION_CACHE_KEY = "gentrail-generation-cache";
+const GENERATION_CACHE_VERSION = 1;
+const DEFAULT_TARGET_DISTANCE_KM = 3;
+const ROUTE_OPTION_COUNT = 5;
+const DEFAULT_PREFERENCES = Object.freeze({
   forest: 7,
   trail: 8,
   water: 5,
@@ -93,7 +99,44 @@ let preferences = {
   avoidMinorRoads: 3,
   avoidRepetitions: 9,
   beachWalking: true,
-};
+});
+const LEGACY_CACHE_KEYS = [
+  "gentrail-cached-routes",
+  "gentrail-cached-debug",
+  "gentrail-cached-selected-route-id",
+];
+
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    console.warn(`Could not read local storage key ${key}:`, error);
+    return null;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.warn(`Could not save local storage key ${key}:`, error);
+    return false;
+  }
+}
+
+function removeStorage(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.warn(`Could not remove local storage key ${key}:`, error);
+  }
+}
+
+let start = null;
+let targetDistanceKm = parseFloat(readStorage("gentrail-target-distance")) || DEFAULT_TARGET_DISTANCE_KM;
+const candidateCount = ROUTE_OPTION_COUNT;
+let preferences = { ...DEFAULT_PREFERENCES };
 let routes = [];
 let selectedRouteId = undefined;
 let latestDebugData = null;
@@ -101,6 +144,7 @@ let latestGenerationSettings = null;
 let loading = false;
 let currentController = null;
 let generationSequence = 0;
+let resetFeedbackTimer = null;
 let map = null;
 let marker = null;
 let routeLayerIds = [];
@@ -110,7 +154,7 @@ const startReadout = document.getElementById("start-readout");
 const startStatus = document.getElementById("start-status");
 const startCoords = document.getElementById("start-coords");
 const inputTargetDistance = document.getElementById("target-distance");
-const selectCandidateCount = document.getElementById("candidate-count");
+const btnResetPreferences = document.getElementById("btn-reset-preferences");
 const btnGenerate = document.getElementById("btn-generate");
 const btnText = document.getElementById("btn-text");
 const btnArrow = document.getElementById("btn-arrow");
@@ -129,6 +173,13 @@ const mapPrompt = document.getElementById("map-prompt");
 
 // Setup map
 function initMap() {
+  if (!window.maplibregl?.Map) {
+    errorMessage.textContent = "The map library could not be loaded. Check your connection and reload the page.";
+    errorMessage.classList.remove("display-none");
+    startStatus.textContent = "Map unavailable";
+    return false;
+  }
+
   const mapStyleUrl = "https://tiles.openfreemap.org/styles/liberty"; // Liberty is keyless
   
   map = new window.maplibregl.Map({
@@ -189,6 +240,7 @@ function initMap() {
     }).length;
     map.getCanvas().style.cursor = overRoute ? "pointer" : "crosshair";
   });
+  return true;
 }
 
 function setStartPoint(coords) {
@@ -201,11 +253,10 @@ function setStartPoint(coords) {
   errorMessage.classList.add("display-none");
 
   // Cache chosen trailhead in LocalStorage
-  localStorage.setItem("gentrail-start-coords", JSON.stringify(coords));
+  writeStorage("gentrail-start-coords", JSON.stringify(coords));
   // Clear cached routes
-  localStorage.removeItem("gentrail-cached-routes");
-  localStorage.removeItem("gentrail-cached-debug");
-  localStorage.removeItem("gentrail-cached-selected-route-id");
+  removeStorage(GENERATION_CACHE_KEY);
+  LEGACY_CACHE_KEYS.forEach(removeStorage);
 
   updateStartDisplay(coords);
 
@@ -271,15 +322,27 @@ beachWalkingInput.addEventListener("change", (event) => {
   preferences.beachWalking = event.target.checked;
 });
 
-// Bind select & number inputs
+// Bind settings inputs
 inputTargetDistance.addEventListener("change", (e) => {
   targetDistanceKm = Math.max(1, Math.min(40, parseFloat(e.target.value) || 1));
   inputTargetDistance.value = targetDistanceKm;
-  localStorage.setItem("gentrail-target-distance", targetDistanceKm);
+  writeStorage("gentrail-target-distance", targetDistanceKm);
 });
 
-selectCandidateCount.addEventListener("change", (e) => {
-  candidateCount = parseInt(e.target.value, 10);
+btnResetPreferences.addEventListener("click", () => {
+  applyGenerationSettings({
+    targetDistanceKm,
+    candidateCount: ROUTE_OPTION_COUNT,
+    preferences: DEFAULT_PREFERENCES,
+  });
+  removeStorage(GENERATION_CACHE_KEY);
+  LEGACY_CACHE_KEYS.forEach(removeStorage);
+
+  clearTimeout(resetFeedbackTimer);
+  btnResetPreferences.textContent = "Tuning reset";
+  resetFeedbackTimer = setTimeout(() => {
+    btnResetPreferences.textContent = "Reset tuning";
+  }, 1600);
 });
 
 // Generate button click
@@ -310,6 +373,7 @@ async function runGeneration() {
   };
   
   loading = true;
+  btnResetPreferences.disabled = true;
   btnGenerate.classList.add("generate-button--cancel");
   btnText.textContent = "Cancel generation";
   btnArrow.textContent = "×";
@@ -322,6 +386,7 @@ async function runGeneration() {
   const controller = new AbortController();
   currentController = controller;
   try {
+    const generateHikesForPage = await getGenerateHikes();
     const result = await generateHikesForPage(
       generationSettings,
       (statusText, progress) => {
@@ -342,14 +407,12 @@ async function runGeneration() {
         snappedTrailhead,
         result.trailhead.snapDistanceMeters,
       );
-      localStorage.setItem("gentrail-start-coords", JSON.stringify(start));
+      writeStorage("gentrail-start-coords", JSON.stringify(start));
     }
 
     routes = result.routes;
-    // Cache generated hikes in LocalStorage
-    localStorage.setItem("gentrail-cached-routes", JSON.stringify(routes));
-    localStorage.setItem("gentrail-cached-debug", JSON.stringify(result.debug));
     renderResults(result.debug);
+    persistGenerationCache();
   } catch (err) {
     if (
       controller.signal.aborted ||
@@ -368,6 +431,7 @@ async function runGeneration() {
       btnText.textContent = "Generate hikes";
       btnArrow.textContent = "→";
       progressContainer.classList.add("display-none");
+      btnResetPreferences.disabled = false;
       currentController = null;
     }
   }
@@ -398,7 +462,7 @@ function renderResults(debugData) {
   }
   if (routes.length < candidateCount) {
     resultMessages.push(
-      `Found ${routes.length} of ${candidateCount} requested loops with at least ${Math.round(ROUTE_DIVERSITY_MINIMUM_DIFFERENT_FRACTION * 100)}% different paths.`,
+      `Found ${routes.length} distinct loop${routes.length === 1 ? "" : "s"}; GenTrail normally shows up to ${candidateCount} with at least ${Math.round(ROUTE_DIVERSITY_MINIMUM_DIFFERENT_FRACTION * 100)}% different paths.`,
     );
   }
   if (debugData?.trailheadSnapDistanceMeters > 250) {
@@ -424,7 +488,7 @@ function renderResults(debugData) {
 
   // Select first route
   if (routes.length > 0) {
-    selectRoute(routes[0].route.candidateId);
+    selectRoute(routes[0].route.candidateId, false);
   }
 
   // Render Debug JSON
@@ -556,9 +620,8 @@ function buildRouteCard(scoredRoute, index) {
   return card;
 }
 
-function selectRoute(routeId) {
+function selectRoute(routeId, persistSelection = true) {
   selectedRouteId = routeId;
-  localStorage.setItem("gentrail-cached-selected-route-id", routeId);
 
   // Update DOM active card state
   const cards = document.querySelectorAll(".route-card");
@@ -582,6 +645,7 @@ function selectRoute(routeId) {
     map.setPaintProperty(layerId, "line-opacity", selected ? 0.95 : 0.48);
     map.setPaintProperty(layerId, "line-blur", selected ? 0 : 0.3);
   });
+  if (persistSelection) persistGenerationCache();
 }
 
 function drawRoutesOnMap() {
@@ -659,58 +723,105 @@ function formatComponentLabel(camelCaseKey) {
   return label.replace(" Score", "").replace(" Penalty", "");
 }
 
-function loadStoredStartPoint() {
-  try {
-    const storedStart = localStorage.getItem("gentrail-start-coords");
-    if (storedStart) {
-      const coords = JSON.parse(storedStart);
-      if (coords && typeof coords.lat === "number" && typeof coords.lng === "number") {
-        map.on("load", () => {
-          start = coords;
-          
-          // Update trailhead marker
-          if (marker) marker.remove();
-          const el = document.createElement("div");
-          el.className = "start-marker";
-          el.setAttribute("aria-label", "Hike starting point");
-          marker = new window.maplibregl.Marker({ element: el, anchor: "center" })
-            .setLngLat([start.lng, start.lat])
-            .addTo(map);
-
-          // Update UI Readout
-          startReadout.classList.add("start-readout--set");
-          startStatus.textContent = "Trailhead set";
-          startCoords.textContent = `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`;
-          btnGenerate.disabled = false;
-          mapPrompt.classList.add("display-none");
-          
-          map.flyTo({ center: [coords.lng, coords.lat], zoom: 14 });
-
-          // Load cached routes
-          const storedRoutes = localStorage.getItem("gentrail-cached-routes");
-          const storedDebug = localStorage.getItem("gentrail-cached-debug");
-          if (storedRoutes) {
-            routes = JSON.parse(storedRoutes);
-            const debugData = storedDebug ? JSON.parse(storedDebug) : null;
-            renderResults(debugData);
-            
-            // Restore selection if stored
-            const storedSel = localStorage.getItem("gentrail-cached-selected-route-id");
-            if (storedSel && routes.some(r => r.route.candidateId === storedSel)) {
-              selectRoute(storedSel);
-            }
-          }
-        });
-      }
-    }
-  } catch (err) {
-    console.warn("Failed to load stored trailhead and hikes:", err);
+function persistGenerationCache() {
+  if (!start || !routes.length || !latestGenerationSettings) return;
+  const cache = {
+    version: GENERATION_CACHE_VERSION,
+    savedAt: new Date().toISOString(),
+    trailhead: { ...start },
+    settings: latestGenerationSettings,
+    routes,
+    debug: latestDebugData,
+    selectedRouteId,
+  };
+  if (writeStorage(GENERATION_CACHE_KEY, JSON.stringify(cache))) {
+    LEGACY_CACHE_KEYS.forEach(removeStorage);
   }
 }
 
+function readGenerationCache() {
+  const stored = readStorage(GENERATION_CACHE_KEY);
+  if (!stored) return null;
+  try {
+    const cache = JSON.parse(stored);
+    if (
+      cache?.version !== GENERATION_CACHE_VERSION ||
+      !isCoordinate(cache.trailhead) ||
+      !isGenerationSettings(cache.settings) ||
+      !Array.isArray(cache.routes)
+    ) {
+      removeStorage(GENERATION_CACHE_KEY);
+      return null;
+    }
+    return cache;
+  } catch (error) {
+    console.warn("Failed to parse the stored GenTrail generation:", error);
+    removeStorage(GENERATION_CACHE_KEY);
+    return null;
+  }
+}
+
+function isCoordinate(value) {
+  return Number.isFinite(value?.lat) && Number.isFinite(value?.lng);
+}
+
+function isGenerationSettings(value) {
+  return value &&
+    Number.isFinite(value.targetDistanceKm) &&
+    Number.isInteger(value.candidateCount) &&
+    value.preferences &&
+    typeof value.preferences === "object";
+}
+
+function applyGenerationSettings(settings) {
+  targetDistanceKm = Math.max(1, Math.min(40, settings.targetDistanceKm));
+  for (const key of preferencesKeys) {
+    const value = Number(settings.preferences[key]);
+    if (!Number.isFinite(value)) continue;
+    preferences[key] = Math.max(0, Math.min(10, Math.round(value)));
+    document.getElementById(`pref-${key}`).value = preferences[key];
+    document.getElementById(`val-${key}`).textContent = preferences[key];
+  }
+  if (typeof settings.preferences.beachWalking === "boolean") {
+    preferences.beachWalking = settings.preferences.beachWalking;
+    beachWalkingInput.checked = preferences.beachWalking;
+  }
+  inputTargetDistance.value = targetDistanceKm;
+}
+
+function loadStoredStartPoint() {
+  const cachedGeneration = readGenerationCache();
+  const storedStart = readStorage("gentrail-start-coords");
+  let legacyStart = null;
+  try {
+    legacyStart = storedStart ? JSON.parse(storedStart) : null;
+  } catch (error) {
+    console.warn("Failed to parse the stored GenTrail trailhead:", error);
+    removeStorage("gentrail-start-coords");
+  }
+  const coords = cachedGeneration?.trailhead ?? legacyStart;
+  if (!isCoordinate(coords)) return;
+
+  map.on("load", () => {
+    updateStartDisplay(coords);
+    btnGenerate.disabled = false;
+    mapPrompt.classList.add("display-none");
+    map.flyTo({ center: [coords.lng, coords.lat], zoom: 14 });
+
+    if (!cachedGeneration?.routes.length) return;
+    applyGenerationSettings(cachedGeneration.settings);
+    latestGenerationSettings = cachedGeneration.settings;
+    routes = cachedGeneration.routes;
+    renderResults(cachedGeneration.debug ?? null);
+    const storedSelection = cachedGeneration.selectedRouteId;
+    if (storedSelection && routes.some(r => r.route.candidateId === storedSelection)) {
+      selectRoute(storedSelection);
+    }
+  });
+}
+
 // Initialize
-initMap();
-loadStoredStartPoint();
+if (initMap()) loadStoredStartPoint();
 inputTargetDistance.value = targetDistanceKm;
 
 function downloadGPX(scoredRoute, index) {

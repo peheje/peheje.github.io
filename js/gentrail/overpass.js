@@ -4,42 +4,52 @@ import {
   stitchClosedRings,
 } from "./osmGeometry.js";
 import { buildFeatureQuery, categoriesFor } from "./osmQuery.js";
+import { runWithTimeout } from "./timedOperation.js";
 
 const OVERPASS_ENDPOINTS = [
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   "https://overpass-api.de/api/interpreter",
-  "https://lz4.overpass-api.de/api/interpreter",
-  "https://z.overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter"
+  "https://overpass.private.coffee/api/interpreter",
 ];
+const ENDPOINT_TIMEOUT_MS = 30000;
 
-export async function fetchOsmFeatures(bounds, signal) {
+export async function fetchOsmFeatures(bounds, signal, onEndpointAttempt) {
   const query = buildFeatureQuery(bounds);
   let lastError = null;
 
-  for (const endpoint of OVERPASS_ENDPOINTS) {
+  for (let endpointIndex = 0; endpointIndex < OVERPASS_ENDPOINTS.length; endpointIndex += 1) {
+    const endpoint = OVERPASS_ENDPOINTS[endpointIndex];
     try {
       signal?.throwIfAborted();
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-        },
-        body: `data=${encodeURIComponent(query)}`,
-        signal,
+      onEndpointAttempt?.({
+        attempt: endpointIndex + 1,
+        total: OVERPASS_ENDPOINTS.length,
+        endpoint,
       });
+      const raw = await runWithTimeout(async (requestSignal) => {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+          },
+          body: `data=${encodeURIComponent(query)}`,
+          signal: requestSignal,
+        });
 
-      let raw;
-      const contentType = response.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        raw = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(`Overpass failed with HTTP ${response.status}: ${text.slice(0, 200)}`);
-      }
+        const contentType = response.headers.get("content-type") || "";
+        let responseBody;
+        if (contentType.includes("application/json")) {
+          responseBody = await response.json();
+        } else {
+          const text = await response.text();
+          throw new Error(`Overpass failed with HTTP ${response.status}: ${text.slice(0, 200)}`);
+        }
 
-      if (!response.ok) {
-        throw new Error(raw.remark ?? `Overpass failed with HTTP ${response.status}`);
-      }
+        if (!response.ok) {
+          throw new Error(responseBody.remark ?? `Overpass failed with HTTP ${response.status}`);
+        }
+        return responseBody;
+      }, signal, ENDPOINT_TIMEOUT_MS, "Map server did not respond within 30 seconds");
 
       return {
         features: (raw.elements ?? []).flatMap(toOsmFeatures),

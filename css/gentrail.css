@@ -183,7 +183,7 @@
 
 .field-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
@@ -303,6 +303,34 @@
   height: 18px;
   accent-color: var(--accent);
   cursor: pointer;
+}
+
+.preferences-reset {
+  display: block;
+  margin: 16px 0 0 auto;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--bg);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background 150ms ease;
+}
+
+.preferences-reset:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--bg-card);
+}
+
+.preferences-reset:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .generate-button {

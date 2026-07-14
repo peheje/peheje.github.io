@@ -41,14 +41,6 @@
                                 <span>km</span>
                             </div>
                         </label>
-                        <label class="field">
-                            <span>Route options</span>
-                            <select id="candidate-count" style="background: var(--bg-card); color: var(--text); border: 1px solid var(--line);">
-                                <option value="3" selected>3 loops</option>
-                                <option value="4">4 loops</option>
-                                <option value="5">5 loops</option>
-                            </select>
-                        </label>
                     </div>
                 </div>
 
@@ -122,6 +114,7 @@
                             <input type="range" id="pref-avoidRepetitions" min="0" max="10" value="9" />
                         </div>
                     </div>
+                    <button type="button" class="preferences-reset" id="btn-reset-preferences">Reset tuning</button>
                     <button class="generate-button" id="btn-generate" disabled>
                         <span id="btn-text">Generate hikes</span>
                         <span aria-hidden="true" id="btn-arrow">→</span>
