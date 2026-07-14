@@ -164,12 +164,7 @@ function collectDays(start, stop) {
 function collectTime(start, stop) {
   const reverse = start > stop;
   const from = reverse ? stop : start;
-  const end = reverse ? start : stop;
-  // Preserve the original Fable calculator's inclusive-date convention: an
-  // end time of midnight includes the whole final calendar day.
-  const to = end.getHours() === 0 && end.getMinutes() === 0
-    ? new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1)
-    : end;
+  const to = reverse ? start : stop;
   let cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
   let totalDays = 0;
   let weekendDays = 0;
