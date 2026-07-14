@@ -16,10 +16,22 @@
             <div class="inline-block">
                 <label for="start-day">Start day:</label>
                 <input id="start-day" type="date" />
+                <div id="start-time-field" hidden>
+                    <label for="start-time">Start time:</label>
+                    <input id="start-time" type="time" step="60" />
+                </div>
             </div>
             <div class="inline-block">
                 <label for="end-day">End day:</label>
                 <input id="end-day" type="date" />
+                <div id="end-time-field" hidden>
+                    <label for="end-time">End time:</label>
+                    <input id="end-time" type="time" step="60" />
+                </div>
+            </div>
+            <div class="inline-block">
+                <label for="include-times">Include times:</label>
+                <input id="include-times" type="checkbox" />
             </div>
         </section>
 
@@ -30,6 +42,11 @@
                 <label>Total duration</label>
                 <b id="total-duration">-</b>
                 <br>
+                <span id="hours-between-row" hidden>
+                    <label>Hours between:</label>
+                    <b id="hours-between">-</b>
+                    <br>
+                </span>
                 <label>Weekend-days:</label>
                 <b id="weekend-days">-</b>
                 <br>
