@@ -18,10 +18,25 @@
             display: flex;
             gap: 10px;
             width: 100%;
+            align-items: stretch;
         }
 
         .search-row input[type="text"] {
             flex: 1;
+        }
+
+        .search-row input[type="text"],
+        .search-row .btn-small {
+            box-sizing: border-box;
+            height: 42px;
+            min-height: 42px;
+        }
+
+        .search-row .btn-small {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.2;
         }
 
         .suggestions-list {
@@ -75,12 +90,33 @@
         }
 
         .location-info {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: start;
+            column-gap: 16px;
             margin-top: 10px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            line-height: 1.35;
             color: var(--muted);
+        }
+
+        .location-selection {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 2px 6px;
+            min-width: 0;
+        }
+
+        .location-coordinates {
+            display: inline-block;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .location-updated {
+            white-space: nowrap;
+            opacity: 0.7;
         }
 
         .weather-summary-grid {
@@ -141,6 +177,18 @@
             width: 100%;
         }
 
+        .forecast-heading-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        #zoom-toggle-btn {
+            white-space: nowrap;
+            flex: 0 0 auto;
+        }
+
         .curve-tabs {
             position: relative;
             display: flex;
@@ -169,6 +217,17 @@
             }
             .weather-actions > .curve-tabs {
                 width: auto;
+            }
+        }
+
+        @media (max-width: 599px) {
+            .forecast-heading-controls {
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            .weather-actions > .curve-tabs {
+                margin-left: 0 !important;
             }
         }
 
@@ -613,7 +672,7 @@
         <section class="inline-block margin-bottom-10">
             <div class="search-container">
                 <div class="search-row">
-                    <input type="text" id="city-search" autocomplete="off" placeholder="Enter a city, then press Search (e.g. Oslo, London, Tokyo)" aria-label="City search" aria-controls="suggestions-list" aria-expanded="false" />
+                    <input type="text" id="city-search" autocomplete="off" placeholder="Search for a city…" aria-label="City search" aria-controls="suggestions-list" aria-expanded="false" />
                     <button id="search-btn" class="btn-small">Search</button>
                     <button id="location-btn" class="btn-small" title="Use current GPS location">GPS</button>
                 </div>
@@ -621,8 +680,8 @@
                 <p class="geocoding-attribution">Place search © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a></p>
             </div>
             <div class="location-info">
-                <span>Selected: <span id="location-display" class="active-location">Oslo, Norge</span><span id="gps-badge" class="gps-badge">GPS</span> <span id="coordinates-display" style="font-family: monospace; font-size: 0.8rem;">(59.91, 10.74)</span></span>
-                <span id="last-updated" style="font-size: 0.8rem; opacity: 0.7;">Updated: --:--</span>
+                <span class="location-selection"><span class="location-label">Selected:</span><span id="location-display" class="active-location">Oslo, Norge</span><span id="gps-badge" class="gps-badge">GPS</span><span id="coordinates-display" class="location-coordinates">(59.91, 10.74)</span></span>
+                <span id="last-updated" class="location-updated">Updated: --:--</span>
             </div>
         </section>
 
@@ -686,14 +745,14 @@
             </section>
 
             <!-- Global Day Toggle Bar -->
-            <div class="actions weather-actions margin-bottom-10" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="actions weather-actions margin-bottom-10">
+                <div class="forecast-heading-controls">
                     <span style="font-weight: 700; color: var(--text);">Daily Forecasts</span>
                     <button id="zoom-toggle-btn" type="button" aria-label="Change forecast time range" style="padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; min-height: 28px; min-width: 125px;">
                         🔍 Zoom: Full Day
                     </button>
                 </div>
-                <div id="day-tabs" class="curve-tabs" style="margin-left: auto;">
+                <div id="day-tabs" class="curve-tabs">
                     <!-- Populated dynamically in JS -->
                 </div>
             </div>
@@ -779,11 +838,6 @@
                         <button class="nav-arrow prev-day" aria-label="Previous Day">&lsaquo;</button>
                         <h4 class="curve-title">Moon phase<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
-                    </div>
-                    <div id="moon-view-tabs" class="curve-tabs" aria-label="Moon graph style" style="width: fit-content; margin: -2px auto 8px;">
-                        <button type="button" class="curve-tab active" data-moon-view="strip">Moons</button>
-                        <button type="button" class="curve-tab" data-moon-view="bars">Light</button>
-                        <button type="button" class="curve-tab" data-moon-view="calendar">Calendar</button>
                     </div>
                     <div class="canvas-container">
                         <canvas id="moon-canvas" role="img" aria-label="Moon phase and illumination graph"></canvas>

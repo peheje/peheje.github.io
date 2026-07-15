@@ -36,10 +36,6 @@ let searchRequestId = 0;
 let lastSearchAt = 0;
 let locationIntentId = 0;
 const geocodeCache = new Map();
-const MOON_VIEW_MODES = ["strip", "bars", "calendar"];
-let moonViewMode = localStorage.getItem("weather_moon_view");
-if (!MOON_VIEW_MODES.includes(moonViewMode)) moonViewMode = "strip";
-
 let globalLimits = {
   uvMax: 10,
   tempMin: 0,
@@ -62,8 +58,6 @@ const loadingSpinner = document.getElementById("loading-spinner");
 
 const dayTabsContainer = document.getElementById("day-tabs");
 const zoomToggleBtn = document.getElementById("zoom-toggle-btn");
-const moonViewTabs = document.getElementById("moon-view-tabs");
-
 const uvCanvas = document.getElementById("uv-canvas");
 const tempCanvas = document.getElementById("temp-canvas");
 const rainCanvas = document.getElementById("rain-canvas");
@@ -566,6 +560,27 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
 
 function getDailyTimeseries(timeseries, dayIndex) {
   const hoursData = getDailyTimeseriesRaw(timeseries, dayIndex);
+
+  // UV is astronomical and follows a daily curve, but today's forecast can
+  // begin partway through the day. Reuse the same hour from a neighboring
+  // day to preserve the curve instead of drawing a flat missing-data segment.
+  const previousDayPoints = dayIndex > 0 ? getDailyTimeseriesRaw(timeseries, dayIndex - 1) : null;
+  const nextDayPoints = dayIndex < 6 ? getDailyTimeseriesRaw(timeseries, dayIndex + 1) : null;
+  hoursData.forEach(point => {
+    if (point.uv !== null && point.uv !== undefined) return;
+
+    const candidates = dayIndex === 0
+      ? [nextDayPoints]
+      : [previousDayPoints, nextDayPoints];
+    const fallback = candidates
+      .map(points => points?.[point.hour])
+      .find(candidate => candidate && candidate.uv !== null && candidate.uv !== undefined);
+    if (fallback) {
+      point.uv = fallback.uv;
+      point.isUvEstimated = true;
+    }
+  });
+
   const displayData = [...hoursData];
 
   // Forecasts often continue at 02:00 after a final 20:00 snapshot. Add one
@@ -609,20 +624,23 @@ function getDailyTimeseries(timeseries, dayIndex) {
   // Find hours with real MET UV data
   const realUvIndices = [];
   displayData.forEach((h, i) => {
-    if (h.uv !== null && h.uv !== undefined) {
+    if (!h.isUvEstimated && h.uv !== null && h.uv !== undefined) {
       realUvIndices.push(i);
     }
   });
 
   if (realUvIndices.length === 0) {
-    // When a future day has no MET UV data, calculate a clear-sky UV estimate
+    // When a future day has no MET UV data, calculate clear-sky estimates only
+    // for points that could not be filled from a neighboring day.
     displayData.forEach(h => {
-      const d = getLocationDayDate(dayIndex, h.hour, 30);
-      h.uv = getClearSkyUv(d, currentLoc.lat, currentLoc.lon);
-      h.isUvEstimated = true;
+      if (h.uv === null) {
+        const d = getLocationDayDate(dayIndex, h.hour, 30);
+        h.uv = getClearSkyUv(d, currentLoc.lat, currentLoc.lon);
+        h.isUvEstimated = true;
+      }
     });
   } else {
-    // Fill all missing points with clear-sky fallback initially (for leading/trailing)
+    // Fill any remaining missing points with a clear-sky fallback.
     displayData.forEach(h => {
       if (h.uv === null) {
         const d = getLocationDayDate(dayIndex, h.hour, 30);
@@ -2594,24 +2612,6 @@ function showContextMenu(x, y, card) {
   }, 0);
 }
 
-// Initialize Page
-function setupMoonViewTabs() {
-  if (!moonViewTabs) return;
-  moonViewTabs.querySelectorAll("[data-moon-view]").forEach(button => {
-    const mode = button.dataset.moonView;
-    button.classList.toggle("active", mode === moonViewMode);
-    button.addEventListener("click", () => {
-      if (!MOON_VIEW_MODES.includes(mode) || mode === moonViewMode) return;
-      moonViewMode = mode;
-      localStorage.setItem("weather_moon_view", moonViewMode);
-      moonViewTabs.querySelectorAll("[data-moon-view]").forEach(tab => {
-        tab.classList.toggle("active", tab.dataset.moonView === moonViewMode);
-      });
-      scheduleForecastDraw();
-    });
-  });
-}
-
 function initWeatherPage() {
   // Hidden developer reset command via URL parameter
   if (new URLSearchParams(window.location.search).has("reset")) {
@@ -2632,8 +2632,6 @@ function initWeatherPage() {
   restoreMinimizedStates();
   setupHeaderContextMenu();
   setupRadarLifecycle();
-  setupMoonViewTabs();
-
   // Load last stored location if any
   loadStoredLocation();
 
@@ -2908,19 +2906,15 @@ function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, ac
     W,
     H,
     days,
-    isLightMode,
     textColor,
     mutedColor,
     accentColor,
     darkMoonBg,
     darkMoonBorder,
-    lightMoonBg,
-    surfaceColor: computedStyle.getPropertyValue("--surface-strong").trim() || "rgba(20, 20, 20, 0.85)"
+    lightMoonBg
   };
 
-  if (moonViewMode === "bars") renderMoonLightBars(view);
-  else if (moonViewMode === "calendar") renderMoonCalendar(view);
-  else renderMoonStrip(view);
+  renderMoonStrip(view);
 }
 
 function renderMoonViewHeading(ctx, W, selected, textColor, mutedColor) {
@@ -2992,104 +2986,6 @@ function renderMoonStrip(view) {
   ctx.textAlign = "right";
   ctx.fillText("next 4 days →", W - 16, H - 18);
   ctx.restore();
-}
-
-function renderMoonLightBars(view) {
-  const { ctx, W, H, days, textColor, mutedColor, accentColor } = view;
-  const selected = days[4];
-  renderMoonViewHeading(ctx, W, selected, textColor, mutedColor);
-
-  const left = 36;
-  const right = W - 14;
-  const top = 40;
-  const bottom = H - 32;
-  const plotH = bottom - top;
-  const slotW = (right - left) / days.length;
-
-  [0, 0.5, 1].forEach(level => {
-    const y = bottom - level * plotH;
-    ctx.save();
-    ctx.strokeStyle = "rgba(148, 163, 184, 0.16)";
-    ctx.setLineDash([3, 4]);
-    ctx.beginPath();
-    ctx.moveTo(left, y);
-    ctx.lineTo(right, y);
-    ctx.stroke();
-    ctx.fillStyle = mutedColor;
-    ctx.font = "8px sans-serif";
-    ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`${level * 100}%`, left - 5, y);
-    ctx.restore();
-  });
-
-  days.forEach((day, index) => {
-    const illumination = day.phase.illumination;
-    const barW = Math.max(8, slotW * 0.58);
-    const x = left + index * slotW + (slotW - barW) / 2;
-    const barH = Math.max(2, illumination * plotH);
-    const y = bottom - barH;
-    const selectedDay = day.offset === 0;
-    ctx.save();
-    ctx.fillStyle = selectedDay ? accentColor : "rgba(250, 245, 220, 0.62)";
-    ctx.fillRect(x, y, barW, barH);
-    if (selectedDay) {
-      ctx.strokeStyle = textColor;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, y, barW, barH);
-    }
-    ctx.fillStyle = textColor;
-    ctx.font = "8px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(`${(illumination * 100).toFixed(0)}`, x + barW / 2, Math.max(top + 9, y - 3));
-    ctx.fillStyle = selectedDay ? accentColor : mutedColor;
-    ctx.textBaseline = "top";
-    ctx.fillText(day.label, x + barW / 2, bottom + 7);
-    ctx.restore();
-  });
-}
-
-function renderMoonCalendar(view) {
-  const { ctx, W, H, days, textColor, mutedColor, accentColor, darkMoonBg, darkMoonBorder, lightMoonBg, surfaceColor } = view;
-  const gap = 5;
-  const paddingX = 8;
-  const paddingY = 7;
-  const cellW = (W - paddingX * 2 - gap * 2) / 3;
-  const cellH = (H - paddingY * 2 - gap * 2) / 3;
-
-  days.forEach((day, index) => {
-    const col = index % 3;
-    const row = Math.floor(index / 3);
-    const x = paddingX + col * (cellW + gap);
-    const y = paddingY + row * (cellH + gap);
-    const selectedDay = day.offset === 0;
-
-    ctx.save();
-    ctx.fillStyle = selectedDay ? "rgba(232, 160, 69, 0.12)" : surfaceColor;
-    ctx.strokeStyle = selectedDay ? accentColor : "rgba(148, 163, 184, 0.18)";
-    ctx.lineWidth = selectedDay ? 2 : 1;
-    ctx.beginPath();
-    ctx.roundRect(x, y, cellW, cellH, 6);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    const moonX = x + 24;
-    const moonY = y + cellH / 2;
-    drawMoonGraphic(ctx, moonX, moonY, Math.min(13, cellH * 0.24), day.phase.fraction, darkMoonBg, darkMoonBorder, lightMoonBg);
-
-    ctx.save();
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = selectedDay ? accentColor : mutedColor;
-    ctx.font = `${selectedDay ? "bold" : "normal"} 8px sans-serif`;
-    ctx.fillText(day.label, x + 45, y + cellH * 0.34);
-    ctx.fillStyle = textColor;
-    ctx.font = "bold 10px sans-serif";
-    ctx.fillText(`${(day.phase.illumination * 100).toFixed(0)}%`, x + 45, y + cellH * 0.64);
-    ctx.restore();
-  });
 }
 
 // Initialize!
