@@ -667,15 +667,23 @@ function getDailyTimeseries(timeseries, dayIndex) {
           const est_j = getClearSkyUv(dj, currentLoc.lat, currentLoc.lon);
           
           let interpUv;
-          if (est_j > 0 && est1 > 0 && est2 > 0) {
+          if (est_j <= 0) {
+            // Never interpolate UV through hours when the sun is below the horizon.
+            interpUv = 0;
+          } else if (est1 > 0 && est2 > 0) {
             const ratio1 = u1 / est1;
             const ratio2 = u2 / est2;
             const t = (j - idx1) / (idx2 - idx1);
             const interpRatio = ratio1 + t * (ratio2 - ratio1);
             interpUv = est_j * interpRatio;
+          } else if (est2 > 0) {
+            // A nighttime left anchor cannot define a useful UV slope. Scale the
+            // solar curve from the daylight reading on the right instead.
+            interpUv = est_j * (u2 / est2);
+          } else if (est1 > 0) {
+            interpUv = est_j * (u1 / est1);
           } else {
-            const t = (j - idx1) / (idx2 - idx1);
-            interpUv = u1 + t * (u2 - u1);
+            interpUv = est_j;
           }
           displayData[j].uv = Math.max(0, interpUv);
           displayData[j].isUvEstimated = true;
