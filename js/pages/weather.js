@@ -86,6 +86,7 @@ const WEATHER_SYMBOLS = {
   partlycloudy: { emoji: "⛅", desc: "Partly Cloudy" },
   cloudy: { emoji: "☁️", desc: "Cloudy" },
   rainshowers: { emoji: "🌧️", desc: "Rain Showers" },
+  rainshowersandthunder: { emoji: "⛈️", desc: "Rain Showers and Thunder" },
   rain: { emoji: "🌧️", desc: "Rain" },
   heavyrain: { emoji: "⛈️", desc: "Heavy Rain" },
   snowshowers: { emoji: "🌨️", desc: "Snow Showers" },
