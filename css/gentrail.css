@@ -699,6 +699,22 @@
   font-size: 10px;
 }
 
+.map-location-status {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 2;
+  max-width: min(340px, calc(100% - 24px));
+  padding: 10px 12px;
+  border: 1px solid #e5b4a5;
+  border-radius: 9px;
+  color: #863e2c;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .start-marker {
   width: 19px;
   height: 19px;
@@ -750,22 +766,385 @@
 }
 
 @media (max-width: 760px) {
-  .gentrail-app {
-    grid-template-columns: 1fr;
-    height: auto;
+  body.gentrail-page {
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: max(28px, env(safe-area-inset-bottom));
+    padding-left: max(8px, env(safe-area-inset-left));
   }
+
+  .gentrail-page .app-shell {
+    margin-top: 10px;
+  }
+
+  .gentrail-app {
+    grid-template-areas:
+      "map"
+      "controls";
+    grid-template-columns: 1fr;
+    gap: 12px;
+    height: auto;
+    min-height: 0;
+  }
+
   .sidebar {
+    grid-area: controls;
     height: auto;
     max-height: none;
+    overflow: visible;
+    border-radius: 14px;
+    scroll-margin-top: 10px;
   }
+
+  .beta-notice {
+    gap: 5px;
+    padding: 15px 18px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .beta-notice strong {
+    font-size: 11px;
+  }
+
+  .control-section,
+  .results-section {
+    padding: 24px 18px 26px;
+  }
+
+  .control-section {
+    scroll-margin-top: 10px;
+  }
+
+  .section-heading {
+    margin-bottom: 20px;
+  }
+
+  .section-heading span,
+  .route-card__eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+  }
+
+  .section-heading h2 {
+    margin-top: 5px;
+    font-size: 24px;
+    letter-spacing: -0.35px;
+  }
+
+  .start-readout {
+    gap: 13px;
+    margin-bottom: 20px;
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .start-readout__dot {
+    width: 12px;
+    height: 12px;
+  }
+
+  .start-readout strong {
+    font-size: 15px;
+  }
+
+  .start-readout small {
+    margin-top: 3px;
+    font-size: 12px;
+  }
+
+  .field {
+    gap: 9px;
+  }
+
+  .field > span {
+    font-size: 14px;
+  }
+
+  .number-input,
+  .field select {
+    height: 50px;
+    border-radius: 11px;
+  }
+
+  .number-input input,
+  .field select {
+    font-size: 16px;
+  }
+
+  .number-input input {
+    padding-left: 14px;
+  }
+
+  .number-input span {
+    padding-right: 14px;
+    font-size: 14px;
+  }
+
+  .preferences {
+    gap: 20px;
+  }
+
+  .preference {
+    column-gap: 14px;
+  }
+
+  .preference__heading {
+    align-items: center;
+    font-size: 15px;
+  }
+
+  .preference__heading output {
+    min-width: 28px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 11%, transparent);
+    text-align: center;
+  }
+
+  .preference__description {
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .preference input[type="range"] {
+    display: block;
+    width: 100%;
+    height: 44px;
+    margin: 2px 0 -4px;
+    padding: 0;
+    touch-action: pan-y;
+  }
+
+  .preference--toggle {
+    min-height: 52px;
+    gap: 16px;
+  }
+
+  .preference--toggle span {
+    gap: 4px;
+  }
+
+  .preference--toggle strong {
+    font-size: 15px;
+  }
+
+  .preference--toggle small {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .preference--toggle input {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+  }
+
+  .preferences-reset {
+    min-height: 44px;
+    margin-top: 20px;
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .generate-button {
+    height: 54px;
+    margin-top: 24px;
+    padding: 0 18px;
+    border-radius: 12px;
+    font-size: 16px;
+  }
+
+  .progress {
+    gap: 10px;
+    margin-top: 16px;
+    font-size: 13px;
+  }
+
+  .progress output {
+    font-size: 12px;
+  }
+
+  .progress__track {
+    height: 8px;
+  }
+
+  .error-message,
+  .info-message {
+    padding: 12px 13px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
   .map-shell {
+    grid-area: map;
     height: 400px;
+    height: min(54svh, 460px);
+    min-height: 340px;
+    border-radius: 14px;
   }
+
   .map-prompt {
-    top: auto;
-    bottom: 20px;
-    right: 20px;
-    left: 20px;
+    top: 12px;
+    right: 64px;
+    bottom: auto;
+    left: 12px;
     width: auto;
+    padding: 13px 14px;
+    border-radius: 10px;
+  }
+
+  .map-prompt span {
+    font-size: 11px;
+  }
+
+  .map-prompt strong {
+    font-size: 19px;
+  }
+
+  .map-prompt p {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .map-location-status {
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
+    padding: 12px 13px;
+    font-size: 14px;
+  }
+
+  .maplibregl-ctrl-top-right {
+    top: 10px;
+    right: 10px;
+  }
+
+  .maplibregl-ctrl-group {
+    gap: 4px;
+  }
+
+  .maplibregl-ctrl-group button {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+    width: 44px !important;
+    height: 44px !important;
+    background-size: 21px 21px !important;
+  }
+
+  .route-list {
+    gap: 12px;
+  }
+
+  .route-card {
+    padding: 17px 16px 17px 20px;
+    border-radius: 12px;
+  }
+
+  .route-card h3 {
+    font-size: 21px;
+  }
+
+  .score-badge {
+    width: 54px;
+    height: 54px;
+  }
+
+  .score-badge strong {
+    font-size: 19px;
+  }
+
+  .score-badge span {
+    font-size: 9px;
+  }
+
+  .route-card__facts {
+    gap: 10px;
+    margin-top: 9px;
+    font-size: 13px;
+  }
+
+  .warnings {
+    gap: 7px;
+    margin-top: 12px;
+  }
+
+  .warnings span {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .score-breakdown {
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 15px;
+  }
+
+  .score-row span {
+    font-size: 13px;
+  }
+
+  .score-row small {
+    margin-top: 3px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .score-row strong {
+    font-size: 14px;
+  }
+
+  .gpx-export-btn,
+  .beta-report__button {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .beta-report {
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .beta-report small {
+    font-size: 12px;
+  }
+
+  .debug-panel summary {
+    padding: 13px 14px;
+    font-size: 12px;
+  }
+
+  .debug-panel pre {
+    font-size: 11px;
+  }
+
+  #debug-log {
+    min-height: 200px;
+    font-size: 13px !important;
+  }
+
+  #copy-log-btn {
+    min-height: 44px;
+    font-size: 14px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .control-section,
+  .results-section {
+    padding-right: 15px;
+    padding-left: 15px;
+  }
+
+  .map-shell {
+    min-height: 320px;
+  }
+
+  .map-prompt strong {
+    font-size: 17px;
   }
 }

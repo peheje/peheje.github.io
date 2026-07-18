@@ -170,6 +170,21 @@ const routeList = document.getElementById("route-list");
 const debugContent = document.getElementById("debug-content");
 const btnBetaReport = document.getElementById("btn-beta-report");
 const mapPrompt = document.getElementById("map-prompt");
+const mapLocationStatus = document.getElementById("map-location-status");
+
+function confirmTrailheadChange() {
+  return !routes?.length || confirm("Are you sure you want to discard the generated routes and select a new trailhead?");
+}
+
+function showLocationError(error) {
+  const messages = {
+    1: "Location access was denied. Enable location access in your browser, then reload and try again.",
+    2: "Your current location is unavailable. Check that GPS is enabled and try again.",
+    3: "Finding your location timed out. Move somewhere with a clearer GPS signal and try again.",
+  };
+  mapLocationStatus.textContent = messages[error?.code] ?? "Your current location could not be found. Check GPS and try again.";
+  mapLocationStatus.classList.remove("display-none");
+}
 
 // Setup map
 function initMap() {
@@ -191,6 +206,34 @@ function initMap() {
   });
 
   map.addControl(new window.maplibregl.NavigationControl(), "top-right");
+  if (window.maplibregl.GeolocateControl) {
+    const geolocateControl = new window.maplibregl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true,
+        maximumAge: 60_000,
+        timeout: 15_000,
+      },
+      fitBoundsOptions: {
+        maxZoom: 15,
+      },
+      trackUserLocation: false,
+      showUserLocation: false,
+      showAccuracyCircle: false,
+    });
+    map.addControl(geolocateControl, "top-right");
+    geolocateControl.on("geolocate", (position) => {
+      const latitude = Number(position?.coords?.latitude);
+      const longitude = Number(position?.coords?.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        showLocationError();
+        return;
+      }
+      if (!confirmTrailheadChange()) return;
+      mapLocationStatus.classList.add("display-none");
+      setStartPoint({ lat: latitude, lng: longitude });
+    });
+    geolocateControl.on("error", showLocationError);
+  }
   map.addControl(
     new window.maplibregl.AttributionControl({ compact: true }),
     "bottom-right",
@@ -215,17 +258,13 @@ function initMap() {
     }
 
     // Prevent accidental click-away if routes are already generated
-    if (routes && routes.length > 0) {
-      if (!confirm("Are you sure you want to discard the generated routes and select a new trailhead?")) {
-        return;
-      }
-    }
+    if (!confirmTrailheadChange()) return;
 
     // Set trailhead start point
     setStartPoint({
       lng: event.lngLat.lng,
       lat: event.lngLat.lat,
-    });
+    }, true);
   });
 
   map.on("mousemove", (event) => {
@@ -243,7 +282,7 @@ function initMap() {
   return true;
 }
 
-function setStartPoint(coords) {
+function setStartPoint(coords, revealControls = false) {
   invalidateActiveGeneration();
   start = coords;
   routes = [];
@@ -264,6 +303,16 @@ function setStartPoint(coords) {
   mapPrompt.classList.add("display-none");
 
   clearMapRoutes();
+
+  if (revealControls && window.matchMedia?.("(max-width: 760px)").matches) {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    requestAnimationFrame(() => {
+      startReadout.closest(".control-section")?.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+  }
 }
 
 function updateStartDisplay(coords, snapDistanceMeters = 0) {
