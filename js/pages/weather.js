@@ -13,8 +13,8 @@ const DEFAULT_LOC = {
 // Caching parameters
 const CACHE_PREFIX = "peheje_weather_";
 const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
-const TIME_ZONE_CACHE_PREFIX = "peheje_weather_timezone_";
 const GEOCODING_URL = "https://nominatim.openstreetmap.org";
+const OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const MAX_FORECAST_CACHE_ENTRIES = 12;
 const rainMock = createRainMock();
 
@@ -97,6 +97,21 @@ const WEATHER_SYMBOLS = {
   fog: { emoji: "🌫️", desc: "Fog" }
 };
 
+function getWeatherSymbolCode(weatherCode) {
+  if (weatherCode === 0) return "clearsky";
+  if (weatherCode === 1) return "fair";
+  if (weatherCode === 2) return "partlycloudy";
+  if (weatherCode === 3) return "cloudy";
+  if (weatherCode === 45 || weatherCode === 48) return "fog";
+  if ([51, 53, 55, 61, 63, 80, 81].includes(weatherCode)) return "rain";
+  if ([56, 57, 66, 67].includes(weatherCode)) return "sleet";
+  if ([65, 82].includes(weatherCode)) return "heavyrain";
+  if ([71, 73, 77, 85].includes(weatherCode)) return "snow";
+  if ([75, 86].includes(weatherCode)) return "heavysnow";
+  if ([95, 96, 99].includes(weatherCode)) return "rainshowersandthunder";
+  return null;
+}
+
 function getWeatherInfo(symbolCode) {
   if (!symbolCode) return { emoji: "❔", desc: "Forecast unavailable" };
   const cleanCode = symbolCode.split("_")[0];
@@ -172,24 +187,6 @@ function getLocationDayDate(dayIndex, hour = 12, minute = 0) {
 
 function getLocationHour(date) {
   return getZonedParts(date).hour;
-}
-
-async function resolveTimeZone(lat, lon, signal) {
-  const cacheKey = `${TIME_ZONE_CACHE_PREFIX}${lat.toFixed(2)}_${lon.toFixed(2)}`;
-  const cached = localStorage.getItem(cacheKey);
-  if (cached) return cached;
-
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&timezone=auto&forecast_days=1`;
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw new Error(`Timezone service returned status ${response.status}`);
-  }
-  const data = await response.json();
-  if (!data.timezone) {
-    throw new Error("Timezone service did not return a timezone");
-  }
-  localStorage.setItem(cacheKey, data.timezone);
-  return data.timezone;
 }
 
 // Show/hide spinner & dashboard
@@ -368,7 +365,65 @@ function getResponseExpiresAt(response, timestamp) {
   return Number.isFinite(expiresAt) && expiresAt > timestamp ? expiresAt : timestamp + CACHE_EXPIRY_MS;
 }
 
-// Fetch forecast from api.met.no with local caching
+function numberAt(values, index) {
+  const value = values?.[index];
+  return Number.isFinite(value) ? value : null;
+}
+
+function normalizeOpenMeteoForecast(payload) {
+  const hourly = payload?.hourly;
+  if (!payload?.timezone || !Array.isArray(hourly?.time) || hourly.time.length === 0) {
+    throw new Error("Open-Meteo returned an incomplete hourly forecast");
+  }
+
+  const timeseries = hourly.time.map((unixSeconds, index) => {
+    if (!Number.isFinite(unixSeconds)) {
+      throw new Error("Open-Meteo returned an invalid forecast timestamp");
+    }
+
+    // Open-Meteo assigns precipitation to the preceding hour. The chart
+    // assigns a bar to the interval beginning at each point, so use the next
+    // response value for the interval represented by this timestamp.
+    const precipitationIndex = index + 1;
+    const precipitation = numberAt(hourly.precipitation, precipitationIndex);
+    const precipitationProbability = numberAt(hourly.precipitation_probability, precipitationIndex);
+    const precipitationDetails = {};
+    if (precipitation !== null) precipitationDetails.precipitation_amount = precipitation;
+    if (precipitationProbability !== null) precipitationDetails.probability_of_precipitation = precipitationProbability;
+
+    return {
+      time: new Date(unixSeconds * 1000).toISOString(),
+      data: {
+        instant: {
+          details: {
+            air_temperature: numberAt(hourly.temperature_2m, index),
+            ultraviolet_index: numberAt(hourly.uv_index, index),
+            ultraviolet_index_clear_sky: numberAt(hourly.uv_index_clear_sky, index),
+            cloud_area_fraction: numberAt(hourly.cloud_cover, index),
+            cloud_area_fraction_low: numberAt(hourly.cloud_cover_low, index),
+            cloud_area_fraction_medium: numberAt(hourly.cloud_cover_mid, index),
+            cloud_area_fraction_high: numberAt(hourly.cloud_cover_high, index),
+            wind_speed: numberAt(hourly.wind_speed_10m, index),
+            wind_from_direction: numberAt(hourly.wind_direction_10m, index)
+          }
+        },
+        next_1_hours: {
+          summary: { symbol_code: getWeatherSymbolCode(numberAt(hourly.weather_code, index)) },
+          details: precipitationDetails
+        }
+      }
+    };
+  });
+
+  return {
+    provider: "open-meteo",
+    schemaVersion: 2,
+    timezone: payload.timezone,
+    properties: { timeseries }
+  };
+}
+
+// Fetch a complete hourly forecast from Open-Meteo with local caching.
 async function fetchWeather(lat, lon, forceRefresh = false, signal) {
   const cacheKey = `${CACHE_PREFIX}${lat.toFixed(3)}_${lon.toFixed(3)}`;
   const cached = localStorage.getItem(cacheKey);
@@ -377,7 +432,7 @@ async function fetchWeather(lat, lon, forceRefresh = false, signal) {
     try {
       const parsed = JSON.parse(cached);
       const expiresAt = parsed.expiresAt || parsed.timestamp + CACHE_EXPIRY_MS;
-      if (Date.now() < expiresAt) {
+      if (parsed.data?.provider === "open-meteo" && parsed.data?.schemaVersion === 2 && Date.now() < expiresAt) {
         parsed.data.lastUpdated = parsed.timestamp;
         parsed.data.expiresAt = expiresAt;
         return parsed.data;
@@ -391,8 +446,29 @@ async function fetchWeather(lat, lon, forceRefresh = false, signal) {
     throw new Error("Window unloaded");
   }
 
-  // Fetch from MET Norway LocationforecastComplete
-  const url = `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`;
+  const params = new URLSearchParams({
+    latitude: lat.toFixed(4),
+    longitude: lon.toFixed(4),
+    hourly: [
+      "temperature_2m",
+      "precipitation",
+      "precipitation_probability",
+      "cloud_cover",
+      "cloud_cover_low",
+      "cloud_cover_mid",
+      "cloud_cover_high",
+      "wind_speed_10m",
+      "wind_direction_10m",
+      "uv_index",
+      "uv_index_clear_sky",
+      "weather_code"
+    ].join(","),
+    timezone: "auto",
+    timeformat: "unixtime",
+    wind_speed_unit: "ms",
+    forecast_days: "10"
+  });
+  const url = `${OPEN_METEO_FORECAST_URL}?${params}`;
   let data;
   let expiresAt;
   try {
@@ -403,17 +479,17 @@ async function fetchWeather(lat, lon, forceRefresh = false, signal) {
     }
 
     if (!response.ok) {
-      throw new Error(`MET Norway API returned status ${response.status}`);
+      throw new Error(`Open-Meteo API returned status ${response.status}`);
     }
 
-    data = await response.json();
+    data = normalizeOpenMeteoForecast(await response.json());
     expiresAt = getResponseExpiresAt(response, Date.now());
   } catch (err) {
     if (err.name === "AbortError") throw err;
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (parsed.data?.properties?.timeseries) {
+        if (parsed.data?.provider === "open-meteo" && parsed.data?.schemaVersion === 2 && parsed.data?.properties?.timeseries) {
           parsed.data.lastUpdated = parsed.timestamp;
           parsed.data.expiresAt = parsed.expiresAt || parsed.timestamp + CACHE_EXPIRY_MS;
           parsed.data.isStale = true;
@@ -424,27 +500,6 @@ async function fetchWeather(lat, lon, forceRefresh = false, signal) {
       }
     }
     throw err;
-  }
-
-  // Merge timeseries from old cache if available to preserve history of today's past hours
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      const oldTimeseries = parsed.data?.properties?.timeseries || [];
-      const newTimeseries = data.properties?.timeseries || [];
-      const earliestNewTime = Math.min(...newTimeseries.map(item => new Date(item.time).getTime()));
-      const minTime = Date.now() - 30 * 60 * 60 * 1000;
-      // Preserve only historical points that the new response cannot contain.
-      // Keeping old future points makes an expired forecast look current.
-      const historicalPoints = oldTimeseries.filter(item => {
-        const time = new Date(item.time).getTime();
-        return time >= minTime && time < earliestNewTime;
-      });
-      data.properties.timeseries = [...historicalPoints, ...newTimeseries]
-        .sort((a, b) => new Date(a.time) - new Date(b.time));
-    } catch (err) {
-      console.warn("Error merging cached forecast timeseries:", err);
-    }
   }
 
   // Save to cache
@@ -508,6 +563,7 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
   const hoursData = Array.from({ length: 24 }, (_, i) => ({
     hour: i,
     uv: null,
+    uvClearSky: null,
     temp: null,
     symbol: null,
     rain: null,
@@ -515,12 +571,12 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
     rainMin: null,
     rainProb: null,
     rainIntervalHours: null,
-    clouds: 0,
-    cloudsLow: 0,
-    cloudsMid: 0,
-    cloudsHigh: 0,
-    windSpeed: 0,
-    windDir: 0
+    clouds: null,
+    cloudsLow: null,
+    cloudsMid: null,
+    cloudsHigh: null,
+    windSpeed: null,
+    windDir: null
   }));
 
   timeseries.forEach(item => {
@@ -530,28 +586,28 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
       const hr = getLocationHour(itemDate);
       const details = item.data.instant.details;
       if (details) {
-        hoursData[hr].uv = details.ultraviolet_index_clear_sky !== undefined ? details.ultraviolet_index_clear_sky : null;
+        hoursData[hr].uv = details.ultraviolet_index ?? null;
+        hoursData[hr].uvClearSky = details.ultraviolet_index_clear_sky ?? null;
         hoursData[hr].temp = details.air_temperature;
-        hoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || item.data.next_6_hours?.summary?.symbol_code || null;
+        hoursData[hr].symbol = item.data.next_1_hours?.summary?.symbol_code || null;
         
         const oneHourRain = item.data.next_1_hours?.details;
-        const sixHourRain = item.data.next_6_hours?.details;
-        const rainDetails = oneHourRain || sixHourRain;
+        const rainDetails = oneHourRain;
         if (rainDetails?.precipitation_amount !== undefined) {
           hoursData[hr].rain = rainDetails.precipitation_amount;
-          hoursData[hr].rainMax = rainDetails.precipitation_amount_max ?? rainDetails.precipitation_amount;
-          hoursData[hr].rainMin = rainDetails.precipitation_amount_min ?? rainDetails.precipitation_amount;
+          hoursData[hr].rainMax = rainDetails.precipitation_amount_max ?? null;
+          hoursData[hr].rainMin = rainDetails.precipitation_amount_min ?? null;
           hoursData[hr].rainProb = rainDetails.probability_of_precipitation ?? null;
-          hoursData[hr].rainIntervalHours = oneHourRain ? 1 : 6;
+          hoursData[hr].rainIntervalHours = 1;
         }
 
-        hoursData[hr].clouds = details.cloud_area_fraction !== undefined ? details.cloud_area_fraction : 0;
-        hoursData[hr].cloudsLow = details.cloud_area_fraction_low !== undefined ? details.cloud_area_fraction_low : 0;
-        hoursData[hr].cloudsMid = details.cloud_area_fraction_medium !== undefined ? details.cloud_area_fraction_medium : 0;
-        hoursData[hr].cloudsHigh = details.cloud_area_fraction_high !== undefined ? details.cloud_area_fraction_high : 0;
+        hoursData[hr].clouds = details.cloud_area_fraction ?? null;
+        hoursData[hr].cloudsLow = details.cloud_area_fraction_low ?? null;
+        hoursData[hr].cloudsMid = details.cloud_area_fraction_medium ?? null;
+        hoursData[hr].cloudsHigh = details.cloud_area_fraction_high ?? null;
 
-        hoursData[hr].windSpeed = details.wind_speed || 0;
-        hoursData[hr].windDir = details.wind_from_direction || 0;
+        hoursData[hr].windSpeed = details.wind_speed ?? null;
+        hoursData[hr].windDir = details.wind_from_direction ?? null;
       }
     }
   });
@@ -561,141 +617,8 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
 
 function getDailyTimeseries(timeseries, dayIndex) {
   const hoursData = getDailyTimeseriesRaw(timeseries, dayIndex);
-
-  // UV is astronomical and follows a daily curve, but today's forecast can
-  // begin partway through the day. Reuse the same hour from a neighboring
-  // day to preserve the curve instead of drawing a flat missing-data segment.
-  const previousDayPoints = dayIndex > 0 ? getDailyTimeseriesRaw(timeseries, dayIndex - 1) : null;
-  const nextDayPoints = dayIndex < 6 ? getDailyTimeseriesRaw(timeseries, dayIndex + 1) : null;
-  hoursData.forEach(point => {
-    if (point.uv !== null && point.uv !== undefined) return;
-
-    const candidates = dayIndex === 0
-      ? [nextDayPoints]
-      : [previousDayPoints, nextDayPoints];
-    const fallback = candidates
-      .map(points => points?.[point.hour])
-      .find(candidate => candidate && candidate.uv !== null && candidate.uv !== undefined);
-    if (fallback) {
-      point.uv = fallback.uv;
-      point.isUvEstimated = true;
-    }
-  });
-
-  const displayData = [...hoursData];
-
-  // Forecasts often continue at 02:00 after a final 20:00 snapshot. Add one
-  // clearly estimated boundary point so the day chart does not look cut off.
-  // Rain stays unknown: a six-hour total must never be converted to hourly rain.
-  if (dayIndex < 6) {
-    const lastPoint = [...hoursData].reverse().find(point => point.temp !== null);
-    const nextDayPoints = getDailyTimeseriesRaw(timeseries, dayIndex + 1);
-    const nextPoint = nextDayPoints.find(point => point.temp !== null);
-    const gapHours = lastPoint && nextPoint ? (24 + nextPoint.hour) - lastPoint.hour : Infinity;
-    if (lastPoint && nextPoint && lastPoint.hour < 23 && gapHours > 1 && gapHours <= 6) {
-      const ratio = (23 - lastPoint.hour) / gapHours;
-      const estimated = {
-        ...lastPoint,
-        hour: 23,
-        uv: lastPoint.uv !== null && nextPoint.uv !== null ? lastPoint.uv + (nextPoint.uv - lastPoint.uv) * ratio : null,
-        temp: lastPoint.temp + (nextPoint.temp - lastPoint.temp) * ratio,
-        rain: null,
-        rainMax: null,
-        rainMin: null,
-        rainProb: null,
-        rainIntervalHours: null,
-        clouds: lastPoint.clouds + (nextPoint.clouds - lastPoint.clouds) * ratio,
-        cloudsLow: lastPoint.cloudsLow + (nextPoint.cloudsLow - lastPoint.cloudsLow) * ratio,
-        cloudsMid: lastPoint.cloudsMid + (nextPoint.cloudsMid - lastPoint.cloudsMid) * ratio,
-        cloudsHigh: lastPoint.cloudsHigh + (nextPoint.cloudsHigh - lastPoint.cloudsHigh) * ratio,
-        windSpeed: lastPoint.windSpeed + (nextPoint.windSpeed - lastPoint.windSpeed) * ratio,
-        isEstimated: true
-      };
-      displayData[23] = estimated;
-    }
-  }
-
-  // --- UV Estimation and Interpolation ---
-  const getClearSkyUv = (d, lat, lon) => {
-    const pos = SunCalc.getPosition(d, lat, lon);
-    if (pos.altitude <= 0) return 0;
-    return Math.max(0, Math.pow(Math.sin(pos.altitude), 2.4) * 10);
-  };
-
-  // Find hours with real MET UV data
-  const realUvIndices = [];
-  displayData.forEach((h, i) => {
-    if (!h.isUvEstimated && h.uv !== null && h.uv !== undefined) {
-      realUvIndices.push(i);
-    }
-  });
-
-  if (realUvIndices.length === 0) {
-    // When a future day has no MET UV data, calculate clear-sky estimates only
-    // for points that could not be filled from a neighboring day.
-    displayData.forEach(h => {
-      if (h.uv === null) {
-        const d = getLocationDayDate(dayIndex, h.hour, 30);
-        h.uv = getClearSkyUv(d, currentLoc.lat, currentLoc.lon);
-        h.isUvEstimated = true;
-      }
-    });
-  } else {
-    // Fill any remaining missing points with a clear-sky fallback.
-    displayData.forEach(h => {
-      if (h.uv === null) {
-        const d = getLocationDayDate(dayIndex, h.hour, 30);
-        h.uv = getClearSkyUv(d, currentLoc.lat, currentLoc.lon);
-        h.isUvEstimated = true;
-      }
-    });
-
-    // For internal gaps between real UV points, render a smooth/dotted interpolated curve
-    for (let i = 0; i < realUvIndices.length - 1; i++) {
-      const idx1 = realUvIndices[i];
-      const idx2 = realUvIndices[i + 1];
-      if (idx2 - idx1 > 1) {
-        const u1 = displayData[idx1].uv;
-        const u2 = displayData[idx2].uv;
-        
-        const d1 = getLocationDayDate(dayIndex, idx1, 30);
-        const d2 = getLocationDayDate(dayIndex, idx2, 30);
-        const est1 = getClearSkyUv(d1, currentLoc.lat, currentLoc.lon);
-        const est2 = getClearSkyUv(d2, currentLoc.lat, currentLoc.lon);
-
-        for (let j = idx1 + 1; j < idx2; j++) {
-          const dj = getLocationDayDate(dayIndex, j, 30);
-          const est_j = getClearSkyUv(dj, currentLoc.lat, currentLoc.lon);
-          
-          let interpUv;
-          if (est_j <= 0) {
-            // Never interpolate UV through hours when the sun is below the horizon.
-            interpUv = 0;
-          } else if (est1 > 0 && est2 > 0) {
-            const ratio1 = u1 / est1;
-            const ratio2 = u2 / est2;
-            const t = (j - idx1) / (idx2 - idx1);
-            const interpRatio = ratio1 + t * (ratio2 - ratio1);
-            interpUv = est_j * interpRatio;
-          } else if (est2 > 0) {
-            // A nighttime left anchor cannot define a useful UV slope. Scale the
-            // solar curve from the daylight reading on the right instead.
-            interpUv = est_j * (u2 / est2);
-          } else if (est1 > 0) {
-            interpUv = est_j * (u1 / est1);
-          } else {
-            interpUv = est_j;
-          }
-          displayData[j].uv = Math.max(0, interpUv);
-          displayData[j].isUvEstimated = true;
-        }
-      }
-    }
-  }
-
-  rainMock?.applyForecast(displayData, dayIndex);
-
-  return { data: hoursData, displayData, found: hoursData.some(h => h.temp !== null) };
+  rainMock?.applyForecast(hoursData, dayIndex);
+  return { data: hoursData, displayData: hoursData, found: hoursData.some(h => h.temp !== null) };
 }
 
 // Chart hours are normally relative to a single day. Rolling views use this
@@ -889,8 +812,10 @@ function calculateGlobalLimits(timeseries) {
   timeseries.forEach(item => {
     const details = item.data.instant.details;
     if (details) {
-      const uv = details.ultraviolet_index_clear_sky || 0;
+      const uv = details.ultraviolet_index || 0;
       if (uv > maxUV) maxUV = uv;
+      const clearSkyUv = details.ultraviolet_index_clear_sky || 0;
+      if (clearSkyUv > maxUV) maxUV = clearSkyUv;
 
       const temp = details.air_temperature;
       if (temp !== undefined && temp !== null) {
@@ -898,13 +823,13 @@ function calculateGlobalLimits(timeseries) {
         if (temp > maxTemp) maxTemp = temp;
       }
 
-      const wind = details.wind_speed || 0;
-      if (wind > maxWind) maxWind = wind;
+      const wind = details.wind_speed;
+      if (Number.isFinite(wind) && wind > maxWind) maxWind = wind;
     }
 
-    const rainDetails = item.data.next_1_hours?.details || item.data.next_6_hours?.details;
+    const rainDetails = item.data.next_1_hours?.details;
     if (rainDetails?.precipitation_amount !== undefined) {
-      const rain = rainDetails.precipitation_amount_max ?? rainDetails.precipitation_amount;
+      const rain = rainDetails.precipitation_amount;
       if (rain > maxRain) maxRain = rain;
     }
   });
@@ -951,7 +876,7 @@ function updateDashboardUI(data, fullRender = true) {
 
   if (currentForecast) {
     const details = currentForecast.data.instant.details;
-    let uvVal = details.ultraviolet_index_clear_sky || 0;
+    let uvVal = details.ultraviolet_index || 0;
     
     // Interpolate UV index based on current minute to show exact minute-by-minute value
     const nextHour = (currentHour + 1) % 24;
@@ -964,7 +889,7 @@ function updateDashboardUI(data, fullRender = true) {
       }
     }
     if (nextForecast) {
-      const nextUv = nextForecast.data.instant.details.ultraviolet_index_clear_sky || 0;
+      const nextUv = nextForecast.data.instant.details.ultraviolet_index || 0;
       const t = now.getMinutes() / 60 + now.getSeconds() / 3600;
       uvVal = uvVal + t * (nextUv - uvVal);
     }
@@ -1099,6 +1024,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   const gridColor = computedStyle.getPropertyValue("--line").trim() || "rgba(200, 160, 120, 0.15)";
   const accentColor = computedStyle.getPropertyValue("--accent").trim() || "#e8a045";
   const accent2Color = computedStyle.getPropertyValue("--accent-2").trim() || "#d4763a";
+  const clearSkyUvColor = computedStyle.getPropertyValue("--uv-clear-sky").trim() || "#8a5a00";
 
   ctx.clearRect(0, 0, W, H);
 
@@ -1186,7 +1112,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       gridLevels.push(val);
     }
   } else if (paramType === "wind") {
-    const maxVal = (globalLimits && globalLimits.windMax !== undefined) ? globalLimits.windMax : Math.max(...dayPoints.map(p => p.windSpeed), 0);
+    const winds = dayPoints.map(p => p.windSpeed).filter(value => value !== null);
+    const maxVal = (globalLimits && globalLimits.windMax !== undefined) ? globalLimits.windMax : Math.max(...winds, 0);
     minScaleY = 0;
     let step;
     if (maxVal > 20) {
@@ -1289,11 +1216,13 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   });
   ctx.restore();
 
-  // Build coordinate points, filtering out entries that do not have forecast data (like past hours, or missing intermediate hours on later days)
+  // Build coordinate points using availability for the graph being rendered.
   const points = dayPoints.filter(p => {
     if (paramType === "tide") return p.value !== null;
     if (paramType === "rain") return p.rain !== null;
     if (paramType === "uv") return p.uv !== null;
+    if (paramType === "wind") return p.windSpeed !== null;
+    if (paramType === "clouds") return p.clouds !== null;
     return p.temp !== null;
   }).map(p => {
     let val = 0;
@@ -1309,6 +1238,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       y: getY(val),
       val: val,
       uv: p.uv,
+      uvClearSky: p.uvClearSky,
       temp: p.temp,
       rain: p.rain,
       rainMax: p.rainMax,
@@ -1323,24 +1253,24 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       windDir: p.windDir,
       hour: p.hour,
       symbol: p.symbol,
-      tideValue: p.value,
-      isEstimated: p.isEstimated === true,
-      isUvEstimated: p.isUvEstimated === true
+      tideValue: p.value
     };
   });
 
   if (points.length === 0) return;
 
-  // Keep source points distinct from the short dotted connectors below. The
-  // connector helps read a six-hour forecast cadence without claiming that
-  // MET supplied hourly values in between.
+  const clearSkyUvPoints = paramType === "uv"
+    ? dayPoints
+      .filter(point => point.uvClearSky !== null)
+      .map(point => ({ x: getX(point.hour), y: getY(point.uvClearSky), hour: point.hour }))
+    : [];
+
+  // Keep disconnected source ranges separate if a provider value is missing.
   const segments = [];
   points.forEach(point => {
     const previous = segments.at(-1)?.at(-1);
     if (!previous || point.hour !== previous.hour + 1) {
       segments.push([point]);
-    } else if (paramType === "uv" && !!point.isUvEstimated !== !!previous.isUvEstimated) {
-      segments.push([previous, point]);
     } else {
       segments.at(-1).push(point);
     }
@@ -1449,6 +1379,33 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     });
     ctx.restore();
 
+    // Clear-sky UV is a reference ceiling: the solid curve remains the
+    // cloud-adjusted forecast used by the current UV card and safety advice.
+    if (paramType === "uv" && clearSkyUvPoints.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = clearSkyUvColor;
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.setLineDash([8, 5]);
+      ctx.beginPath();
+      ctx.moveTo(clearSkyUvPoints[0].x, clearSkyUvPoints[0].y);
+      for (let i = 0; i < clearSkyUvPoints.length - 1; i++) {
+        const point = clearSkyUvPoints[i];
+        const nextPoint = clearSkyUvPoints[i + 1];
+        if (nextPoint.hour !== point.hour + 1) {
+          ctx.moveTo(nextPoint.x, nextPoint.y);
+          continue;
+        }
+        const xc = (point.x + nextPoint.x) / 2;
+        const yc = (point.y + nextPoint.y) / 2;
+        ctx.quadraticCurveTo(point.x, point.y, xc, yc);
+      }
+      ctx.lineTo(clearSkyUvPoints.at(-1).x, clearSkyUvPoints.at(-1).y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // 4. Draw curve line stroke
     ctx.save();
     const lineGrad = ctx.createLinearGradient(paddingL, 0, W - paddingR, 0);
@@ -1477,11 +1434,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
     segments.forEach(segment => {
       ctx.save();
-      if (paramType === "uv" && segment.some(point => point.isUvEstimated)) {
-        ctx.setLineDash([4, 4]);
-      } else {
-        ctx.setLineDash([]);
-      }
+      ctx.setLineDash([]);
       ctx.beginPath();
       ctx.moveTo(segment[0].x, segment[0].y);
       for (let i = 0; i < segment.length - 1; i++) {
@@ -1498,30 +1451,10 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       ctx.restore();
     });
 
-    // Forecasts commonly become six-hourly farther into the future. Connect
-    // nearby source points with a dotted line, but never create hourly values
-    // or use this representation for precipitation totals.
-    if (paramType !== "tide" && paramType !== "uv") {
-      points.slice(0, -1).forEach((point, index) => {
-        const nextPoint = points[index + 1];
-        const gapHours = nextPoint.hour - point.hour;
-        if (gapHours > 1 && gapHours <= 6) {
-          ctx.save();
-          ctx.setLineDash([6, 5]);
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(point.x, point.y);
-          ctx.lineTo(nextPoint.x, nextPoint.y);
-          ctx.stroke();
-          ctx.restore();
-        }
-      });
-    }
-
-    // Small circles identify the actual provider-supplied forecast snapshots.
+    // Small circles identify provider-supplied hourly forecast values.
     ctx.save();
     ctx.fillStyle = lineGrad;
-    points.filter(point => !point.isEstimated && !point.isUvEstimated).forEach(point => {
+    points.forEach(point => {
       ctx.beginPath();
       ctx.arc(point.x, point.y, 2.5, 0, 2 * Math.PI);
       ctx.fill();
@@ -1697,6 +1630,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       const hpY = p0.y + t * (p1.y - p0.y);
       const hpVal = p0.val + t * (p1.val - p0.val);
       const hpUv = p0.uv + t * (p1.uv - p0.uv);
+      const hpUvClearSky = p0.uvClearSky !== null && p1.uvClearSky !== null
+        ? p0.uvClearSky + t * (p1.uvClearSky - p0.uvClearSky)
+        : p0.uvClearSky;
       const hpTemp = p0.temp !== null && p1.temp !== null ? p0.temp + t * (p1.temp - p0.temp) : p0.temp;
       const hpRain = p0.rain !== null && p1.rain !== null ? p0.rain + t * (p1.rain - p0.rain) : p0.rain;
       const hpWindSpeed = p0.windSpeed + t * (p1.windSpeed - p0.windSpeed);
@@ -1715,6 +1651,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         y: hpY,
         val: hpVal,
         uv: hpUv,
+        uvClearSky: hpUvClearSky,
         temp: hpTemp,
         rain: hpRain,
         windSpeed: hpWindSpeed,
@@ -1729,9 +1666,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         rainProb: hpRainProb,
         rainMin: hpRainMin,
         rainMax: hpRainMax,
-        rainIntervalHours: p0.rainIntervalHours,
-        isEstimated: p0.isEstimated,
-        isUvEstimated: p0.isUvEstimated
+        rainIntervalHours: p0.rainIntervalHours
       };
 
       // Dotted hover line
@@ -1772,6 +1707,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         boxColor = uvLevel.color;
         tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
         tooltipLines.push(`UV Index: ${hp.uv.toFixed(1)}`);
+        if (hp.uvClearSky !== null) {
+          tooltipLines.push(`Clear sky: ${hp.uvClearSky.toFixed(1)}`);
+        }
         tooltipLines.push(`Level: ${uvLevel.label}`);
       } else if (paramType === "temp") {
         const emojiInfo = getWeatherInfo(hp.symbol);
@@ -1808,13 +1746,6 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         tooltipLines.push(`Low Clouds: ${hp.cloudsLow.toFixed(0)}%`);
         tooltipLines.push(`Mid Clouds: ${hp.cloudsMid.toFixed(0)}%`);
         tooltipLines.push(`High Clouds: ${hp.cloudsHigh.toFixed(0)}%`);
-      }
-
-      if (hp.isEstimated) {
-        tooltipLines.push("Estimated to day boundary");
-      }
-      if (paramType === "uv" && hp.isUvEstimated) {
-        tooltipLines.push("Modelled clear-sky UV");
       }
 
       ctx.font = "bold 11px sans-serif";
@@ -2028,13 +1959,8 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false, fo
     setLoaderState(true);
   }
   try {
-    const [nextForecast, timeZone] = await Promise.all([
-      fetchWeather(lat, lon, forceRefresh, controller.signal),
-      resolveTimeZone(lat, lon, controller.signal).catch(err => {
-        console.warn("Timezone lookup failed; using the previous timezone", err);
-        return currentLoc.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-      })
-    ]);
+    const nextForecast = await fetchWeather(lat, lon, forceRefresh, controller.signal);
+    const timeZone = nextForecast.timezone || currentLoc.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     if (!window.location || loadId !== weatherLoadId || locationIntent !== locationIntentId) return;
 
     forecastData = nextForecast;
@@ -2557,11 +2483,11 @@ function showContextMenu(x, y, card) {
 
   // Source Attribution (Unclickable Button)
   const CARD_SOURCES = {
-    temp: "MET Norway",
-    precip: "MET Norway",
-    clouds: "MET Norway",
-    uv: "MET Norway",
-    wind: "MET Norway",
+    temp: "Open-Meteo",
+    precip: "Open-Meteo",
+    clouds: "Open-Meteo",
+    uv: "Open-Meteo",
+    wind: "Open-Meteo",
     tide: "Open-Meteo Marine (forecast sea level)",
     moon: "Local Calculation",
     radar: "Windy"

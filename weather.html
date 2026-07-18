@@ -501,6 +501,25 @@
             text-align: center;
         }
 
+        html {
+            --uv-clear-sky: #8a5a00;
+        }
+
+        html.theme-blue,
+        html.theme-warm,
+        html.theme-forest,
+        html.theme-dusk {
+            --uv-clear-sky: #fde047;
+        }
+
+        .uv-clear-sky-swatch {
+            display: inline-block;
+            width: 20px;
+            margin: 0 3px 2px 2px;
+            border-top: 3px dashed var(--uv-clear-sky);
+            vertical-align: middle;
+        }
+
         canvas {
             display: block;
             width: 100%;
@@ -802,8 +821,9 @@
                         <h4 class="curve-title">UV index<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
+                    <p class="tide-note">Solid: cloud-adjusted forecast · <span class="uv-clear-sky-swatch" aria-hidden="true"></span>Clear-sky potential</p>
                     <div class="canvas-container">
-                        <canvas id="uv-canvas" role="img" aria-label="UV index forecast graph"></canvas>
+                        <canvas id="uv-canvas" role="img" aria-label="Cloud-adjusted and clear-sky UV index forecast graph"></canvas>
                     </div>
                 </div>
 
@@ -864,14 +884,15 @@
             </div>
             
             <div style="font-size: 0.8rem; color: var(--muted); text-align: center; margin-bottom: 20px;">
-                Solid lines and dots are provider forecast snapshots. Dotted lines connect nearby snapshots when forecasts are six-hourly. Dotted UV curves are approximate clear-sky models, not provider forecasts. Precipitation totals are never interpolated. Swipe graph titles (or use chevrons) to change forecast days. Drag on graphs to synchronously inspect timelines. Right-click or long-press card headers to minimize or reorder.
+                Curves show hourly model forecasts, including elapsed hours today; they are not station observations. Precipitation bars cover the following hour and are never interpolated. Swipe graph titles (or use chevrons) to change forecast days. Drag on graphs to synchronously inspect timelines. Right-click or long-press card headers to minimize or reorder.
+                Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo.com</a>, available under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.
             </div>
         </div>
 
         <!-- Loader -->
         <div id="loading-spinner" class="loader">
             <div class="spinner"></div>
-            <p>Fetching weather forecast from Yr...</p>
+            <p>Fetching weather forecast from Open-Meteo...</p>
         </div>
     </main>
 
