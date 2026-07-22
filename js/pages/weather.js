@@ -404,6 +404,7 @@ function normalizeOpenMeteoForecast(payload) {
             cloud_area_fraction_medium: numberAt(hourly.cloud_cover_mid, index),
             cloud_area_fraction_high: numberAt(hourly.cloud_cover_high, index),
             wind_speed: numberAt(hourly.wind_speed_10m, index),
+            wind_speed_of_gust: numberAt(hourly.wind_gusts_10m, index),
             wind_from_direction: numberAt(hourly.wind_direction_10m, index)
           }
         },
@@ -417,7 +418,7 @@ function normalizeOpenMeteoForecast(payload) {
 
   return {
     provider: "open-meteo",
-    schemaVersion: 2,
+    schemaVersion: 3,
     timezone: payload.timezone,
     properties: { timeseries }
   };
@@ -432,7 +433,7 @@ async function fetchWeather(lat, lon, forceRefresh = false, signal) {
     try {
       const parsed = JSON.parse(cached);
       const expiresAt = parsed.expiresAt || parsed.timestamp + CACHE_EXPIRY_MS;
-      if (parsed.data?.provider === "open-meteo" && parsed.data?.schemaVersion === 2 && Date.now() < expiresAt) {
+      if (parsed.data?.provider === "open-meteo" && parsed.data?.schemaVersion === 3 && Date.now() < expiresAt) {
         parsed.data.lastUpdated = parsed.timestamp;
         parsed.data.expiresAt = expiresAt;
         return parsed.data;
@@ -458,6 +459,7 @@ async function fetchWeather(lat, lon, forceRefresh = false, signal) {
       "cloud_cover_mid",
       "cloud_cover_high",
       "wind_speed_10m",
+      "wind_gusts_10m",
       "wind_direction_10m",
       "uv_index",
       "uv_index_clear_sky",
@@ -489,7 +491,7 @@ async function fetchWeather(lat, lon, forceRefresh = false, signal) {
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (parsed.data?.provider === "open-meteo" && parsed.data?.schemaVersion === 2 && parsed.data?.properties?.timeseries) {
+        if (parsed.data?.provider === "open-meteo" && parsed.data?.schemaVersion === 3 && parsed.data?.properties?.timeseries) {
           parsed.data.lastUpdated = parsed.timestamp;
           parsed.data.expiresAt = parsed.expiresAt || parsed.timestamp + CACHE_EXPIRY_MS;
           parsed.data.isStale = true;
@@ -576,6 +578,7 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
     cloudsMid: null,
     cloudsHigh: null,
     windSpeed: null,
+    windGust: null,
     windDir: null
   }));
 
@@ -607,6 +610,7 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
         hoursData[hr].cloudsHigh = details.cloud_area_fraction_high ?? null;
 
         hoursData[hr].windSpeed = details.wind_speed ?? null;
+        hoursData[hr].windGust = details.wind_speed_of_gust ?? null;
         hoursData[hr].windDir = details.wind_from_direction ?? null;
       }
     }
@@ -825,6 +829,8 @@ function calculateGlobalLimits(timeseries) {
 
       const wind = details.wind_speed;
       if (Number.isFinite(wind) && wind > maxWind) maxWind = wind;
+      const windGust = details.wind_speed_of_gust;
+      if (Number.isFinite(windGust) && windGust > maxWind) maxWind = windGust;
     }
 
     const rainDetails = item.data.next_1_hours?.details;
@@ -915,6 +921,7 @@ function updateDashboardUI(data, fullRender = true) {
     const tempValue = document.getElementById("temp-value");
     const weatherDesc = document.getElementById("weather-desc");
     const windValue = document.getElementById("wind-value");
+    const windGustValue = document.getElementById("wind-gust-value");
     const precipValue = document.getElementById("precip-value");
 
     const symbolCode = currentForecast.data.next_1_hours?.summary?.symbol_code || null;
@@ -924,6 +931,7 @@ function updateDashboardUI(data, fullRender = true) {
     weatherDesc.textContent = weather.desc;
 
     windValue.textContent = Number.isFinite(details.wind_speed) ? `${details.wind_speed.toFixed(1)} m/s` : "-- m/s";
+    windGustValue.textContent = Number.isFinite(details.wind_speed_of_gust) ? `${details.wind_speed_of_gust.toFixed(1)} m/s` : "-- m/s";
     
     const precip = currentForecast.data.next_1_hours?.details?.precipitation_amount;
     precipValue.textContent = precip === undefined ? "-- mm" : `${precip.toFixed(1)} mm`;
@@ -1250,6 +1258,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       cloudsMid: p.cloudsMid,
       cloudsHigh: p.cloudsHigh,
       windSpeed: p.windSpeed,
+      windGust: p.windGust,
       windDir: p.windDir,
       hour: p.hour,
       symbol: p.symbol,
@@ -1263,6 +1272,12 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     ? dayPoints
       .filter(point => point.uvClearSky !== null)
       .map(point => ({ x: getX(point.hour), y: getY(point.uvClearSky), hour: point.hour }))
+    : [];
+
+  const windGustPoints = paramType === "wind"
+    ? dayPoints
+      .filter(point => point.windGust !== null)
+      .map(point => ({ x: getX(point.hour), y: getY(point.windGust), hour: point.hour }))
     : [];
 
   // Keep disconnected source ranges separate if a provider value is missing.
@@ -1402,6 +1417,31 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         ctx.quadraticCurveTo(point.x, point.y, xc, yc);
       }
       ctx.lineTo(clearSkyUvPoints.at(-1).x, clearSkyUvPoints.at(-1).y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (paramType === "wind" && windGustPoints.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = "#f97316";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.setLineDash([8, 5]);
+      ctx.beginPath();
+      ctx.moveTo(windGustPoints[0].x, windGustPoints[0].y);
+      for (let i = 0; i < windGustPoints.length - 1; i++) {
+        const point = windGustPoints[i];
+        const nextPoint = windGustPoints[i + 1];
+        if (nextPoint.hour !== point.hour + 1) {
+          ctx.moveTo(nextPoint.x, nextPoint.y);
+          continue;
+        }
+        const xc = (point.x + nextPoint.x) / 2;
+        const yc = (point.y + nextPoint.y) / 2;
+        ctx.quadraticCurveTo(point.x, point.y, xc, yc);
+      }
+      ctx.lineTo(windGustPoints.at(-1).x, windGustPoints.at(-1).y);
       ctx.stroke();
       ctx.restore();
     }
@@ -1636,6 +1676,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       const hpTemp = p0.temp !== null && p1.temp !== null ? p0.temp + t * (p1.temp - p0.temp) : p0.temp;
       const hpRain = p0.rain !== null && p1.rain !== null ? p0.rain + t * (p1.rain - p0.rain) : p0.rain;
       const hpWindSpeed = p0.windSpeed + t * (p1.windSpeed - p0.windSpeed);
+      const hpWindGust = p0.windGust !== null && p1.windGust !== null
+        ? p0.windGust + t * (p1.windGust - p0.windGust)
+        : p0.windGust;
       const hpTideValue = p0.tideValue !== null && p1.tideValue !== null ? p0.tideValue + t * (p1.tideValue - p0.tideValue) : p0.tideValue;
       const hpClouds = p0.clouds + t * (p1.clouds - p0.clouds);
       const hpCloudsLow = p0.cloudsLow + t * (p1.cloudsLow - p0.cloudsLow);
@@ -1655,6 +1698,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         temp: hpTemp,
         rain: hpRain,
         windSpeed: hpWindSpeed,
+        windGust: hpWindGust,
         windDir: p0.windDir,
         tideValue: hpTideValue,
         clouds: hpClouds,
@@ -1734,6 +1778,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         boxColor = "#00f5d4";
         tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
         tooltipLines.push(`Wind: ${hp.windSpeed.toFixed(1)} m/s`);
+        tooltipLines.push(`Gusts: ${hp.windGust !== null ? hp.windGust.toFixed(1) : "--"} m/s`);
         tooltipLines.push(`Direction: ${getWindDirectionLabel(hp.windDir)} (${hp.windDir}\u00B0)`);
       } else if (paramType === "tide") {
         boxColor = "#00b4d8";

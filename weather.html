@@ -396,7 +396,7 @@
 
         .weather-details-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 12px;
             margin-top: 15px;
             border-top: 1px solid var(--line);
@@ -517,6 +517,14 @@
             width: 20px;
             margin: 0 3px 2px 2px;
             border-top: 3px dashed var(--uv-clear-sky);
+            vertical-align: middle;
+        }
+
+        .wind-gust-swatch {
+            display: inline-block;
+            width: 20px;
+            margin: 0 3px 2px 2px;
+            border-top: 3px dashed #f97316;
             vertical-align: middle;
         }
 
@@ -727,6 +735,10 @@
                             <span class="weather-detail-lbl">Wind Speed</span>
                         </div>
                         <div class="weather-detail-item">
+                            <span id="wind-gust-value" class="weather-detail-val">-- m/s</span>
+                            <span class="weather-detail-lbl">Wind Gusts</span>
+                        </div>
+                        <div class="weather-detail-item">
                             <span id="precip-value" class="weather-detail-val">-- mm</span>
                             <span class="weather-detail-lbl">Precip (1h)</span>
                         </div>
@@ -834,6 +846,7 @@
                         <h4 class="curve-title">Wind (m/s)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
+                    <p class="tide-note">Solid: wind speed · <span class="wind-gust-swatch" aria-hidden="true"></span>Wind gusts</p>
                     <div class="canvas-container">
                         <canvas id="wind-canvas" role="img" aria-label="Wind forecast graph"></canvas>
                     </div>
