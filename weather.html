@@ -501,6 +501,42 @@
             text-align: center;
         }
 
+        .graph-legend {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px 14px;
+            margin: -3px 0 8px;
+            color: var(--muted);
+            font-size: 0.74rem;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .graph-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .graph-legend-line {
+            display: inline-block;
+            width: 30px;
+            height: 3px;
+            flex: 0 0 30px;
+            border-radius: 999px;
+        }
+
+        .graph-legend-line.uv-forecast {
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        }
+
+        .graph-legend-line.wind-speed {
+            background: linear-gradient(90deg, #00f5d4, #00bbf9);
+        }
+
         html {
             --uv-clear-sky: #8a5a00;
         }
@@ -512,20 +548,33 @@
             --uv-clear-sky: #fde047;
         }
 
-        .uv-clear-sky-swatch {
-            display: inline-block;
-            width: 20px;
-            margin: 0 3px 2px 2px;
-            border-top: 3px dashed var(--uv-clear-sky);
-            vertical-align: middle;
+        .graph-legend-line.uv-clear-sky {
+            background: repeating-linear-gradient(
+                90deg,
+                var(--uv-clear-sky) 0 8px,
+                transparent 8px 13px
+            );
         }
 
-        .wind-gust-swatch {
-            display: inline-block;
-            width: 20px;
-            margin: 0 3px 2px 2px;
-            border-top: 3px dashed #f97316;
-            vertical-align: middle;
+        .graph-legend-line.wind-gusts {
+            background: repeating-linear-gradient(
+                90deg,
+                #f97316 0 8px,
+                transparent 8px 13px
+            );
+        }
+
+        .graph-legend-arrow {
+            display: inline-flex;
+            width: 30px;
+            height: 14px;
+            flex: 0 0 30px;
+            align-items: center;
+            justify-content: center;
+            color: var(--text);
+            font-size: 1rem;
+            font-weight: 700;
+            line-height: 1;
         }
 
         canvas {
@@ -833,7 +882,16 @@
                         <h4 class="curve-title">UV index<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
-                    <p class="tide-note">Solid: cloud-adjusted forecast · <span class="uv-clear-sky-swatch" aria-hidden="true"></span>Clear-sky potential</p>
+                    <div class="graph-legend" role="list" aria-label="UV graph legend">
+                        <span class="graph-legend-item" role="listitem">
+                            <span class="graph-legend-line uv-forecast" aria-hidden="true"></span>
+                            Cloud-adjusted UV
+                        </span>
+                        <span class="graph-legend-item" role="listitem">
+                            <span class="graph-legend-line uv-clear-sky" aria-hidden="true"></span>
+                            UV without clouds
+                        </span>
+                    </div>
                     <div class="canvas-container">
                         <canvas id="uv-canvas" role="img" aria-label="Cloud-adjusted and clear-sky UV index forecast graph"></canvas>
                     </div>
@@ -846,7 +904,20 @@
                         <h4 class="curve-title">Wind (m/s)<span class="graph-date"></span></h4>
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
-                    <p class="tide-note">Solid: wind speed · <span class="wind-gust-swatch" aria-hidden="true"></span>Wind gusts</p>
+                    <div class="graph-legend" role="list" aria-label="Wind graph legend">
+                        <span class="graph-legend-item" role="listitem">
+                            <span class="graph-legend-line wind-speed" aria-hidden="true"></span>
+                            Wind speed
+                        </span>
+                        <span class="graph-legend-item" role="listitem">
+                            <span class="graph-legend-line wind-gusts" aria-hidden="true"></span>
+                            Gusts
+                        </span>
+                        <span class="graph-legend-item" role="listitem">
+                            <span class="graph-legend-arrow" aria-hidden="true">&rarr;</span>
+                            Wind direction
+                        </span>
+                    </div>
                     <div class="canvas-container">
                         <canvas id="wind-canvas" role="img" aria-label="Wind forecast graph"></canvas>
                     </div>
