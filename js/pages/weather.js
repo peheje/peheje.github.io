@@ -23,6 +23,7 @@ let forecastData = null;
 let tideData = null;
 let activeTab = 0; // 0 for Today, 1 for Tomorrow, 2-6 for future days
 let hoverHour = null; // Currently hovered hour on the canvas (0-23)
+let pinnedCurrentGraph = null;
 let radarSource = "";
 let radarIsInViewport = false;
 let radarObserver = null;
@@ -772,6 +773,7 @@ function changeDay(newIndex) {
     triggerGraphAnimation(direction);
 
     hoverHour = null;
+    pinnedCurrentGraph = null;
     drawForecastCurves();
   }
 }
@@ -999,6 +1001,8 @@ function drawForecastCurves() {
 // Canvas rendering helper for a single curve parameters
 function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   if (!canvas) return;
+  canvas.__currentValueHitTarget = null;
+  canvas.classList.remove("current-value-pinned");
   if (window.__weatherTest) {
     canvas.__testPoints = dayPoints;
   }
@@ -1033,6 +1037,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   const accentColor = computedStyle.getPropertyValue("--accent").trim() || "#e8a045";
   const accent2Color = computedStyle.getPropertyValue("--accent-2").trim() || "#d4763a";
   const clearSkyUvColor = computedStyle.getPropertyValue("--uv-clear-sky").trim() || "#8a5a00";
+  const graphKey = paramType === "rain" ? "precip" : paramType;
 
   ctx.clearRect(0, 0, W, H);
 
@@ -1610,9 +1615,10 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
   // 5. Current hour vertical line indicator (shows the current minute via linear interpolation)
   const now = new Date();
+  let currentTimeDec = null;
   if (activeTab === 0) {
     const nowParts = getZonedParts(now);
-    const currentTimeDec = nowParts.hour + nowParts.minute / 60 + nowParts.second / 3600;
+    currentTimeDec = nowParts.hour + nowParts.minute / 60 + nowParts.second / 3600;
     const h0 = Math.floor(currentTimeDec);
     const h1 = Math.min(23, h0 + 1);
     const curX = getX(currentTimeDec);
@@ -1650,21 +1656,34 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       ctx.fill();
       ctx.stroke();
       ctx.restore();
+
+      canvas.__currentValueHitTarget = {
+        x: curX,
+        y: curY,
+        radius: 28,
+        graphKey
+      };
     }
   }
 
   ctx.restore(); // End horizontal clipping!
 
-  // 6. Draw hover tooltip / inspector cursor (interpolated continuously for the hovered minute)
-  if (hoverHour !== null && hoverHour >= viewStartHour && hoverHour <= viewEndHour) {
-    const h0 = Math.floor(hoverHour);
+  // 6. Draw the hover inspector, or a per-graph current-value inspector when pinned.
+  const isPinnedCurrent = hoverHour === null &&
+    activeTab === 0 &&
+    currentTimeDec !== null &&
+    pinnedCurrentGraph === graphKey;
+  canvas.classList.toggle("current-value-pinned", isPinnedCurrent);
+  const inspectorHour = hoverHour ?? (isPinnedCurrent ? currentTimeDec : null);
+  if (inspectorHour !== null && inspectorHour >= viewStartHour && inspectorHour <= viewEndHour) {
+    const h0 = Math.floor(inspectorHour);
     const h1 = h0 + 1;
     
     const p0 = points.find(p => p.hour === h0);
     const p1 = points.find(p => p.hour === h1) || p0;
     
     if (p0) {
-      const t = hoverHour - h0;
+      const t = inspectorHour - h0;
       
       const hpX = p0.x + t * (p1.x - p0.x);
       const hpY = p0.y + t * (p1.y - p0.y);
@@ -1705,7 +1724,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         cloudsLow: hpCloudsLow,
         cloudsMid: hpCloudsMid,
         cloudsHigh: hpCloudsHigh,
-        hour: hoverHour,
+        hour: inspectorHour,
         symbol: p0.symbol,
         rainProb: hpRainProb,
         rainMin: hpRainMin,
@@ -1745,11 +1764,12 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       const localHour = ((hh % 24) + 24) % 24;
       const timeStr = `${String(localHour).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
       const datePrefix = zoomIndex === 0 ? "" : `${getDayNameAndDate(Math.floor(hh / 24))}, `;
+      const timeLine = isPinnedCurrent ? `Now · ${timeStr}` : `Time: ${datePrefix}${timeStr}`;
       
       if (paramType === "uv") {
         const uvLevel = getUVLevel(hp.uv);
         boxColor = uvLevel.color;
-        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
+        tooltipLines.push(timeLine);
         tooltipLines.push(`UV Index: ${hp.uv.toFixed(1)}`);
         if (hp.uvClearSky !== null) {
           tooltipLines.push(`Clear sky: ${hp.uvClearSky.toFixed(1)}`);
@@ -1758,12 +1778,12 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       } else if (paramType === "temp") {
         const emojiInfo = getWeatherInfo(hp.symbol);
         boxColor = "#ff6b8b";
-        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
+        tooltipLines.push(timeLine);
         tooltipLines.push(`Temp: ${hp.temp !== null ? hp.temp.toFixed(1) : "--"}\u00B0C`);
         tooltipLines.push(`Weather: ${emojiInfo.emoji}`);
       } else if (paramType === "rain") {
         boxColor = "#38d4ff";
-        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
+        tooltipLines.push(timeLine);
         const intervalLabel = hp.rainIntervalHours === 6 ? "next 6h" : "next hour";
         tooltipLines.push(`Interval: ${intervalLabel}`);
         tooltipLines.push(`Expected: ${hp.rain !== null ? hp.rain.toFixed(1) : "--"} mm`);
@@ -1776,17 +1796,17 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         }
       } else if (paramType === "wind") {
         boxColor = "#00f5d4";
-        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
+        tooltipLines.push(timeLine);
         tooltipLines.push(`Wind: ${hp.windSpeed.toFixed(1)} m/s`);
         tooltipLines.push(`Gusts: ${hp.windGust !== null ? hp.windGust.toFixed(1) : "--"} m/s`);
         tooltipLines.push(`Direction: ${getWindDirectionLabel(hp.windDir)} (${hp.windDir}\u00B0)`);
       } else if (paramType === "tide") {
         boxColor = "#00b4d8";
-        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
+        tooltipLines.push(timeLine);
         tooltipLines.push(`Forecast sea level: ${hp.tideValue !== null ? hp.tideValue.toFixed(1) : "--"} cm`);
       } else if (paramType === "clouds") {
         boxColor = "#38b2ff";
-        tooltipLines.push(`Time: ${datePrefix}${timeStr}`);
+        tooltipLines.push(timeLine);
         tooltipLines.push(`Total Cloud Cover: ${hp.clouds.toFixed(0)}%`);
         tooltipLines.push(`Low Clouds: ${hp.cloudsLow.toFixed(0)}%`);
         tooltipLines.push(`Mid Clouds: ${hp.cloudsMid.toFixed(0)}%`);
@@ -1962,7 +1982,15 @@ function handleCanvasHover(e) {
   const rect = canvas.getBoundingClientRect();
   const touch = e.touches && e.touches[0];
   const clientX = touch ? touch.clientX : e.clientX;
+  const clientY = touch ? touch.clientY : e.clientY;
   const x = clientX - rect.left;
+  const y = clientY - rect.top;
+
+  if (!touch) {
+    const target = canvas.__currentValueHitTarget;
+    const nearCurrentDot = target && Math.hypot(x - target.x, y - target.y) <= target.radius;
+    canvas.style.cursor = nearCurrentDot ? "pointer" : "crosshair";
+  }
 
   const paddingL = 38;
   const paddingR = 15;
@@ -1988,6 +2016,37 @@ function handleCanvasLeave() {
     hoverHour = null;
     scheduleForecastDraw();
   }
+}
+
+function togglePinnedCurrent(canvas) {
+  const target = canvas.__currentValueHitTarget;
+  if (!target || activeTab !== 0) return;
+  pinnedCurrentGraph = pinnedCurrentGraph === target.graphKey ? null : target.graphKey;
+  hoverHour = null;
+  scheduleForecastDraw();
+}
+
+function handleCanvasClick(e) {
+  const canvas = e.currentTarget;
+  const target = canvas.__currentValueHitTarget;
+  if (!target || activeTab !== 0) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  if (Math.hypot(x - target.x, y - target.y) <= target.radius) {
+    togglePinnedCurrent(canvas);
+  } else if (pinnedCurrentGraph !== null) {
+    pinnedCurrentGraph = null;
+    scheduleForecastDraw();
+  }
+}
+
+function handleCanvasKeydown(e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  if (!e.currentTarget.__currentValueHitTarget || activeTab !== 0) return;
+  e.preventDefault();
+  togglePinnedCurrent(e.currentTarget);
 }
 
 // Fetch forecast and refresh page
@@ -2673,6 +2732,8 @@ function initWeatherPage() {
     if (!canvas) return;
     canvas.addEventListener("mousemove", handleCanvasHover);
     canvas.addEventListener("mouseleave", handleCanvasLeave);
+    canvas.addEventListener("click", handleCanvasClick);
+    canvas.addEventListener("keydown", handleCanvasKeydown);
 
     canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
     canvas.addEventListener("touchmove", handleTouchMove, { passive: false });

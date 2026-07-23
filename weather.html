@@ -584,6 +584,11 @@
             touch-action: pan-y;
         }
 
+        canvas:focus-visible {
+            outline: 2px solid var(--focus-outline);
+            outline-offset: -3px;
+        }
+
         .loader {
             display: flex;
             flex-direction: column;
@@ -847,7 +852,7 @@
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="temp-canvas" role="img" aria-label="Temperature forecast graph"></canvas>
+                        <canvas id="temp-canvas" role="img" tabindex="0" aria-label="Temperature forecast graph. Select the current-time dot to keep its value visible."></canvas>
                     </div>
                 </div>
 
@@ -859,7 +864,7 @@
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="rain-canvas" role="img" aria-label="Precipitation forecast graph"></canvas>
+                        <canvas id="rain-canvas" role="img" tabindex="0" aria-label="Precipitation forecast graph. Select the current-time dot to keep its value visible."></canvas>
                     </div>
                 </div>
 
@@ -871,7 +876,7 @@
                         <button class="nav-arrow next-day" aria-label="Next Day">&rsaquo;</button>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="clouds-canvas" role="img" aria-label="Cloud cover forecast graph"></canvas>
+                        <canvas id="clouds-canvas" role="img" tabindex="0" aria-label="Cloud cover forecast graph. Select the current-time dot to keep its value visible."></canvas>
                     </div>
                 </div>
 
@@ -893,7 +898,7 @@
                         </span>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="uv-canvas" role="img" aria-label="Cloud-adjusted and clear-sky UV index forecast graph"></canvas>
+                        <canvas id="uv-canvas" role="img" tabindex="0" aria-label="Cloud-adjusted and clear-sky UV index forecast graph. Select the current-time dot to keep its value visible."></canvas>
                     </div>
                 </div>
 
@@ -919,7 +924,7 @@
                         </span>
                     </div>
                     <div class="canvas-container">
-                        <canvas id="wind-canvas" role="img" aria-label="Wind forecast graph"></canvas>
+                        <canvas id="wind-canvas" role="img" tabindex="0" aria-label="Wind forecast graph. Select the current-time dot to keep its value visible."></canvas>
                     </div>
                 </div>
 
@@ -932,7 +937,7 @@
                     </div>
                     <p class="tide-note">Modelled sea level combines tides and weather effects, relative to global mean sea level. It is not a local tide table—use official local tide information for navigation or safety decisions.</p>
                     <div class="canvas-container">
-                        <canvas id="tide-canvas" role="img" aria-label="Forecast sea-level graph"></canvas>
+                        <canvas id="tide-canvas" role="img" tabindex="0" aria-label="Forecast sea-level graph. Select the current-time dot to keep its value visible."></canvas>
                     </div>
                 </div>
 
