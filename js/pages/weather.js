@@ -23,7 +23,7 @@ let forecastData = null;
 let tideData = null;
 let activeTab = 0; // 0 for Today, 1 for Tomorrow, 2-6 for future days
 let hoverHour = null; // Currently hovered hour on the canvas (0-23)
-let pinnedCurrentGraph = null;
+let currentTimePinned = false;
 let radarSource = "";
 let radarIsInViewport = false;
 let radarObserver = null;
@@ -773,7 +773,7 @@ function changeDay(newIndex) {
     triggerGraphAnimation(direction);
 
     hoverHour = null;
-    pinnedCurrentGraph = null;
+    currentTimePinned = false;
     drawForecastCurves();
   }
 }
@@ -1037,8 +1037,6 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   const accentColor = computedStyle.getPropertyValue("--accent").trim() || "#e8a045";
   const accent2Color = computedStyle.getPropertyValue("--accent-2").trim() || "#d4763a";
   const clearSkyUvColor = computedStyle.getPropertyValue("--uv-clear-sky").trim() || "#8a5a00";
-  const graphKey = paramType === "rain" ? "precip" : paramType;
-
   ctx.clearRect(0, 0, W, H);
 
   if (paramType === "moon") {
@@ -1660,19 +1658,18 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       canvas.__currentValueHitTarget = {
         x: curX,
         y: curY,
-        radius: 28,
-        graphKey
+        radius: 28
       };
     }
   }
 
   ctx.restore(); // End horizontal clipping!
 
-  // 6. Draw the hover inspector, or a per-graph current-value inspector when pinned.
+  // 6. Draw the synchronized hover inspector, or current values when pinned.
   const isPinnedCurrent = hoverHour === null &&
     activeTab === 0 &&
     currentTimeDec !== null &&
-    pinnedCurrentGraph === graphKey;
+    currentTimePinned;
   canvas.classList.toggle("current-value-pinned", isPinnedCurrent);
   const inspectorHour = hoverHour ?? (isPinnedCurrent ? currentTimeDec : null);
   if (inspectorHour !== null && inspectorHour >= viewStartHour && inspectorHour <= viewEndHour) {
@@ -1978,6 +1975,8 @@ function handleCanvasWheel(e) {
 function handleCanvasHover(e) {
   if (!forecastData) return;
 
+  const clearedCurrentPin = currentTimePinned;
+  currentTimePinned = false;
   const canvas = e.currentTarget;
   const rect = canvas.getBoundingClientRect();
   const touch = e.touches && e.touches[0];
@@ -2005,7 +2004,7 @@ function handleCanvasHover(e) {
   }
   hr = Math.max(viewStartHour, Math.min(viewEndHour, hr));
 
-  if (hoverHour !== hr) {
+  if (hoverHour !== hr || clearedCurrentPin) {
     hoverHour = hr;
     scheduleForecastDraw();
   }
@@ -2021,7 +2020,7 @@ function handleCanvasLeave() {
 function togglePinnedCurrent(canvas) {
   const target = canvas.__currentValueHitTarget;
   if (!target || activeTab !== 0) return;
-  pinnedCurrentGraph = pinnedCurrentGraph === target.graphKey ? null : target.graphKey;
+  currentTimePinned = !currentTimePinned;
   hoverHour = null;
   scheduleForecastDraw();
 }
@@ -2036,8 +2035,8 @@ function handleCanvasClick(e) {
   const y = e.clientY - rect.top;
   if (Math.hypot(x - target.x, y - target.y) <= target.radius) {
     togglePinnedCurrent(canvas);
-  } else if (pinnedCurrentGraph !== null) {
-    pinnedCurrentGraph = null;
+  } else if (currentTimePinned) {
+    currentTimePinned = false;
     scheduleForecastDraw();
   }
 }
