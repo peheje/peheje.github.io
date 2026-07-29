@@ -190,6 +190,22 @@ function getLocationHour(date) {
   return getZonedParts(date).hour;
 }
 
+function getLocationHourPosition(date) {
+  const { hour, minute, second } = getZonedParts(date);
+  const fraction = minute / 60 + second / 3600;
+  return {
+    hour,
+    fraction,
+    decimalHour: hour + fraction
+  };
+}
+
+function interpolateHourlyValue(currentValue, nextValue, fraction) {
+  if (!Number.isFinite(currentValue)) return null;
+  if (!Number.isFinite(nextValue)) return currentValue;
+  return currentValue + fraction * (nextValue - currentValue);
+}
+
 // Show/hide spinner & dashboard
 function setLoaderState(isLoading) {
   const spinnerEl = loadingSpinner.querySelector(".spinner");
@@ -865,7 +881,8 @@ function updateDashboardUI(data, fullRender = true) {
   
   // Find current hour forecast
   const now = new Date();
-  const currentHour = getLocationHour(now);
+  const currentTime = getLocationHourPosition(now);
+  const currentHour = currentTime.hour;
   const todayStr = getLocationDateString(now);
 
   let currentForecast = null;
@@ -884,25 +901,42 @@ function updateDashboardUI(data, fullRender = true) {
 
   if (currentForecast) {
     const details = currentForecast.data.instant.details;
-    let uvVal = details.ultraviolet_index || 0;
     
-    // Interpolate UV index based on current minute to show exact minute-by-minute value
-    const nextHour = (currentHour + 1) % 24;
+    // Use the same interpolation as the graph's current-time marker. At the
+    // end of the day, both displays hold the 23:00 point because the Today
+    // graph has no later point to interpolate toward.
+    const nextHour = currentHour + 1;
     let nextForecast = null;
-    for (const item of timeseries) {
-      const itemDate = new Date(item.time);
-      if (getLocationDateString(itemDate) === todayStr && getLocationHour(itemDate) === nextHour) {
-        nextForecast = item;
-        break;
+    if (nextHour < 24) {
+      for (const item of timeseries) {
+        const itemDate = new Date(item.time);
+        if (getLocationDateString(itemDate) === todayStr && getLocationHour(itemDate) === nextHour) {
+          nextForecast = item;
+          break;
+        }
       }
     }
-    if (nextForecast) {
-      const nextUv = nextForecast.data.instant.details.ultraviolet_index || 0;
-      const t = now.getMinutes() / 60 + now.getSeconds() / 3600;
-      uvVal = uvVal + t * (nextUv - uvVal);
-    }
-
-    const tempVal = details.air_temperature;
+    const nextDetails = nextForecast?.data.instant.details;
+    const uvVal = interpolateHourlyValue(
+      details.ultraviolet_index ?? 0,
+      nextDetails?.ultraviolet_index ?? null,
+      currentTime.fraction
+    ) ?? 0;
+    const tempVal = interpolateHourlyValue(
+      details.air_temperature,
+      nextDetails?.air_temperature,
+      currentTime.fraction
+    );
+    const windVal = interpolateHourlyValue(
+      details.wind_speed,
+      nextDetails?.wind_speed,
+      currentTime.fraction
+    );
+    const windGustVal = interpolateHourlyValue(
+      details.wind_speed_of_gust,
+      nextDetails?.wind_speed_of_gust,
+      currentTime.fraction
+    );
     
     const uvLevel = getUVLevel(uvVal);
     
@@ -929,11 +963,11 @@ function updateDashboardUI(data, fullRender = true) {
     const symbolCode = currentForecast.data.next_1_hours?.summary?.symbol_code || null;
     const weather = getWeatherInfo(symbolCode);
     weatherEmoji.textContent = weather.emoji;
-    tempValue.textContent = `${tempVal.toFixed(1)}\u00B0C`;
+    tempValue.textContent = Number.isFinite(tempVal) ? `${tempVal.toFixed(1)}\u00B0C` : "--\u00B0C";
     weatherDesc.textContent = weather.desc;
 
-    windValue.textContent = Number.isFinite(details.wind_speed) ? `${details.wind_speed.toFixed(1)} m/s` : "-- m/s";
-    windGustValue.textContent = Number.isFinite(details.wind_speed_of_gust) ? `${details.wind_speed_of_gust.toFixed(1)} m/s` : "-- m/s";
+    windValue.textContent = Number.isFinite(windVal) ? `${windVal.toFixed(1)} m/s` : "-- m/s";
+    windGustValue.textContent = Number.isFinite(windGustVal) ? `${windGustVal.toFixed(1)} m/s` : "-- m/s";
     
     const precip = currentForecast.data.next_1_hours?.details?.precipitation_amount;
     precipValue.textContent = precip === undefined ? "-- mm" : `${precip.toFixed(1)} mm`;
@@ -1615,8 +1649,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   const now = new Date();
   let currentTimeDec = null;
   if (activeTab === 0) {
-    const nowParts = getZonedParts(now);
-    currentTimeDec = nowParts.hour + nowParts.minute / 60 + nowParts.second / 3600;
+    currentTimeDec = getLocationHourPosition(now).decimalHour;
     const h0 = Math.floor(currentTimeDec);
     const h1 = Math.min(23, h0 + 1);
     const curX = getX(currentTimeDec);
@@ -1674,7 +1707,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   const inspectorHour = hoverHour ?? (isPinnedCurrent ? currentTimeDec : null);
   if (inspectorHour !== null && inspectorHour >= viewStartHour && inspectorHour <= viewEndHour) {
     const h0 = Math.floor(inspectorHour);
-    const h1 = h0 + 1;
+    const h1 = isPinnedCurrent ? Math.min(23, h0 + 1) : h0 + 1;
     
     const p0 = points.find(p => p.hour === h0);
     const p1 = points.find(p => p.hour === h1) || p0;
@@ -1684,17 +1717,13 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       
       const hpX = p0.x + t * (p1.x - p0.x);
       const hpY = p0.y + t * (p1.y - p0.y);
-      const hpVal = p0.val + t * (p1.val - p0.val);
-      const hpUv = p0.uv + t * (p1.uv - p0.uv);
-      const hpUvClearSky = p0.uvClearSky !== null && p1.uvClearSky !== null
-        ? p0.uvClearSky + t * (p1.uvClearSky - p0.uvClearSky)
-        : p0.uvClearSky;
-      const hpTemp = p0.temp !== null && p1.temp !== null ? p0.temp + t * (p1.temp - p0.temp) : p0.temp;
+      const hpVal = interpolateHourlyValue(p0.val, p1.val, t);
+      const hpUv = interpolateHourlyValue(p0.uv, p1.uv, t);
+      const hpUvClearSky = interpolateHourlyValue(p0.uvClearSky, p1.uvClearSky, t);
+      const hpTemp = interpolateHourlyValue(p0.temp, p1.temp, t);
       const hpRain = p0.rain !== null && p1.rain !== null ? p0.rain + t * (p1.rain - p0.rain) : p0.rain;
-      const hpWindSpeed = p0.windSpeed + t * (p1.windSpeed - p0.windSpeed);
-      const hpWindGust = p0.windGust !== null && p1.windGust !== null
-        ? p0.windGust + t * (p1.windGust - p0.windGust)
-        : p0.windGust;
+      const hpWindSpeed = interpolateHourlyValue(p0.windSpeed, p1.windSpeed, t);
+      const hpWindGust = interpolateHourlyValue(p0.windGust, p1.windGust, t);
       const hpTideValue = p0.tideValue !== null && p1.tideValue !== null ? p0.tideValue + t * (p1.tideValue - p0.tideValue) : p0.tideValue;
       const hpClouds = p0.clouds + t * (p1.clouds - p0.clouds);
       const hpCloudsLow = p0.cloudsLow + t * (p1.cloudsLow - p0.cloudsLow);
