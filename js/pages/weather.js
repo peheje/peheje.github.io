@@ -190,22 +190,6 @@ function getLocationHour(date) {
   return getZonedParts(date).hour;
 }
 
-function getLocationHourPosition(date) {
-  const { hour, minute, second } = getZonedParts(date);
-  const fraction = minute / 60 + second / 3600;
-  return {
-    hour,
-    fraction,
-    decimalHour: hour + fraction
-  };
-}
-
-function interpolateHourlyValue(currentValue, nextValue, fraction) {
-  if (!Number.isFinite(currentValue)) return null;
-  if (!Number.isFinite(nextValue)) return currentValue;
-  return currentValue + fraction * (nextValue - currentValue);
-}
-
 // Show/hide spinner & dashboard
 function setLoaderState(isLoading) {
   const spinnerEl = loadingSpinner.querySelector(".spinner");
@@ -733,7 +717,7 @@ function updateHeaderDates() {
   const { start, end } = getZoomWindow();
   const dateSpan = zoomIndex === 0
     ? getDayNameAndDate(activeTab)
-    : `${getDayNameAndDate(Math.floor(start / 24))} → ${getDayNameAndDate(Math.floor(end / 24))}`;
+    : `${getDayNameAndDate(Math.floor(start / 24))} → ${getDayNameAndDate(Math.floor((end - 0.001) / 24))}`;
   const dateLabels = document.querySelectorAll(".graph-date");
   dateLabels.forEach(el => {
     el.textContent = ` (${dateSpan})`;
@@ -760,6 +744,13 @@ function changeDay(newIndex) {
   if (activeTab !== newIndex) {
     const direction = newIndex > activeTab ? "next" : "prev";
     activeTab = newIndex;
+
+    // A rolling 12-hour focus is meaningful only for the current day. Once a
+    // future day is selected, return to its complete calendar day rather than
+    // carrying the current clock time into that future date.
+    if (activeTab > 0 && zoomIndex === 1) {
+      zoomIndex = 0;
+    }
     
     // Update the tabs active class and scroll it into view
     if (dayTabsContainer) {
@@ -782,15 +773,14 @@ function changeDay(newIndex) {
     // Sync header navigation arrows
     updateHeaderArrows();
 
-    // Sync header navigation dates
-    updateHeaderDates();
-
     // Trigger visual transitions
     triggerGraphAnimation(direction);
 
     hoverHour = null;
     currentTimePinned = false;
-    drawForecastCurves();
+    // Keep the range button, date labels, and graph data in sync after a day
+    // change. The 12-hour mode may have been reset above.
+    updateZoomUI();
   }
 }
 
@@ -881,8 +871,7 @@ function updateDashboardUI(data, fullRender = true) {
   
   // Find current hour forecast
   const now = new Date();
-  const currentTime = getLocationHourPosition(now);
-  const currentHour = currentTime.hour;
+  const currentHour = getLocationHour(now);
   const todayStr = getLocationDateString(now);
 
   let currentForecast = null;
@@ -901,42 +890,25 @@ function updateDashboardUI(data, fullRender = true) {
 
   if (currentForecast) {
     const details = currentForecast.data.instant.details;
+    let uvVal = details.ultraviolet_index || 0;
     
-    // Use the same interpolation as the graph's current-time marker. At the
-    // end of the day, both displays hold the 23:00 point because the Today
-    // graph has no later point to interpolate toward.
-    const nextHour = currentHour + 1;
+    // Interpolate UV index based on current minute to show exact minute-by-minute value
+    const nextHour = (currentHour + 1) % 24;
     let nextForecast = null;
-    if (nextHour < 24) {
-      for (const item of timeseries) {
-        const itemDate = new Date(item.time);
-        if (getLocationDateString(itemDate) === todayStr && getLocationHour(itemDate) === nextHour) {
-          nextForecast = item;
-          break;
-        }
+    for (const item of timeseries) {
+      const itemDate = new Date(item.time);
+      if (getLocationDateString(itemDate) === todayStr && getLocationHour(itemDate) === nextHour) {
+        nextForecast = item;
+        break;
       }
     }
-    const nextDetails = nextForecast?.data.instant.details;
-    const uvVal = interpolateHourlyValue(
-      details.ultraviolet_index ?? 0,
-      nextDetails?.ultraviolet_index ?? null,
-      currentTime.fraction
-    ) ?? 0;
-    const tempVal = interpolateHourlyValue(
-      details.air_temperature,
-      nextDetails?.air_temperature,
-      currentTime.fraction
-    );
-    const windVal = interpolateHourlyValue(
-      details.wind_speed,
-      nextDetails?.wind_speed,
-      currentTime.fraction
-    );
-    const windGustVal = interpolateHourlyValue(
-      details.wind_speed_of_gust,
-      nextDetails?.wind_speed_of_gust,
-      currentTime.fraction
-    );
+    if (nextForecast) {
+      const nextUv = nextForecast.data.instant.details.ultraviolet_index || 0;
+      const t = now.getMinutes() / 60 + now.getSeconds() / 3600;
+      uvVal = uvVal + t * (nextUv - uvVal);
+    }
+
+    const tempVal = details.air_temperature;
     
     const uvLevel = getUVLevel(uvVal);
     
@@ -963,11 +935,11 @@ function updateDashboardUI(data, fullRender = true) {
     const symbolCode = currentForecast.data.next_1_hours?.summary?.symbol_code || null;
     const weather = getWeatherInfo(symbolCode);
     weatherEmoji.textContent = weather.emoji;
-    tempValue.textContent = Number.isFinite(tempVal) ? `${tempVal.toFixed(1)}\u00B0C` : "--\u00B0C";
+    tempValue.textContent = `${tempVal.toFixed(1)}\u00B0C`;
     weatherDesc.textContent = weather.desc;
 
-    windValue.textContent = Number.isFinite(windVal) ? `${windVal.toFixed(1)} m/s` : "-- m/s";
-    windGustValue.textContent = Number.isFinite(windGustVal) ? `${windGustVal.toFixed(1)} m/s` : "-- m/s";
+    windValue.textContent = Number.isFinite(details.wind_speed) ? `${details.wind_speed.toFixed(1)} m/s` : "-- m/s";
+    windGustValue.textContent = Number.isFinite(details.wind_speed_of_gust) ? `${details.wind_speed_of_gust.toFixed(1)} m/s` : "-- m/s";
     
     const precip = currentForecast.data.next_1_hours?.details?.precipitation_amount;
     precipValue.textContent = precip === undefined ? "-- mm" : `${precip.toFixed(1)} mm`;
@@ -1649,7 +1621,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   const now = new Date();
   let currentTimeDec = null;
   if (activeTab === 0) {
-    currentTimeDec = getLocationHourPosition(now).decimalHour;
+    const nowParts = getZonedParts(now);
+    currentTimeDec = nowParts.hour + nowParts.minute / 60 + nowParts.second / 3600;
     const h0 = Math.floor(currentTimeDec);
     const h1 = Math.min(23, h0 + 1);
     const curX = getX(currentTimeDec);
@@ -1707,7 +1680,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   const inspectorHour = hoverHour ?? (isPinnedCurrent ? currentTimeDec : null);
   if (inspectorHour !== null && inspectorHour >= viewStartHour && inspectorHour <= viewEndHour) {
     const h0 = Math.floor(inspectorHour);
-    const h1 = isPinnedCurrent ? Math.min(23, h0 + 1) : h0 + 1;
+    const h1 = h0 + 1;
     
     const p0 = points.find(p => p.hour === h0);
     const p1 = points.find(p => p.hour === h1) || p0;
@@ -1717,13 +1690,17 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       
       const hpX = p0.x + t * (p1.x - p0.x);
       const hpY = p0.y + t * (p1.y - p0.y);
-      const hpVal = interpolateHourlyValue(p0.val, p1.val, t);
-      const hpUv = interpolateHourlyValue(p0.uv, p1.uv, t);
-      const hpUvClearSky = interpolateHourlyValue(p0.uvClearSky, p1.uvClearSky, t);
-      const hpTemp = interpolateHourlyValue(p0.temp, p1.temp, t);
+      const hpVal = p0.val + t * (p1.val - p0.val);
+      const hpUv = p0.uv + t * (p1.uv - p0.uv);
+      const hpUvClearSky = p0.uvClearSky !== null && p1.uvClearSky !== null
+        ? p0.uvClearSky + t * (p1.uvClearSky - p0.uvClearSky)
+        : p0.uvClearSky;
+      const hpTemp = p0.temp !== null && p1.temp !== null ? p0.temp + t * (p1.temp - p0.temp) : p0.temp;
       const hpRain = p0.rain !== null && p1.rain !== null ? p0.rain + t * (p1.rain - p0.rain) : p0.rain;
-      const hpWindSpeed = interpolateHourlyValue(p0.windSpeed, p1.windSpeed, t);
-      const hpWindGust = interpolateHourlyValue(p0.windGust, p1.windGust, t);
+      const hpWindSpeed = p0.windSpeed + t * (p1.windSpeed - p0.windSpeed);
+      const hpWindGust = p0.windGust !== null && p1.windGust !== null
+        ? p0.windGust + t * (p1.windGust - p0.windGust)
+        : p0.windGust;
       const hpTideValue = p0.tideValue !== null && p1.tideValue !== null ? p0.tideValue + t * (p1.tideValue - p0.tideValue) : p0.tideValue;
       const hpClouds = p0.clouds + t * (p1.clouds - p0.clouds);
       const hpCloudsLow = p0.cloudsLow + t * (p1.cloudsLow - p0.cloudsLow);
@@ -1885,22 +1862,28 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     ctx.fillStyle = accentColor;
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
-    ctx.fillText(zoomIndex === 1 ? "🔍 Focus: 12 hours" : "🔍 Next 48 hours", W - paddingR - 4, paddingT - 18);
+    ctx.fillText(zoomIndex === 1 ? "🔍 Focus: Now + 12 hours" : "🔍 Zoom: Next 48 hours", W - paddingR - 4, paddingT - 18);
     ctx.restore();
   }
 }
 
-let zoomIndex = 0; // 0 = Full Day, 1 = 12-hour focus, 2 = next 48 hours
+let zoomIndex = 0; // 0 = Full Day, 1 = now + 12 hours, 2 = next 48 hours
 let startTouchDist = null;
-const ZOOM_LEVELS_BY_RANGE = [1, 0, 2]; // 12 hours, full day, 48 hours
+
+function getZoomLevels() {
+  // A current-time focus has no useful anchor on a future calendar day.
+  return activeTab === 0 ? [1, 0, 2] : [0, 2];
+}
 
 function stepZoom(towardLongerRange) {
-  const currentLevel = ZOOM_LEVELS_BY_RANGE.indexOf(zoomIndex);
+  const zoomLevels = getZoomLevels();
+  const currentLevel = zoomLevels.indexOf(zoomIndex);
+  const safeCurrentLevel = currentLevel === -1 ? 0 : currentLevel;
   const nextLevel = Math.max(
     0,
-    Math.min(ZOOM_LEVELS_BY_RANGE.length - 1, currentLevel + (towardLongerRange ? 1 : -1))
+    Math.min(zoomLevels.length - 1, safeCurrentLevel + (towardLongerRange ? 1 : -1))
   );
-  const nextZoomIndex = ZOOM_LEVELS_BY_RANGE[nextLevel];
+  const nextZoomIndex = zoomLevels[nextLevel];
   if (nextZoomIndex === zoomIndex) return false;
 
   zoomIndex = nextZoomIndex;
@@ -1908,17 +1891,25 @@ function stepZoom(towardLongerRange) {
   return true;
 }
 
+function cycleZoom() {
+  const zoomLevels = activeTab === 0 ? [0, 1, 2] : [0, 2];
+  const currentLevel = zoomLevels.indexOf(zoomIndex);
+  zoomIndex = zoomLevels[(currentLevel + 1) % zoomLevels.length];
+  updateZoomUI();
+}
+
 function getZoomWindow() {
   const now = new Date();
   const nowParts = getZonedParts(now);
   const currentHour = nowParts.hour + nowParts.minute / 60 + nowParts.second / 3600;
-  const anchor = activeTab * 24 + currentHour;
+  const dayStart = activeTab * 24;
+  const anchor = activeTab === 0 ? currentHour : dayStart;
 
   if (zoomIndex === 0) {
     return { start: activeTab * 24, end: activeTab * 24 + 23 };
   }
   if (zoomIndex === 1) {
-    return { start: Math.max(0, anchor - 2), end: anchor + 10 };
+    return { start: anchor, end: anchor + 12 };
   }
   return { start: anchor, end: anchor + 48 };
 }
@@ -1926,9 +1917,9 @@ function getZoomWindow() {
 function updateZoomUI() {
   const btn = document.getElementById("zoom-toggle-btn");
   if (btn) {
-    if (zoomIndex === 0) btn.textContent = "🔍 Zoom: Full Day";
-    else if (zoomIndex === 1) btn.textContent = "🔍 Focus: 12 hours";
-    else btn.textContent = "🔍 Next 48 hours";
+    if (zoomIndex === 0) btn.textContent = "🔍 Zoom: 24 hours";
+    else if (zoomIndex === 1) btn.textContent = "🔍 Focus: Now + 12 hours";
+    else btn.textContent = "🔍 Zoom: Next 48 hours";
   }
   updateHeaderDates();
   drawForecastCurves();
@@ -2721,8 +2712,7 @@ function initWeatherPage() {
   // Zoom toggle button handler
   if (zoomToggleBtn) {
     zoomToggleBtn.addEventListener("click", () => {
-      zoomIndex = (zoomIndex + 1) % 3;
-      updateZoomUI();
+      cycleZoom();
     });
   }
 
