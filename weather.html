@@ -169,29 +169,39 @@
         }
 
         .weather-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 14px;
             align-items: stretch;
-            overflow: hidden;
             width: 100%;
         }
 
-        .forecast-heading-controls {
+        .forecast-tab-label {
             display: flex;
             align-items: center;
-            gap: 10px;
+            min-height: 36px;
+            color: var(--text);
+            font-size: 0.78rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .forecast-tab-group {
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
             min-width: 0;
         }
 
-        #zoom-toggle-btn {
-            white-space: nowrap;
-            flex: 0 0 auto;
+        .forecast-tab-group .curve-tabs {
+            flex: 1 1 auto;
+            min-width: 0;
         }
 
         .curve-tabs {
             position: relative;
             display: flex;
+            align-items: stretch;
             gap: 4px;
             background: var(--nav-bg);
             border: 1px solid var(--nav-border);
@@ -208,26 +218,34 @@
             display: none;
         }
 
-        @media (min-width: 600px) {
+        .forecast-range-tabs .curve-tab {
+            flex: 1 0 66px;
+            min-width: 66px;
+        }
+
+        .forecast-day-tabs .curve-tab {
+            min-width: 80px;
+        }
+
+        @media (min-width: 768px) {
             .weather-actions {
-                flex-direction: row;
-                justify-content: space-between;
-                align-items: center;
-                overflow: visible;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                padding-left: 0;
+                padding-right: 0;
             }
-            .weather-actions > .curve-tabs {
-                width: auto;
+
+            .forecast-range-group {
+                padding-left: 14px;
+            }
+
+            .forecast-day-group {
+                padding-right: 14px;
             }
         }
 
         @media (max-width: 599px) {
-            .forecast-heading-controls {
-                justify-content: space-between;
+            .forecast-tab-group {
                 width: 100%;
-            }
-
-            .weather-actions > .curve-tabs {
-                margin-left: 0 !important;
             }
         }
 
@@ -432,6 +450,11 @@
 
 
         .curve-tab {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            line-height: 1.2;
             background: transparent;
             border: none;
             border-radius: var(--btn-radius);
@@ -453,33 +476,48 @@
             font-weight: 700;
         }
 
-        .curve-tab:focus,
-        .curve-tab:focus-visible,
+        .forecast-day-tabs .curve-tab.range-covered-full {
+            background: var(--accent);
+            color: var(--btn-text);
+            font-weight: 700;
+        }
+
+        .forecast-day-tabs .curve-tab.range-covered-partial {
+            background: color-mix(in srgb, var(--accent) 22%, transparent);
+            color: var(--text);
+        }
+
+        .forecast-day-tabs .curve-tab.range-covered-partial.range-start {
+            border-left: 2px solid var(--accent);
+        }
+
+        .forecast-day-tabs .curve-tab.range-covered-partial.range-end {
+            border-right: 2px solid var(--accent);
+        }
+
+        .forecast-day-tabs .curve-tab.active {
+            box-shadow: inset 0 0 0 2px var(--focus-outline);
+        }
+
+        .curve-tab:disabled {
+            cursor: not-allowed;
+            opacity: 0.38;
+        }
+
+        .curve-tab:focus:not(:focus-visible),
         .curve-tab:active {
             outline: none;
         }
 
+        .curve-tab:focus-visible {
+            outline: 2px solid var(--focus-outline);
+            outline-offset: 1px;
+        }
+
         @media (hover: hover) {
-            .curve-tab:not(.active):hover {
+            .curve-tab:not(.active):not(.range-covered-full):hover {
                 color: var(--text);
             }
-        }
-
-        #zoom-toggle-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: var(--btn-radius);
-            color: var(--muted);
-            font-size: 0.8rem;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: none;
-            transition: all 0.15s ease;
-        }
-
-        #zoom-toggle-btn:hover {
-            color: var(--text);
-            border-color: var(--accent);
         }
 
         .canvas-container {
@@ -829,16 +867,17 @@
                 </div>
             </section>
 
-            <!-- Global Day Toggle Bar -->
+            <!-- Forecast range and day navigation -->
             <div class="actions weather-actions margin-bottom-10">
-                <div class="forecast-heading-controls">
-                    <span style="font-weight: 700; color: var(--text);">Daily Forecasts</span>
-                    <button id="zoom-toggle-btn" type="button" aria-label="Change forecast time range" style="padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; min-height: 28px; min-width: 125px;">
-                        🔍 Zoom: 24 hours
-                    </button>
+                <div class="forecast-tab-group forecast-range-group">
+                    <span class="forecast-tab-label">Range</span>
+                    <div id="range-tabs" class="curve-tabs forecast-range-tabs" role="radiogroup" aria-label="Forecast range"></div>
                 </div>
-                <div id="day-tabs" class="curve-tabs">
-                    <!-- Populated dynamically in JS -->
+                <div class="forecast-tab-group forecast-day-group">
+                    <span class="forecast-tab-label">From</span>
+                    <div id="day-tabs" class="curve-tabs forecast-day-tabs" role="radiogroup" aria-label="Forecast start date">
+                        <!-- Populated dynamically in JS -->
+                    </div>
                 </div>
             </div>
 

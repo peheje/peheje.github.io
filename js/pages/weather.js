@@ -1,5 +1,6 @@
 import { mountSiteShell } from "../site.js";
 import SunCalc from "../lib/suncalc.js";
+import { createScrollableTabBar } from "../scrollable-tabs.js";
 import { createRainMock } from "./weather-rain-mock.js";
 
 // Default location (Oslo, Norway)
@@ -16,12 +17,23 @@ const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 const GEOCODING_URL = "https://nominatim.openstreetmap.org";
 const OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const MAX_FORECAST_CACHE_ENTRIES = 12;
+const FORECAST_DAY_COUNT = 8;
+const TIDE_CACHE_SCHEMA_VERSION = 2;
+const RANGE_MODES = [
+  { id: "focus", label: "Now + 12h", hours: 12, currentOnly: true },
+  { id: "day", label: "24h", hours: 24, days: 1 },
+  { id: "two-days", label: "48h", hours: 48, days: 2 },
+  { id: "three-days", label: "3 days", hours: 72, days: 3 },
+  { id: "four-days", label: "4 days", hours: 96, days: 4 },
+  { id: "five-days", label: "5 days", hours: 120, days: 5 }
+];
 const rainMock = createRainMock();
 
 let currentLoc = { ...DEFAULT_LOC };
 let forecastData = null;
 let tideData = null;
-let activeTab = 0; // 0 for Today, 1 for Tomorrow, 2-6 for future days
+let activeTab = 0; // 0 for Today, 1 for Tomorrow, then future start dates.
+let activeRangeMode = "day";
 let hoverHour = null; // Currently hovered hour on the canvas (0-23)
 let currentTimePinned = false;
 let radarSource = "";
@@ -58,7 +70,7 @@ const dashboardContent = document.getElementById("dashboard-content");
 const loadingSpinner = document.getElementById("loading-spinner");
 
 const dayTabsContainer = document.getElementById("day-tabs");
-const zoomToggleBtn = document.getElementById("zoom-toggle-btn");
+const rangeTabsContainer = document.getElementById("range-tabs");
 const uvCanvas = document.getElementById("uv-canvas");
 const tempCanvas = document.getElementById("temp-canvas");
 const rainCanvas = document.getElementById("rain-canvas");
@@ -66,6 +78,13 @@ const windCanvas = document.getElementById("wind-canvas");
 const tideCanvas = document.getElementById("tide-canvas");
 const cloudsCanvas = document.getElementById("clouds-canvas");
 const moonCanvas = document.getElementById("moon-canvas");
+
+const rangeTabs = createScrollableTabBar(rangeTabsContainer, {
+  onChange: item => setRangeMode(item.key)
+});
+const dayTabs = createScrollableTabBar(dayTabsContainer, {
+  onChange: item => changeDay(Number(item.key))
+});
 
 // WHO UV Levels config
 const UV_LEVELS = [
@@ -469,7 +488,7 @@ async function fetchWeather(lat, lon, forceRefresh = false, signal) {
     timezone: "auto",
     timeformat: "unixtime",
     wind_speed_unit: "ms",
-    forecast_days: "10"
+    forecast_days: String(FORECAST_DAY_COUNT)
   });
   const url = `${OPEN_METEO_FORECAST_URL}?${params}`;
   let data;
@@ -527,7 +546,7 @@ async function fetchTideData(lat, lon, signal) {
     try {
       const parsed = JSON.parse(cached);
       const age = Date.now() - parsed.timestamp;
-      if (age < CACHE_EXPIRY_MS) {
+      if (parsed.schemaVersion === TIDE_CACHE_SCHEMA_VERSION && age < CACHE_EXPIRY_MS) {
         return parsed.data;
       }
     } catch (err) {
@@ -539,7 +558,15 @@ async function fetchTideData(lat, lon, signal) {
     throw new Error("Window unloaded");
   }
 
-  const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&hourly=sea_level_height_msl`;
+  const params = new URLSearchParams({
+    latitude: lat.toFixed(4),
+    longitude: lon.toFixed(4),
+    hourly: "sea_level_height_msl",
+    timezone: "auto",
+    timeformat: "unixtime",
+    forecast_days: String(FORECAST_DAY_COUNT)
+  });
+  const url = `https://marine-api.open-meteo.com/v1/marine?${params}`;
   const response = await fetch(url, { signal });
 
   if (!window.location) {
@@ -553,6 +580,7 @@ async function fetchTideData(lat, lon, signal) {
   const data = await response.json();
   const cacheData = {
     timestamp: Date.now(),
+    schemaVersion: TIDE_CACHE_SCHEMA_VERSION,
     data: data
   };
   saveForecastCache(cacheKey, cacheData);
@@ -670,7 +698,10 @@ function getDailyTideSeriesRaw(tideData, dayIndex) {
   const values = tideData.hourly.sea_level_height_msl;
 
   for (let i = 0; i < times.length; i++) {
-    const itemDate = new Date(times[i] + 'Z');
+    const rawTime = times[i];
+    const itemDate = typeof rawTime === "number"
+      ? new Date(rawTime * 1000)
+      : new Date(`${rawTime}${/[zZ]|[+-]\d{2}:\d{2}$/.test(rawTime) ? "" : "Z"}`);
     const dateStr = getLocationDateString(itemDate);
     if (dateStr === targetStr) {
       const hr = getLocationHour(itemDate);
@@ -699,23 +730,114 @@ function getDayNameAndDate(i) {
   return `${dayName} ${dateStr}`;
 }
 
+function getForecastDayCount() {
+  const timeseries = forecastData?.properties?.timeseries;
+  if (!Array.isArray(timeseries) || timeseries.length === 0) return FORECAST_DAY_COUNT;
+
+  const dates = new Set();
+  timeseries.forEach(item => {
+    if (item?.time) dates.add(getLocationDateString(new Date(item.time)));
+  });
+
+  let contiguousDays = 0;
+  for (let dayIndex = 0; dayIndex < FORECAST_DAY_COUNT; dayIndex++) {
+    const date = getLocationDateString(getLocationDayDate(dayIndex));
+    if (!dates.has(date)) break;
+    contiguousDays++;
+  }
+  return Math.max(1, contiguousDays);
+}
+
+function getRangeTabItems() {
+  const forecastDays = getForecastDayCount();
+  return RANGE_MODES.map(mode => {
+    const disabled = mode.currentOnly
+      ? activeTab !== 0
+      : activeTab + mode.days > forecastDays;
+    return {
+      ...mode,
+      key: mode.id,
+      disabled,
+      disabledLabel: disabled ? "This range is unavailable for the selected start date" : ""
+    };
+  });
+}
+
+function getAvailableRangeModes() {
+  return getRangeTabItems().filter(mode => !mode.disabled);
+}
+
+function ensureRangeModeAvailable() {
+  const available = getAvailableRangeModes();
+  if (available.some(mode => mode.id === activeRangeMode)) return;
+
+  const fallback = available.find(mode => mode.id === "day") || available[0];
+  activeRangeMode = fallback?.id || "day";
+}
+
+function renderRangeTabs() {
+  ensureRangeModeAvailable();
+  rangeTabs.render(getRangeTabItems(), activeRangeMode);
+}
+
+function setRangeMode(nextMode) {
+  const selected = getRangeTabItems().find(mode => mode.id === nextMode);
+  if (!selected || selected.disabled) return false;
+
+  activeRangeMode = selected.id;
+  updateRangeUI();
+  return true;
+}
+
+function getDayRangeCoverage(dayIndex) {
+  const { start, end } = getZoomWindow();
+  const dayStart = dayIndex * 24;
+  const dayEnd = dayStart + 23;
+  if (end < dayStart || start > dayEnd) return "outside";
+
+  const isFull = start <= dayStart && end >= dayEnd;
+  const classes = [isFull ? "range-covered-full" : "range-covered-partial"];
+  if (!isFull && start > dayStart) classes.push("range-start");
+  if (!isFull && end < dayEnd) classes.push("range-end");
+  return classes.join(" ");
+}
+
+function updateDayRangeCoverage() {
+  if (!dayTabsContainer) return;
+  dayTabsContainer.querySelectorAll(".curve-tab").forEach(button => {
+    const dayIndex = Number(button.dataset.key);
+    button.classList.remove(
+      "range-covered-full",
+      "range-covered-partial",
+      "range-start",
+      "range-end"
+    );
+    const coverage = getDayRangeCoverage(dayIndex);
+    if (coverage !== "outside") {
+      coverage.split(" ").forEach(className => button.classList.add(className));
+    }
+    button.dataset.rangeCoverage = coverage;
+  });
+}
+
 // Helper to update all prev-day and next-day buttons enabled state
 function updateHeaderArrows() {
   const prevBtns = document.querySelectorAll(".prev-day");
   const nextBtns = document.querySelectorAll(".next-day");
+  const finalDayIndex = getForecastDayCount() - 1;
   
   prevBtns.forEach(btn => {
     btn.disabled = (activeTab === 0);
   });
   nextBtns.forEach(btn => {
-    btn.disabled = (activeTab === 6);
+    btn.disabled = (activeTab >= finalDayIndex);
   });
 }
 
 // Helper to update all graph header date labels
 function updateHeaderDates() {
   const { start, end } = getZoomWindow();
-  const dateSpan = zoomIndex === 0
+  const dateSpan = activeRangeMode === "day"
     ? getDayNameAndDate(activeTab)
     : `${getDayNameAndDate(Math.floor(start / 24))} → ${getDayNameAndDate(Math.floor((end - 0.001) / 24))}`;
   const dateLabels = document.querySelectorAll(".graph-date");
@@ -740,7 +862,7 @@ function triggerGraphAnimation(direction) {
 
 // Helper to transition active forecast day
 function changeDay(newIndex) {
-  if (newIndex < 0 || newIndex > 6) return;
+  if (newIndex < 0 || newIndex >= getForecastDayCount()) return;
   if (activeTab !== newIndex) {
     const direction = newIndex > activeTab ? "next" : "prev";
     activeTab = newIndex;
@@ -748,27 +870,13 @@ function changeDay(newIndex) {
     // A rolling 12-hour focus is meaningful only for the current day. Once a
     // future day is selected, return to its complete calendar day rather than
     // carrying the current clock time into that future date.
-    if (activeTab > 0 && zoomIndex === 1) {
-      zoomIndex = 0;
+    if (activeTab > 0 && activeRangeMode === "focus") {
+      activeRangeMode = "day";
     }
-    
-    // Update the tabs active class and scroll it into view
-    if (dayTabsContainer) {
-      const buttons = dayTabsContainer.querySelectorAll(".curve-tab");
-      buttons.forEach((btn, idx) => {
-        const isActive = idx === activeTab;
-        btn.classList.toggle("active", isActive);
-        if (isActive) {
-          const containerWidth = dayTabsContainer.clientWidth;
-          const btnLeft = btn.offsetLeft;
-          const btnWidth = btn.clientWidth;
-          dayTabsContainer.scrollTo({
-            left: btnLeft - (containerWidth / 2) + (btnWidth / 2),
-            behavior: "smooth"
-          });
-        }
-      });
-    }
+
+    ensureRangeModeAvailable();
+    dayTabs.setActive(String(activeTab));
+    renderRangeTabs();
 
     // Sync header navigation arrows
     updateHeaderArrows();
@@ -778,39 +886,34 @@ function changeDay(newIndex) {
 
     hoverHour = null;
     currentTimePinned = false;
-    // Keep the range button, date labels, and graph data in sync after a day
+    // Keep both tab bars, date labels, and graph data in sync after a day
     // change. The 12-hour mode may have been reset above.
-    updateZoomUI();
+    updateRangeUI();
   }
 }
 
-// Render dynamic day selection tabs for next 7 days
+// Render every available start date in the shared forecast horizon.
 function renderDayTabs() {
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-  // Populate tab buttons
-  if (dayTabsContainer) {
-    let tabsHtml = "";
-    for (let i = 0; i < 7; i++) {
-      const parts = getZonedParts(getLocationDayDate(i));
-      const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
-      const dayName = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[weekday]);
-      const dateStr = `${parts.day}/${parts.month}`;
-      const text = `${dayName} ${dateStr}`;
-
-      const activeClass = (i === activeTab) ? " active" : "";
-      tabsHtml += `<button type="button" class="curve-tab${activeClass}" data-index="${i}">${text}</button>`;
-    }
-    dayTabsContainer.innerHTML = tabsHtml;
-
-    const buttons = dayTabsContainer.querySelectorAll(".curve-tab");
-    buttons.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const i = parseInt(btn.getAttribute("data-index"), 10);
-        changeDay(i);
-      });
+  const forecastDays = getForecastDayCount();
+  activeTab = Math.min(activeTab, forecastDays - 1);
+  const items = [];
+  for (let i = 0; i < forecastDays; i++) {
+    const parts = getZonedParts(getLocationDayDate(i));
+    const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+    const dayName = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[weekday]);
+    const dateStr = `${parts.day}/${parts.month}`;
+    const coverage = getDayRangeCoverage(i);
+    items.push({
+      key: i,
+      label: `${dayName} ${dateStr}`,
+      className: coverage === "outside" ? "" : coverage
     });
   }
+
+  dayTabs.render(items, activeTab);
+  renderRangeTabs();
+  updateDayRangeCoverage();
 }
 
 // Calculate global min/max parameters over the entire forecast timeseries
@@ -1011,6 +1114,10 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   canvas.classList.remove("current-value-pinned");
   if (window.__weatherTest) {
     canvas.__testPoints = dayPoints;
+    canvas.__testAnnotations = {
+      sunEvents: [],
+      windArrowHours: []
+    };
   }
 
   // Use native devicePixelRatio for ultra-sharp canvas rendering on high-density mobile displays.
@@ -1070,6 +1177,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
   const graphW = W - paddingL - paddingR;
   const graphH = H - paddingT - paddingB;
+  const rangeMode = getActiveRangeMode();
 
   // Coordinate setup depending on active parameter
   let minScaleY = 0;
@@ -1212,24 +1320,53 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   
-  let hoursToShow = [];
-  if (zoomIndex === 0) {
+  let hoursToShow;
+  if (activeRangeMode === "day") {
     hoursToShow = [0, 4, 8, 12, 16, 20, 23].map(hour => activeTab * 24 + hour);
   } else {
     const s = Math.ceil(viewStartHour);
     const e = Math.floor(viewEndHour);
-    const interval = zoomIndex === 2 ? 6 : 2;
+    const interval = rangeMode.currentOnly
+      ? 2
+      : (rangeMode.hours <= 48 ? 6 : (rangeMode.hours <= 96 ? 12 : 24));
+    const tickHours = new Set();
     for (let hr = s; hr <= e; hr++) {
       if (hr % interval === 0) {
-        hoursToShow.push(hr);
+        tickHours.add(hr);
       }
     }
+
+    // Always keep midnight visible so multi-day views have clear day anchors.
+    for (let hr = Math.ceil(viewStartHour / 24) * 24; hr <= e; hr += 24) {
+      if (hr >= s) tickHours.add(hr);
+    }
+    hoursToShow = Array.from(tickHours).sort((a, b) => a - b);
+  }
+
+  if (rangeMode.hours > 24 || rangeMode.currentOnly) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 4]);
+    for (let hr = Math.ceil(viewStartHour / 24) * 24; hr < viewEndHour; hr += 24) {
+      const x = getX(hr);
+      ctx.beginPath();
+      ctx.moveTo(x, paddingT);
+      ctx.lineTo(x, H - paddingB);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   hoursToShow.forEach(hr => {
     const x = getX(hr);
     const localHour = ((hr % 24) + 24) % 24;
-    ctx.fillText(`${String(localHour).padStart(2, '0')}:00`, x, H - paddingB + 8);
+    const isDayBoundary = localHour === 0 && activeRangeMode !== "day";
+    const label = isDayBoundary
+      ? getDayNameAndDate(Math.floor(hr / 24))
+      : `${String(localHour).padStart(2, '0')}:00`;
+    ctx.textAlign = x < paddingL + 35 ? "left" : (x > W - paddingR - 35 ? "right" : "center");
+    ctx.fillText(label, x, H - paddingB + 8);
   });
   ctx.restore();
 
@@ -1511,83 +1648,80 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     ctx.restore();
     ctx.restore();
 
-    // Draw sunrise and sunset lines on the UV curve
+    // Draw sunrise and sunset for every visible day. Labels stay on the first
+    // visible day so longer ranges remain readable.
     if (paramType === "uv") {
       try {
-        const targetDate = getLocationDayDate(activeTab);
-        const sunTimes = SunCalc.getTimes(targetDate, currentLoc.lat, currentLoc.lon);
-        const sunrise = sunTimes.sunrise;
-        const sunset = sunTimes.sunset;
+        const firstVisibleDay = Math.floor(viewStartHour / 24);
+        const finalVisibleDay = Math.floor(viewEndHour / 24);
+        const drawSunEvent = (eventName, date, dayIndex, color, showLabel) => {
+          if (!date || isNaN(date.getTime())) return;
+          const parts = getZonedParts(date);
+          const localHour = parts.hour + parts.minute / 60 + parts.second / 3600;
+          const absoluteHour = dayIndex * 24 + localHour;
+          const x = getX(absoluteHour);
+          if (x < paddingL || x > W - paddingR) return;
 
-        if (sunrise && !isNaN(sunrise.getTime())) {
-          const sunriseParts = getZonedParts(sunrise);
-          const sunriseHour = sunriseParts.hour + sunriseParts.minute / 60 + sunriseParts.second / 3600;
-          const xSunrise = getX(activeTab * 24 + sunriseHour);
-          if (xSunrise >= paddingL && xSunrise <= W - paddingR) {
-            ctx.save();
-            ctx.strokeStyle = "rgba(234, 179, 8, 0.45)"; // Amber/yellow dashed line
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.moveTo(xSunrise, paddingT + 32);
-            ctx.lineTo(xSunrise, H - paddingB);
-            ctx.stroke();
-            ctx.restore();
+          ctx.save();
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(x, showLabel ? paddingT + 32 : paddingT);
+          ctx.lineTo(x, H - paddingB);
+          ctx.stroke();
+          ctx.restore();
 
-            ctx.save();
-            ctx.fillStyle = textColor;
-            ctx.font = "bold 9px sans-serif";
-            const sunriseLabelX = xSunrise < paddingL + 28 ? paddingL + 4 : xSunrise;
-            ctx.textAlign = xSunrise < paddingL + 28 ? "left" : "center";
-            ctx.textBaseline = "top";
-            const timeStr = `${String(sunriseParts.hour).padStart(2, '0')}:${String(sunriseParts.minute).padStart(2, '0')}`;
-            ctx.fillText("Sunrise", sunriseLabelX, paddingT + 5);
-            ctx.fillText(timeStr, sunriseLabelX, paddingT + 17);
-            ctx.restore();
+          if (window.__weatherTest) {
+            canvas.__testAnnotations.sunEvents.push({
+              type: eventName.toLowerCase(),
+              dayIndex,
+              labeled: showLabel
+            });
           }
-        }
+          if (!showLabel) return;
 
-        if (sunset && !isNaN(sunset.getTime())) {
-          const sunsetParts = getZonedParts(sunset);
-          const sunsetHour = sunsetParts.hour + sunsetParts.minute / 60 + sunsetParts.second / 3600;
-          const xSunset = getX(activeTab * 24 + sunsetHour);
-          if (xSunset >= paddingL && xSunset <= W - paddingR) {
-            ctx.save();
-            ctx.strokeStyle = "rgba(168, 85, 247, 0.45)"; // Purple/dusk dashed line
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.moveTo(xSunset, paddingT + 32);
-            ctx.lineTo(xSunset, H - paddingB);
-            ctx.stroke();
-            ctx.restore();
+          ctx.save();
+          ctx.fillStyle = textColor;
+          ctx.font = "bold 9px sans-serif";
+          const nearLeft = x < paddingL + 28;
+          const nearRight = x > W - paddingR - 28;
+          const labelX = nearLeft ? paddingL + 4 : (nearRight ? W - paddingR - 4 : x);
+          ctx.textAlign = nearLeft ? "left" : (nearRight ? "right" : "center");
+          ctx.textBaseline = "top";
+          const timeStr = `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+          ctx.fillText(eventName, labelX, paddingT + 5);
+          ctx.fillText(timeStr, labelX, paddingT + 17);
+          ctx.restore();
+        };
 
-            ctx.save();
-            ctx.fillStyle = textColor;
-            ctx.font = "bold 9px sans-serif";
-            const sunsetLabelX = xSunset > W - paddingR - 28 ? W - paddingR - 4 : xSunset;
-            ctx.textAlign = xSunset > W - paddingR - 28 ? "right" : "center";
-            ctx.textBaseline = "top";
-            const timeStr = `${String(sunsetParts.hour).padStart(2, '0')}:${String(sunsetParts.minute).padStart(2, '0')}`;
-            ctx.fillText("Sunset", sunsetLabelX, paddingT + 5);
-            ctx.fillText(timeStr, sunsetLabelX, paddingT + 17);
-            ctx.restore();
-          }
+        for (let dayIndex = firstVisibleDay; dayIndex <= finalVisibleDay; dayIndex++) {
+          const targetDate = getLocationDayDate(dayIndex);
+          const sunTimes = SunCalc.getTimes(targetDate, currentLoc.lat, currentLoc.lon);
+          const showLabel = dayIndex === firstVisibleDay;
+          drawSunEvent("Sunrise", sunTimes.sunrise, dayIndex, "rgba(234, 179, 8, 0.45)", showLabel);
+          drawSunEvent("Sunset", sunTimes.sunset, dayIndex, "rgba(168, 85, 247, 0.45)", showLabel);
         }
       } catch (err) {
         console.error("Error drawing sunrise/sunset lines:", err);
       }
     }
 
-    // 4b. Draw wind direction arrows at 3-hour intervals
+    // 4b. Reduce wind-direction density as the visible range grows.
     if (paramType === "wind") {
       ctx.save();
       ctx.fillStyle = textColor;
       ctx.strokeStyle = textColor;
       ctx.lineWidth = 1.5;
-      
+      const arrowInterval = rangeMode.hours <= 24
+        ? 3
+        : (rangeMode.hours <= 48 ? 6 : (rangeMode.hours <= 96 ? 12 : 24));
+
       points.forEach(p => {
-        if (p.hour % 3 === 0) {
+        if (p.hour % arrowInterval === 0 && Number.isFinite(p.windDir)) {
+          if (window.__weatherTest) {
+            canvas.__testAnnotations.windArrowHours.push(p.hour);
+          }
           ctx.save();
           ctx.translate(p.x, p.y);
           
@@ -1766,7 +1900,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       const mm = totalMinutes % 60;
       const localHour = ((hh % 24) + 24) % 24;
       const timeStr = `${String(localHour).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-      const datePrefix = zoomIndex === 0 ? "" : `${getDayNameAndDate(Math.floor(hh / 24))}, `;
+      const datePrefix = activeRangeMode === "day" ? "" : `${getDayNameAndDate(Math.floor(hh / 24))}, `;
       const timeLine = isPinnedCurrent ? `Now · ${timeStr}` : `Time: ${datePrefix}${timeStr}`;
       
       if (paramType === "uv") {
@@ -1856,71 +1990,55 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   }
 
   // 7. Draw rolling-view indicator.
-  if (zoomIndex > 0) {
+  if (activeRangeMode !== "day") {
     ctx.save();
     ctx.font = "bold 9px sans-serif";
     ctx.fillStyle = accentColor;
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
-    ctx.fillText(zoomIndex === 1 ? "🔍 Focus: Now + 12 hours" : "🔍 Zoom: Next 48 hours", W - paddingR - 4, paddingT - 18);
+    ctx.fillText(`🔍 ${getActiveRangeMode().label}`, W - paddingR - 4, paddingT - 18);
     ctx.restore();
   }
 }
 
-let zoomIndex = 0; // 0 = Full Day, 1 = now + 12 hours, 2 = next 48 hours
 let startTouchDist = null;
 
-function getZoomLevels() {
-  // A current-time focus has no useful anchor on a future calendar day.
-  return activeTab === 0 ? [1, 0, 2] : [0, 2];
+function getActiveRangeMode() {
+  return RANGE_MODES.find(mode => mode.id === activeRangeMode) || RANGE_MODES[1];
 }
 
 function stepZoom(towardLongerRange) {
-  const zoomLevels = getZoomLevels();
-  const currentLevel = zoomLevels.indexOf(zoomIndex);
+  const rangeModes = getAvailableRangeModes();
+  const currentLevel = rangeModes.findIndex(mode => mode.id === activeRangeMode);
   const safeCurrentLevel = currentLevel === -1 ? 0 : currentLevel;
   const nextLevel = Math.max(
     0,
-    Math.min(zoomLevels.length - 1, safeCurrentLevel + (towardLongerRange ? 1 : -1))
+    Math.min(rangeModes.length - 1, safeCurrentLevel + (towardLongerRange ? 1 : -1))
   );
-  const nextZoomIndex = zoomLevels[nextLevel];
-  if (nextZoomIndex === zoomIndex) return false;
-
-  zoomIndex = nextZoomIndex;
-  updateZoomUI();
-  return true;
-}
-
-function cycleZoom() {
-  const zoomLevels = activeTab === 0 ? [0, 1, 2] : [0, 2];
-  const currentLevel = zoomLevels.indexOf(zoomIndex);
-  zoomIndex = zoomLevels[(currentLevel + 1) % zoomLevels.length];
-  updateZoomUI();
+  const nextMode = rangeModes[nextLevel];
+  if (!nextMode || nextMode.id === activeRangeMode) return false;
+  return setRangeMode(nextMode.id);
 }
 
 function getZoomWindow() {
+  const rangeMode = getActiveRangeMode();
   const now = new Date();
   const nowParts = getZonedParts(now);
   const currentHour = nowParts.hour + nowParts.minute / 60 + nowParts.second / 3600;
   const dayStart = activeTab * 24;
-  const anchor = activeTab === 0 ? currentHour : dayStart;
+  const anchor = rangeMode.currentOnly && activeTab === 0 ? currentHour : dayStart;
 
-  if (zoomIndex === 0) {
-    return { start: activeTab * 24, end: activeTab * 24 + 23 };
+  if (rangeMode.currentOnly) {
+    return { start: anchor, end: anchor + rangeMode.hours };
   }
-  if (zoomIndex === 1) {
-    return { start: anchor, end: anchor + 12 };
-  }
-  return { start: anchor, end: anchor + 48 };
+
+  return { start: dayStart, end: dayStart + rangeMode.hours - 1 };
 }
 
-function updateZoomUI() {
-  const btn = document.getElementById("zoom-toggle-btn");
-  if (btn) {
-    if (zoomIndex === 0) btn.textContent = "🔍 Zoom: 24 hours";
-    else if (zoomIndex === 1) btn.textContent = "🔍 Focus: Now + 12 hours";
-    else btn.textContent = "🔍 Zoom: Next 48 hours";
-  }
+function updateRangeUI() {
+  ensureRangeModeAvailable();
+  rangeTabs.setActive(activeRangeMode);
+  updateDayRangeCoverage();
   updateHeaderDates();
   drawForecastCurves();
 }
@@ -1951,11 +2069,11 @@ function handleTouchMove(e) {
     
     const ratio = dist / startTouchDist;
     
-    if (ratio > 1.25) { // Fingers spread apart -> move one level toward 12 hours
+    if (ratio > 1.25) { // Fingers spread apart -> move toward a shorter range
       if (stepZoom(false)) {
         startTouchDist = dist;
       }
-    } else if (ratio < 0.8) { // Fingers pinch together -> move one level toward 48 hours
+    } else if (ratio < 0.8) { // Fingers pinch together -> move toward a longer range
       if (stepZoom(true)) {
         startTouchDist = dist;
       }
@@ -2019,7 +2137,7 @@ function handleCanvasHover(e) {
   const relativeX = x - paddingL;
   const range = viewEndHour - viewStartHour;
   let hr = viewStartHour + (relativeX / graphW) * range;
-  if (zoomIndex === 0) {
+  if (activeRangeMode === "day") {
     hr = Math.round(hr);
   }
   hr = Math.max(viewStartHour, Math.min(viewEndHour, hr));
@@ -2708,13 +2826,6 @@ function initWeatherPage() {
 
   // Search button click handler
   searchBtn.addEventListener("click", performSearch);
-
-  // Zoom toggle button handler
-  if (zoomToggleBtn) {
-    zoomToggleBtn.addEventListener("click", () => {
-      cycleZoom();
-    });
-  }
 
   // Search enter handler
   searchInput.addEventListener("keydown", (e) => {
