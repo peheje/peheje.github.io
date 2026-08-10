@@ -3,7 +3,7 @@ import { mountSiteShell } from "../site.js";
 
 const monthlyLimitKey = "poe-monthly-limit";
 const resetDayKey = "poe-reset-day";
-const requiredHeaders = ["Timestamp", "Provider/Model", "App", "Points", "Dollars"];
+const requiredHeaders = ["Timestamp", "Provider/Model", "Points", "Dollars"];
 
 function getElement(id) {
   return document.getElementById(id);
@@ -155,7 +155,7 @@ function parseCsv(text) {
     const values = parseCsvLine(line);
     const timestampValue = values[indexes.Timestamp] || "";
     const model = values[indexes["Provider/Model"]] || "";
-    const app = values[indexes.App] || "";
+    const app = values[indexes.App] || values[indexes.Bot] || "";
     const points = Number.parseFloat(values[indexes.Points] || "0");
     const dollars = Number.parseFloat(values[indexes.Dollars] || "0");
     const timestamp = new Date(timestampValue);

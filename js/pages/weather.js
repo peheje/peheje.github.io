@@ -625,10 +625,10 @@ function getDailyTimeseriesRaw(timeseries, dayIndex) {
         
         const oneHourRain = item.data.next_1_hours?.details;
         const rainDetails = oneHourRain;
-        if (rainDetails?.precipitation_amount !== undefined) {
-          hoursData[hr].rain = rainDetails.precipitation_amount;
-          hoursData[hr].rainMax = rainDetails.precipitation_amount_max ?? null;
-          hoursData[hr].rainMin = rainDetails.precipitation_amount_min ?? null;
+        if (rainDetails && (rainDetails.precipitation_amount !== undefined || rainDetails.probability_of_precipitation !== undefined)) {
+          hoursData[hr].rain = rainDetails.precipitation_amount ?? 0;
+          hoursData[hr].rainMax = rainDetails.precipitation_amount_max ?? hoursData[hr].rain;
+          hoursData[hr].rainMin = rainDetails.precipitation_amount_min ?? hoursData[hr].rain;
           hoursData[hr].rainProb = rainDetails.probability_of_precipitation ?? null;
           hoursData[hr].rainIntervalHours = 1;
         }
@@ -1044,8 +1044,16 @@ function updateDashboardUI(data, fullRender = true) {
     windValue.textContent = Number.isFinite(details.wind_speed) ? `${details.wind_speed.toFixed(1)} m/s` : "-- m/s";
     windGustValue.textContent = Number.isFinite(details.wind_speed_of_gust) ? `${details.wind_speed_of_gust.toFixed(1)} m/s` : "-- m/s";
     
-    const precip = currentForecast.data.next_1_hours?.details?.precipitation_amount;
-    precipValue.textContent = precip === undefined ? "-- mm" : `${precip.toFixed(1)} mm`;
+    const precipDetails = currentForecast.data.next_1_hours?.details;
+    const precip = precipDetails?.precipitation_amount;
+    const precipProb = precipDetails?.probability_of_precipitation;
+    if (precip === undefined && precipProb === undefined) {
+      precipValue.textContent = "-- mm";
+    } else if (precipProb !== undefined && precipProb !== null && precipProb > 0) {
+      precipValue.textContent = `${(precip ?? 0).toFixed(1)} mm (${Math.round(precipProb)}%)`;
+    } else {
+      precipValue.textContent = `${(precip ?? 0).toFixed(1)} mm`;
+    }
   }
 
   if (fullRender) {
@@ -1116,7 +1124,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     canvas.__testPoints = dayPoints;
     canvas.__testAnnotations = {
       sunEvents: [],
-      windArrowHours: []
+      windArrowHours: [],
+      dayBoundaryHours: []
     };
   }
 
@@ -1171,7 +1180,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
   // Margins
   const paddingL = 38;
-  const paddingR = 15;
+  const paddingR = paramType === "rain" ? 38 : 15;
   const paddingT = 25;
   const paddingB = 30;
 
@@ -1290,6 +1299,9 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     const norm = (val - minScaleY) / (maxScaleY - minScaleY);
     return H - paddingB - norm * graphH;
   };
+  const getProbY = (prob) => {
+    return H - paddingB - (Math.min(100, Math.max(0, prob)) / 100) * graphH;
+  };
 
   // 1. Draw horizontal grid lines and labels
   ctx.save();
@@ -1309,9 +1321,24 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     ctx.stroke();
 
     ctx.setLineDash([]);
+    ctx.fillStyle = paramType === "rain" ? "rgba(56, 178, 255, 0.9)" : mutedColor;
     ctx.fillText(val, paddingL - 8, y);
   });
   ctx.restore();
+
+  // Right Y-axis labels for Rain Chance (%)
+  if (paramType === "rain") {
+    ctx.save();
+    ctx.fillStyle = "rgba(192, 132, 252, 0.9)";
+    ctx.font = "8px sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    [0, 50, 100].forEach(probVal => {
+      const py = getProbY(probVal);
+      ctx.fillText(`${probVal}%`, W - paddingR + 5, py);
+    });
+    ctx.restore();
+  }
 
   // 2. Draw vertical time lines and labels
   ctx.save();
@@ -1341,21 +1368,6 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       if (hr >= s) tickHours.add(hr);
     }
     hoursToShow = Array.from(tickHours).sort((a, b) => a - b);
-  }
-
-  if (rangeMode.hours > 24 || rangeMode.currentOnly) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([2, 4]);
-    for (let hr = Math.ceil(viewStartHour / 24) * 24; hr < viewEndHour; hr += 24) {
-      const x = getX(hr);
-      ctx.beginPath();
-      ctx.moveTo(x, paddingT);
-      ctx.lineTo(x, H - paddingB);
-      ctx.stroke();
-    }
-    ctx.restore();
   }
 
   hoursToShow.forEach(hr => {
@@ -1499,6 +1511,47 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       }
     });
     ctx.restore();
+
+    // ---- Draw Rain Chance (%) Overlay Curve ----
+    const probPoints = points
+      .filter(p => p.rainProb !== null && p.rainProb !== undefined)
+      .map(p => {
+        const intervalHours = p.rainIntervalHours || 1;
+        const barW = Math.max(3, Math.abs(getX(p.hour + intervalHours) - getX(p.hour)) * 0.85);
+        const cx = p.x + 1 + barW / 2;
+        const cy = getProbY(p.rainProb);
+        return { ...p, cx, cy };
+      });
+
+    if (probPoints.length > 0) {
+      // Sleek dashed probability line
+      ctx.save();
+      ctx.strokeStyle = "rgba(192, 132, 252, 0.85)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(probPoints[0].cx, probPoints[0].cy);
+      for (let i = 0; i < probPoints.length - 1; i++) {
+        const p0 = probPoints[i];
+        const p1 = probPoints[i + 1];
+        const xc = (p0.cx + p1.cx) / 2;
+        const yc = (p0.cy + p1.cy) / 2;
+        ctx.quadraticCurveTo(p0.cx, p0.cy, xc, yc);
+      }
+      if (probPoints.length > 1) {
+        ctx.lineTo(probPoints.at(-1).cx, probPoints.at(-1).cy);
+      }
+      ctx.stroke();
+
+      // Subtle node dots along the line
+      ctx.fillStyle = "rgba(192, 132, 252, 0.9)";
+      probPoints.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.cx, p.cy, 2, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
   } else {
     // ---- Draw Curves for UV / Temperature ----
     // 3. Draw gradient area under the curve
@@ -1751,6 +1804,28 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     }
   }
 
+  // Draw day transitions above the data layer so filled curves and bars cannot
+  // obscure them. Only boundaries inside a multi-day window are included.
+  if (rangeMode.hours > 24) {
+    ctx.save();
+    ctx.strokeStyle = mutedColor;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 5]);
+    const firstBoundary = (Math.floor(viewStartHour / 24) + 1) * 24;
+    for (let hour = firstBoundary; hour <= viewEndHour; hour += 24) {
+      const x = getX(hour);
+      ctx.beginPath();
+      ctx.moveTo(x, paddingT);
+      ctx.lineTo(x, H - paddingB);
+      ctx.stroke();
+      if (window.__weatherTest) {
+        canvas.__testAnnotations.dayBoundaryHours.push(hour);
+      }
+    }
+    ctx.restore();
+  }
+
   // 5. Current hour vertical line indicator (shows the current minute via linear interpolation)
   const now = new Date();
   let currentTimeDec = null;
@@ -1888,6 +1963,17 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
       ctx.arc(hp.x, hp.y, 6, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
+
+      if (paramType === "rain" && hp.rainProb !== null && hp.rainProb !== undefined) {
+        const hpProbY = getProbY(hp.rainProb);
+        ctx.fillStyle = "#c084fc";
+        ctx.strokeStyle = textColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(hp.x, hpProbY, 5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+      }
       ctx.restore();
 
       // Parameter-specific tooltip box
