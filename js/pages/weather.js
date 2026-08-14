@@ -1134,6 +1134,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   canvas.classList.remove("current-value-pinned");
   if (window.__weatherTest) {
     canvas.__testPoints = dayPoints;
+    canvas.__testPinnedValues = null;
     canvas.__testAnnotations = {
       sunEvents: [],
       windArrowHours: [],
@@ -1951,6 +1952,10 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         rainMax: hpRainMax,
         rainIntervalHours: p0.rainIntervalHours
       };
+
+      if (window.__weatherTest && isPinnedCurrent) {
+        canvas.__testPinnedValues = { temp: hp.temp };
+      }
 
       // Dotted hover line
       ctx.save();
