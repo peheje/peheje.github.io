@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>peheje</title>
+  <rect width="64" height="64" rx="16" fill="#26343a"/>
+  <path fill="#f0d36b" d="M18 11h17.5C46.27 11 54 18.73 54 29.5S46.27 48 35.5 48H29v8H18V11Zm11 10v17h6.5c4.7 0 7.5-3.25 7.5-8.5S40.2 21 35.5 21H29Z"/>
+</svg>
