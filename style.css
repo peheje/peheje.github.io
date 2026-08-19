@@ -1728,6 +1728,64 @@ body.page-loaded .app-shell > *:not(.display-none) {
     font-size: 1.45rem;
 }
 
+.site-title-easter-egg {
+    cursor: pointer;
+}
+
+.site-title-easter-egg:focus-visible {
+    outline: 3px solid var(--focus-outline);
+    outline-offset: 5px;
+    border-radius: 4px;
+}
+
+.hamster-easter-egg {
+    position: fixed;
+    left: 50%;
+    bottom: clamp(18px, 4vw, 36px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(320px, calc(100vw - 32px));
+    padding: 10px 14px 10px 10px;
+    color: var(--text);
+    background: linear-gradient(145deg, var(--site-head-bg-1), var(--site-head-bg-2));
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transform: translate(-50%, 16px) scale(0.96);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+}
+
+.hamster-easter-egg.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+}
+
+.hamster-easter-egg img {
+    width: 46px;
+    height: 46px;
+    flex: 0 0 auto;
+    padding: 4px;
+    box-sizing: border-box;
+    object-fit: contain;
+    background: var(--accent);
+    border-radius: 50%;
+}
+
+.hamster-easter-egg span {
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hamster-easter-egg {
+        transition: none;
+    }
+}
+
 .fav-nav {
     display: contents;
 }

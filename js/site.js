@@ -625,6 +625,64 @@ function rebuildFavoritesNav(container) {
   }
 }
 
+function showHamsterEasterEgg() {
+  const existing = document.querySelector(".hamster-easter-egg");
+  if (existing) {
+    existing.remove();
+  }
+
+  const egg = document.createElement("aside");
+  egg.className = "hamster-easter-egg";
+  egg.setAttribute("role", "status");
+  egg.setAttribute("aria-live", "polite");
+
+  const hamster = document.createElement("img");
+  hamster.src = "/hamster.png";
+  hamster.alt = "A tiny hamster";
+
+  const message = document.createElement("span");
+  message.textContent = "You found the hamster.";
+
+  egg.append(hamster, message);
+  document.body.append(egg);
+
+  requestAnimationFrame(() => egg.classList.add("is-visible"));
+
+  window.setTimeout(() => {
+    egg.classList.remove("is-visible");
+    egg.addEventListener("transitionend", () => egg.remove(), { once: true });
+    window.setTimeout(() => egg.remove(), 350);
+  }, 4200);
+}
+
+function initHamsterEasterEgg(trigger) {
+  let clickCount = 0;
+
+  trigger.classList.add("site-title-easter-egg");
+  trigger.tabIndex = 0;
+  trigger.setAttribute("role", "button");
+  trigger.setAttribute("aria-label", "Page title. Press Enter or Space to interact.");
+
+  const countClick = () => {
+    clickCount += 1;
+
+    if (clickCount === 7) {
+      clickCount = 0;
+      showHamsterEasterEgg();
+    }
+  };
+
+  trigger.addEventListener("click", countClick);
+  trigger.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    countClick();
+  });
+}
+
 export function mountSiteShell() {
   const site = sites.find((entry) => entry.url === window.location.pathname);
 
@@ -684,7 +742,10 @@ export function mountSiteShell() {
 
     const title = document.createElement("h1");
     title.id = "page-title";
-    title.textContent = site.name;
+    const titleTrigger = document.createElement("span");
+    titleTrigger.textContent = site.name;
+    initHamsterEasterEgg(titleTrigger);
+    title.append(titleTrigger);
 
     titleRow.append(title);
 
