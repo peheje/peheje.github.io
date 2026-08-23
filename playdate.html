@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="theme-color" content="#f5f3ed">
+    <title>Skal vi lege?</title>
+    <link rel="stylesheet" href="playdate.css">
+</head>
+<body>
+    <main class="page-shell">
+        <header class="site-header">
+            <div class="header-start">
+                <button class="back-button" id="back-button" type="button" aria-label="Gå tilbage">←</button>
+                <a class="brand" href="playdate.html" aria-label="Skal vi lege? – forside">
+                    <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span>skal vi lege?</span>
+                </a>
+            </div>
+            <span class="local-badge"><span aria-hidden="true"></span> Kun på din telefon</span>
+        </header>
+
+        <section class="intro">
+            <div class="intro-doodle" aria-hidden="true">
+                <span class="sun"></span>
+                <span class="cloud"></span>
+            </div>
+            <p class="overline">EN NEM, LILLE INVITATION</p>
+            <h1>Mindre planlægning.<br><em>Mere leg.</em></h1>
+            <p>Vælg det, der passer jer. Så skriver vi en besked, du kan sende, hvor et manglende svar bare betyder “ikke i dag”.</p>
+        </section>
+
+        <form class="builder-card" id="invite-form">
+            <section class="form-step">
+                <div class="step-heading">
+                    <span class="step-number">01</span>
+                    <div><h2>Hvem vil lege?</h2><p>Skriv barnets navn</p></div>
+                </div>
+                <label class="name-field" for="child-name">
+                    <span class="child-avatar" id="child-initial">M</span>
+                    <input id="child-name" name="child-name" type="text" value="Milo" maxlength="30" autocomplete="off" enterkeyhint="done" aria-describedby="name-help">
+                    <span class="edit-mark" aria-hidden="true">✎</span>
+                </label>
+                <span class="visually-hidden" id="name-help">Barnets navn bruges kun i den færdige tekst.</span>
+            </section>
+
+            <section class="form-step">
+                <div class="step-heading">
+                    <span class="step-number">02</span>
+                    <div><h2>Hvornår?</h2><p>Hvornår er I klar?</p></div>
+                </div>
+                <div class="when-grid" role="group" aria-label="Vælg tidspunkt">
+                    <button class="option selected" type="button" data-group="when" data-value="now" aria-pressed="true"><span class="option-icon">☀</span><strong>Nu</strong></button>
+                    <button class="option" type="button" data-group="when" data-value="quarter" aria-pressed="false"><span class="option-icon">◷</span><strong>Om 15 min</strong></button>
+                    <button class="option" type="button" data-group="when" data-value="half" aria-pressed="false"><span class="option-icon">◷</span><strong>Om 30 min</strong></button>
+                    <div class="timed-option" id="specific-time-option">
+                        <button class="option" type="button" data-group="when" data-value="specific" aria-pressed="false"><span class="option-icon">◴</span><strong>Bestemt tid</strong></button>
+                        <label for="when-time" class="visually-hidden">Vælg et bestemt tidspunkt</label>
+                        <input id="when-time" type="time" value="15:00" aria-label="Bestemt tidspunkt">
+                    </div>
+                </div>
+            </section>
+
+            <section class="form-step">
+                <div class="step-heading">
+                    <span class="step-number">03</span>
+                    <div><h2>Hvor kunne det være?</h2><p>Vælg gerne flere muligheder</p></div>
+                </div>
+                <div class="segmented place-grid" role="group" aria-label="Vælg et eller flere steder">
+                    <button class="option selected" type="button" data-group="place" data-value="ours" aria-pressed="true"><span class="option-icon house-icon">⌂</span><strong>Hos os</strong></button>
+                    <button class="option" type="button" data-group="place" data-value="theirs" aria-pressed="false"><span class="option-icon house-icon">⌂</span><strong>Hos jer</strong></button>
+                    <button class="option" type="button" data-group="place" data-value="playground" aria-pressed="false"><span class="option-icon">♧</span><strong>Legeplads</strong></button>
+                </div>
+                <div class="place-detail" id="our-place-detail" hidden>
+                    <label class="detail-option" for="ours-outdoors">
+                        <input id="ours-outdoors" type="checkbox">
+                        <span class="detail-check" aria-hidden="true">✓</span>
+                        <span><strong>Vi vil gerne holde det udendørs</strong><small>i vores have</small></span>
+                    </label>
+                </div>
+                <div class="playground-name" id="playground-name-field" hidden>
+                    <label for="playground-name">Hvad hedder legepladsen? <span>valgfrit</span></label>
+                    <input id="playground-name" type="text" maxlength="40" autocomplete="off" placeholder="fx Enghave Plads">
+                </div>
+            </section>
+
+            <section class="form-step">
+                <div class="step-heading">
+                    <span class="step-number">04</span>
+                    <div><h2>Hvor længe?</h2><p>En løs ramme er helt fin</p></div>
+                </div>
+                <div class="duration-grid" role="group" aria-label="Vælg varighed">
+                    <button class="duration-option selected" type="button" data-group="duration" data-value="open" aria-pressed="true"><span>♡</span><strong>Ingen fast tid</strong></button>
+                    <button class="duration-option" type="button" data-group="duration" data-value="one" aria-pressed="false"><span>1</span><strong>Ca. 1 time</strong></button>
+                    <button class="duration-option" type="button" data-group="duration" data-value="two" aria-pressed="false"><span>2</span><strong>Ca. 2 timer</strong></button>
+                    <div class="until-option" id="until-option">
+                        <button class="duration-option" type="button" data-group="duration" data-value="until" aria-pressed="false"><span>◷</span><strong>Til kl.</strong></button>
+                        <label for="end-time" class="visually-hidden">Vælg sluttid</label>
+                        <input id="end-time" type="time" value="16:00" aria-label="Sluttid">
+                    </div>
+                </div>
+            </section>
+
+            <div class="form-footer">
+                <p><span aria-hidden="true">♡</span> Ingen konto. Dine valg gemmes kun på denne enhed.</p>
+                <button class="generate-button" type="submit">Lav beskeden <span aria-hidden="true">→</span></button>
+            </div>
+        </form>
+
+        <section class="result-card" id="result-card" aria-live="polite" hidden>
+            <div class="result-topline">
+                <div><span class="overline">DIN BESKED</span><h2>Klar til at sende</h2></div>
+                <span class="paper-plane" aria-hidden="true">↗</span>
+            </div>
+            <div class="message-preview" id="message-output"></div>
+            <p class="result-note">Du kan selvfølgelig rette teksten, efter du har kopieret den.</p>
+            <div class="result-actions">
+                <button class="copy-button" id="copy-button" type="button"><span aria-hidden="true">▣</span> Kopiér tekst</button>
+                <button class="share-button" id="share-button" type="button"><span aria-hidden="true">↗</span> Del besked</button>
+            </div>
+        </section>
+
+        <footer class="page-footer">
+            <span>En lille idé til spontane legeaftaler</span>
+            <span aria-hidden="true">✦</span>
+        </footer>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite">
+        <span class="toast-check" aria-hidden="true">✓</span>
+        <span id="toast-text">Teksten er kopieret</span>
+    </div>
+
+    <script src="playdate.js"></script>
+</body>
+</html>
