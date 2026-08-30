@@ -1691,6 +1691,148 @@ body.page-loaded .app-shell > *:not(.display-none) {
     gap: 10px;
 }
 
+.hamster-secret {
+    position: relative;
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--accent);
+    background: transparent;
+    box-shadow: none;
+    opacity: 0.7;
+}
+
+.hamster-secret::before,
+.hamster-secret::after {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    transform: translate(-50%, -50%);
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.hamster-secret::after {
+    width: 15px;
+    height: 15px;
+    border: 1px solid currentColor;
+    background: transparent;
+    opacity: 0.45;
+}
+
+button.hamster-secret:hover,
+button.hamster-secret[aria-expanded="true"] {
+    color: var(--accent-2);
+    opacity: 1;
+    transform: none;
+    filter: none;
+    box-shadow: none;
+}
+
+button.hamster-secret:active {
+    transform: none;
+}
+
+.hamster-secret:hover::before,
+.hamster-secret[aria-expanded="true"]::before {
+    transform: translate(-50%, -50%) scale(1.35);
+}
+
+.hamster-secret:hover::after,
+.hamster-secret[aria-expanded="true"]::after {
+    transform: translate(-50%, -50%) scale(1.16);
+    opacity: 0.8;
+}
+
+.hamster-reveal {
+    position: fixed;
+    z-index: 80;
+    top: 92px;
+    right: max(24px, calc((100vw - 1400px) / 2 + 24px));
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: min(340px, calc(100vw - 32px));
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    color: var(--text);
+    background: linear-gradient(145deg, var(--modal-bg-1), var(--modal-bg-2));
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.hamster-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.hamster-reveal img {
+    flex: 0 0 auto;
+    width: 68px;
+    height: 68px;
+    padding: 10px;
+    border-radius: 18px;
+    object-fit: contain;
+    background: linear-gradient(145deg, var(--accent), var(--accent-2));
+}
+
+.hamster-reveal-copy {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.hamster-reveal-kicker {
+    margin: 0;
+    color: var(--accent-2);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.hamster-reveal h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.18rem;
+    line-height: 1.1;
+}
+
+.hamster-reveal-copy > p:not(.hamster-reveal-kicker) {
+    margin: 0 0 4px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
+.hamster-reveal-close {
+    justify-self: start;
+    min-width: auto;
+    min-height: auto;
+    padding: 3px 0;
+    border: 0;
+    color: var(--accent-2);
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.75rem;
+}
+
+.hamster-reveal-close:hover {
+    color: var(--text);
+    box-shadow: none;
+    filter: none;
+}
+
 .fav-star {
     appearance: none;
     border: none;
@@ -2029,5 +2171,20 @@ body.tool-picker-active {
 
     .top-nav {
         gap: 6px;
+    }
+
+    .hamster-reveal {
+        top: 84px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hamster-reveal,
+    .hamster-secret::before,
+    .hamster-secret::after {
+        transition: none;
     }
 }

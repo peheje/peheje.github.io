@@ -257,6 +257,104 @@ function renderThemeToggle() {
   };
 }
 
+function mountHamsterSecret(parent) {
+  const secret = document.createElement("button");
+  secret.type = "button";
+  secret.className = "hamster-secret";
+  secret.setAttribute("aria-label", "Reveal the hidden hamster");
+  secret.setAttribute("aria-expanded", "false");
+
+  let panel = null;
+  let panelCleanup = null;
+
+  function closePanel() {
+    if (!panel || panel.dataset.closing === "true") return;
+
+    panel.dataset.closing = "true";
+    panel.classList.remove("is-visible");
+    secret.setAttribute("aria-expanded", "false");
+
+    const panelToRemove = panel;
+    const cleanup = panelCleanup;
+    panel = null;
+    panelCleanup = null;
+    window.setTimeout(() => {
+      cleanup?.();
+      panelToRemove.remove();
+    }, 260);
+  }
+
+  function openPanel() {
+    if (panel) {
+      closePanel();
+      return;
+    }
+
+    const nextPanel = document.createElement("aside");
+    nextPanel.className = "hamster-reveal";
+    nextPanel.setAttribute("role", "dialog");
+    nextPanel.setAttribute("aria-label", "Hidden hamster");
+
+    const image = document.createElement("img");
+    image.src = "/hamster.png";
+    image.alt = "A tiny hamster silhouette";
+
+    const copy = document.createElement("div");
+    copy.className = "hamster-reveal-copy";
+
+    const kicker = document.createElement("p");
+    kicker.className = "hamster-reveal-kicker";
+    kicker.textContent = "Small discovery";
+
+    const title = document.createElement("h2");
+    title.textContent = "The hamster was here.";
+
+    const message = document.createElement("p");
+    message.textContent = "A tiny resident of peheje. It has no useful advice.";
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "hamster-reveal-close";
+    close.textContent = "Dismiss";
+    close.addEventListener("click", closePanel);
+
+    copy.append(kicker, title, message, close);
+    nextPanel.append(image, copy);
+    document.body.append(nextPanel);
+    panel = nextPanel;
+    secret.setAttribute("aria-expanded", "true");
+
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") closePanel();
+    };
+    const closeOnOutside = (event) => {
+      if (panel === nextPanel && !nextPanel.contains(event.target) && event.target !== secret) {
+        closePanel();
+      }
+    };
+
+    document.addEventListener("keydown", closeOnEscape);
+    window.setTimeout(() => document.addEventListener("click", closeOnOutside), 0);
+    window.setTimeout(() => nextPanel.classList.add("is-visible"), 20);
+    panelCleanup = () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("click", closeOnOutside);
+    };
+  }
+
+  secret.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (panel) {
+      closePanel();
+    } else {
+      openPanel();
+    }
+  });
+
+  parent.append(secret);
+}
+
 // ---- Navigation ----
 
 function navigateWithTransition(url) {
@@ -701,6 +799,8 @@ export function mountSiteShell() {
       star.classList.add("page-fav-star");
       titleRow.append(star);
     }
+
+    mountHamsterSecret(titleRow);
 
     intro.append(titleRow);
 
