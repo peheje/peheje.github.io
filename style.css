@@ -1691,6 +1691,287 @@ body.page-loaded .app-shell > *:not(.display-none) {
     gap: 10px;
 }
 
+.hamster-secret {
+    position: relative;
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--accent);
+    background: transparent;
+    box-shadow: none;
+    opacity: 0.7;
+}
+
+.hamster-secret::before,
+.hamster-secret::after {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    transform: translate(-50%, -50%);
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.hamster-secret::after {
+    width: 15px;
+    height: 15px;
+    border: 1px solid currentColor;
+    background: transparent;
+    opacity: 0.45;
+}
+
+button.hamster-secret:hover,
+button.hamster-secret[aria-expanded="true"] {
+    color: var(--accent-2);
+    opacity: 1;
+    transform: none;
+    filter: none;
+    box-shadow: none;
+}
+
+button.hamster-secret:active {
+    transform: none;
+}
+
+.hamster-secret:hover::before,
+.hamster-secret[aria-expanded="true"]::before {
+    transform: translate(-50%, -50%) scale(1.35);
+}
+
+.hamster-secret:hover::after,
+.hamster-secret[aria-expanded="true"]::after {
+    transform: translate(-50%, -50%) scale(1.16);
+    opacity: 0.8;
+}
+
+.hamster-reveal {
+    position: fixed;
+    z-index: 80;
+    top: 92px;
+    right: max(24px, calc((100vw - 1400px) / 2 + 24px));
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: min(340px, calc(100vw - 32px));
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    color: var(--text);
+    background: linear-gradient(145deg, var(--modal-bg-1), var(--modal-bg-2));
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.hamster-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.hamster-reveal-cameo {
+    top: auto;
+    right: max(20px, calc((100vw - 1400px) / 2 + 20px));
+    bottom: clamp(18px, 4vw, 36px);
+    pointer-events: none;
+    transform: translate(18px, 10px) scale(0.94);
+}
+
+.hamster-reveal-cameo.is-visible {
+    transform: translate(0, 0) scale(1);
+}
+
+.hamster-reveal img {
+    flex: 0 0 auto;
+    width: 68px;
+    height: 68px;
+    padding: 10px;
+    border-radius: 18px;
+    object-fit: contain;
+    background: linear-gradient(145deg, var(--accent), var(--accent-2));
+}
+
+.hamster-reveal-cameo.is-visible img {
+    animation: hamster-arrival 0.55s cubic-bezier(0.2, 0.8, 0.25, 1.2) both;
+}
+
+@keyframes hamster-arrival {
+    0% {
+        opacity: 0;
+        transform: translateY(12px) rotate(7deg) scale(0.78);
+    }
+    65% {
+        opacity: 1;
+        transform: translateY(-2px) rotate(-2deg) scale(1.04);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) rotate(0) scale(1);
+    }
+}
+
+.hamster-reveal-copy {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.hamster-reveal-kicker {
+    margin: 0;
+    color: var(--accent-2);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.hamster-reveal h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.18rem;
+    line-height: 1.1;
+}
+
+.hamster-reveal-quote {
+    margin: 0 0 4px;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.hamster-reveal-copy > p:not(.hamster-reveal-kicker):not(.hamster-reveal-quote) {
+    margin: 0 0 4px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
+.hamster-reveal-close {
+    justify-self: start;
+    min-width: auto;
+    min-height: auto;
+    padding: 3px 0;
+    border: 0;
+    color: var(--accent-2);
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.75rem;
+}
+
+.hamster-reveal-close:hover {
+    color: var(--text);
+    box-shadow: none;
+    filter: none;
+}
+
+/* ---- Hamster development controls (?hamster-debug=1) ---- */
+
+.hamster-debug {
+    position: fixed;
+    left: 12px;
+    bottom: 12px;
+    z-index: 95;
+    width: min(390px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+    overflow: auto;
+    color: var(--text);
+    background: linear-gradient(145deg, var(--modal-bg-1), var(--modal-bg-2));
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    font-size: 0.78rem;
+}
+
+.hamster-debug summary {
+    padding: 10px 12px;
+    color: var(--accent-2);
+    font-weight: 800;
+    cursor: pointer;
+    user-select: none;
+}
+
+.hamster-debug-body {
+    display: grid;
+    gap: 9px;
+    padding: 0 12px 12px;
+}
+
+.hamster-debug-state {
+    color: var(--muted);
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    line-height: 1.4;
+}
+
+.hamster-debug-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.hamster-debug button,
+.hamster-debug a {
+    min-width: 0;
+    min-height: 38px;
+    padding: 7px 9px;
+    border: 1px solid var(--nav-border);
+    border-radius: var(--nav-radius);
+    color: var(--text);
+    background: var(--nav-bg);
+    box-shadow: none;
+    font: inherit;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+}
+
+.hamster-debug button:hover,
+.hamster-debug a:hover,
+.hamster-debug button[aria-pressed="true"] {
+    color: var(--nav-active-text);
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-color: transparent;
+    transform: none;
+    filter: none;
+    box-shadow: none;
+}
+
+.hamster-debug-stages,
+.hamster-debug-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hamster-debug-stages span {
+    margin-right: 2px;
+    color: var(--muted);
+    font-weight: 700;
+}
+
+.hamster-debug-stages button {
+    flex: 1 1 0;
+    padding: 6px;
+}
+
+.hamster-debug-nav > * {
+    flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hamster-debug small {
+    color: var(--muted);
+}
+
 .fav-star {
     appearance: none;
     border: none;
@@ -2029,5 +2310,47 @@ body.tool-picker-active {
 
     .top-nav {
         gap: 6px;
+    }
+
+    .hamster-reveal {
+        top: 84px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+    }
+
+    .hamster-reveal-cameo {
+        top: auto;
+        bottom: max(14px, env(safe-area-inset-bottom));
+    }
+
+    body:has(.hamster-debug) .hamster-reveal-cameo {
+        top: 12px;
+        bottom: auto;
+    }
+
+    .hamster-debug {
+        right: 8px;
+        bottom: 8px;
+        left: 8px;
+        width: auto;
+        max-height: min(48dvh, 410px);
+    }
+
+    .hamster-debug button,
+    .hamster-debug a {
+        min-height: 44px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hamster-reveal,
+    .hamster-secret::before,
+    .hamster-secret::after {
+        transition: none;
+    }
+
+    .hamster-reveal-cameo.is-visible img {
+        animation: none;
     }
 }

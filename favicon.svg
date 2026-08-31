@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="peheje">
+  <rect width="64" height="64" rx="16" fill="#172027"/>
+  <path d="M32 10 37.6 26.4 54 32l-16.4 5.6L32 54l-5.6-16.4L10 32l16.4-5.6L32 10Z" fill="#e5cf62"/>
+  <circle cx="32" cy="32" r="5" fill="#f8f4eb"/>
+</svg>

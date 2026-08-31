@@ -1,3 +1,6 @@
+import { startHamster } from "./hamster/runtime.js";
+import { mountHamsterDebug } from "./hamster/debug.js";
+
 // Local utility sites and configurations
 const sites = [
   {
@@ -132,9 +135,27 @@ const defaultFavorites = [
   "/poe.html",
 ];
 
+function safeStorageGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    // storage disabled or quota exceeded; ignore
+    return false;
+  }
+}
+
 function getFavoriteUrls() {
   try {
-    const raw = localStorage.getItem(favoritesKey);
+    const raw = safeStorageGet(favoritesKey);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
@@ -150,7 +171,7 @@ function getFavoriteUrls() {
 }
 
 function setFavoriteUrls(urls) {
-  localStorage.setItem(favoritesKey, JSON.stringify(urls));
+  safeStorageSet(favoritesKey, JSON.stringify(urls));
 }
 
 function toggleFavorite(url) {
@@ -202,11 +223,11 @@ function getActiveTheme() {
 }
 
 function getSavedTheme() {
-  return localStorage.getItem("theme") || "paper";
+  return safeStorageGet("theme") || "paper";
 }
 
 function setSavedTheme(theme) {
-  localStorage.setItem("theme", theme);
+  safeStorageSet("theme", theme);
 }
 
 function applyTheme() {
@@ -713,6 +734,12 @@ export function mountSiteShell() {
 
     header.append(nav, intro);
     menu.replaceChildren(header);
+
+    const hamsterRuntime = startHamster({
+      page: site.url,
+      triggerParent: site.url === "/compare.html" ? titleRow : null,
+    });
+    mountHamsterDebug({ runtime: hamsterRuntime, document, window });
   }
 
   applyTheme();

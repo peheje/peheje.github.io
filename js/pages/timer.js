@@ -1,5 +1,6 @@
 import { initNumberSteppers } from "../number-stepper.js";
 import { mountSiteShell } from "../site.js";
+import { HAMSTER_EVENTS, signalHamsterEvent } from "../hamster/runtime.js";
 
 const settingsKey = "kid-timer-settings";
 const stateKey = "kid-timer-state";
@@ -707,6 +708,10 @@ function initTimerPage() {
     }
 
     render();
+    signalHamsterEvent(HAMSTER_EVENTS.TIMER_COMPLETED, {
+      durationMs: state.durationMs,
+      finishedAt,
+    });
   }
 
   function reconcileStateWithTime() {
