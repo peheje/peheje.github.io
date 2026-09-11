@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>The Burrow · peheje</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+    <div id="menu"></div>
+    <main class="app-shell burrow-shell">
+        <section id="burrow-locked" class="burrow-door" hidden>
+                <div class="burrow-keyhole" aria-hidden="true"></div>
+                <h2>The latch is still drawn.</h2>
+        </section>
+
+        <div id="burrow-home" hidden>
+            <section class="burrow-room" aria-label="The hamster's room">
+                <div id="burrow-scene" class="burrow-scene">
+                    <button id="burrow-cloak-object" class="burrow-room-cloak" type="button" aria-label="Examine the cloak" hidden></button>
+                    <button id="burrow-motion-trigger" class="burrow-hamster" type="button" aria-label="The hamster at home" title="Disturb the stillness">
+                        <img src="/hamster.png" alt="The hamster at home">
+                    </button>
+                    <button id="burrow-button-object" class="burrow-room-button" type="button" aria-label="Examine the brass button" hidden></button>
+                    <button id="burrow-seed-object" class="burrow-room-seed" type="button" aria-label="Examine the black seed" hidden></button>
+                    <span class="burrow-floorboard" aria-hidden="true"></span>
+                </div>
+            </section>
+            <p id="burrow-voice" class="burrow-voice" role="status">The hamster is sorting seeds.</p>
+        </div>
+    </main>
+    <script type="module" src="js/pages/burrow.js"></script>
+</body>
+</html>

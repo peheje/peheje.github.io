@@ -1,5 +1,6 @@
 import { showInfoDialog } from "../dialog.js";
 import { initNumberSteppers } from "../number-stepper.js";
+import { HAMSTER_EVENTS, signalHamsterEvent } from "../hamster/runtime.js";
 import { mountSiteShell } from "../site.js";
 
 function show(id) {
@@ -58,6 +59,7 @@ function initMemoryPage() {
     if (state === "guess") {
       if (ioInput.value === number) {
         await showInfoDialog("Correct");
+        signalHamsterEvent(HAMSTER_EVENTS.MEMORY_CORRECT);
       } else {
         await showInfoDialog(`Not correct, number was: ${number}`);
       }

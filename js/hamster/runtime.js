@@ -11,6 +11,14 @@ export { HAMSTER_EVENTS } from "./catalog.js";
 
 export const HAMSTER_EVENT_NAME = "peheje:hamster-event";
 
+function getTimeBand(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 6 || hour >= 22) return "night";
+  if (hour < 11) return "morning";
+  if (hour < 17) return "day";
+  return "evening";
+}
+
 export function createHamsterRuntime({
   repository,
   view,
@@ -24,13 +32,19 @@ export function createHamsterRuntime({
   let started = false;
 
   function record(type, detail = {}) {
+    const timestamp = now();
+    const context = {
+      localHour: new Date(timestamp).getHours(),
+      timeBand: getTimeBand(new Date(timestamp)),
+      ...detail,
+    };
     const result = recordHamsterEvent(
       repository.load(),
-      { type, page: currentPage, detail },
-      { catalog, policies, now: now(), random },
+      { type, page: currentPage, detail: context },
+      { catalog, policies, now: timestamp, random },
     );
     repository.save(result.state);
-    if (result.encounter) view.show(result.encounter, detail);
+    if (result.encounter) view.show(result.encounter, context);
     return result;
   }
 

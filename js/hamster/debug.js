@@ -3,8 +3,8 @@ import { createHamsterState, relationshipStage } from "./model.js";
 
 const debugParameter = "hamster-debug";
 const debugSessionKey = "peheje-hamster-debug";
-const stageCounts = [0, 4, 10, 20];
-const historyLabels = ["new", "met", "familiar", "old"];
+const stageCounts = [0, 4, 10];
+const historyLabels = ["new", "met", "familiar"];
 
 function safeSessionGet(window, key) {
   try {
@@ -54,6 +54,13 @@ export function mountHamsterDebug({ runtime, document, window }) {
         <button type="button" data-action="ambient">Ambient quote</button>
         <button type="button" data-action="timer-first">First timer</button>
         <button type="button" data-action="timer-later">Later timer</button>
+        <button type="button" data-action="recall-timer">Recall timer</button>
+        <button type="button" data-action="recall-memory">Recall memory</button>
+        <button type="button" data-action="quest-offer">Offer errand</button>
+        <button type="button" data-action="quest-complete">Finish errand</button>
+        <button type="button" data-action="weather-offer">Offer cloak</button>
+        <button type="button" data-action="weather-wet">Bring rain</button>
+        <button type="button" data-action="weather-dry">Bring clear sky</button>
         <button type="button" data-action="relationship">+ Relationship</button>
         <button type="button" data-action="reset">Reset memory</button>
       </div>
@@ -64,6 +71,8 @@ export function mountHamsterDebug({ runtime, document, window }) {
       <nav class="hamster-debug-nav" aria-label="Hamster debug pages">
         <a href="${debugHref("/compare.html")}">Compare</a>
         <a href="${debugHref("/timer.html")}">Timer</a>
+        <a href="${debugHref("/weather.html")}">Weather</a>
+        <a href="${debugHref("/burrow.html")}">Burrow</a>
         <button type="button" data-action="exit">Exit debug</button>
       </nav>
       <small>Memory belongs to this browser only.</small>
@@ -92,14 +101,28 @@ export function mountHamsterDebug({ runtime, document, window }) {
   function prepareTimer({ first }) {
     runtime.closeEncounter();
     updateState((state) => {
+      state.activeQuestId = null;
       state.relationshipCount = Math.max(state.relationshipCount, first ? 4 : 10);
       state.eventCounts[HAMSTER_EVENTS.TIMER_COMPLETED] = first ? 0 : 1;
       delete state.lastEncounterAtByEvent[HAMSTER_EVENTS.TIMER_COMPLETED];
-      state.recentEncounterIds = state.recentEncounterIds.filter((id) => !id.startsWith("timer-"));
       if (first) delete state.seenEncounterIds["timer-first-ending"];
       else state.seenEncounterIds["timer-first-ending"] = Math.max(1, state.seenEncounterIds["timer-first-ending"] || 0);
     });
     runtime.record(HAMSTER_EVENTS.TIMER_COMPLETED, { debug: true });
+    refresh();
+  }
+
+  function prepareMemoryRecall(event, encounterIds) {
+    runtime.closeEncounter();
+    updateState((state) => {
+      const yesterday = Date.now() - 21 * 60 * 60 * 1000;
+      state.eventCounts[event] = 1;
+      state.lastEventAtByEvent[event] = yesterday;
+      delete state.lastEncounterAtByEvent[HAMSTER_EVENTS.MANUAL_REVEAL];
+      delete state.lastEncounterAtByEvent[HAMSTER_EVENTS.PAGE_VIEWED];
+      encounterIds.forEach((encounterId) => delete state.seenEncounterIds[encounterId]);
+    });
+    runtime.record(HAMSTER_EVENTS.MANUAL_REVEAL, { debug: true });
     refresh();
   }
 
@@ -123,6 +146,57 @@ export function mountHamsterDebug({ runtime, document, window }) {
         break;
       case "timer-later":
         prepareTimer({ first: false });
+        break;
+      case "recall-timer":
+        prepareMemoryRecall(HAMSTER_EVENTS.TIMER_COMPLETED, ["remembered-first-timer", "remembered-five-timers"]);
+        break;
+      case "recall-memory":
+        prepareMemoryRecall(HAMSTER_EVENTS.MEMORY_CORRECT, ["remembered-memory-round", "remembered-ten-answers"]);
+        break;
+      case "quest-offer":
+        runtime.closeEncounter();
+        updateState((state) => {
+          state.activeQuestId = null;
+          delete state.completedQuestIds["wake-in-three"];
+          delete state.keepsakes["brass-button"];
+          delete state.seenEncounterIds["quest-wake-offer"];
+          delete state.seenEncounterIds["quest-wake-complete"];
+          delete state.lastEncounterAtByEvent[HAMSTER_EVENTS.MANUAL_REVEAL];
+          delete state.lastEncounterAtByEvent[HAMSTER_EVENTS.PAGE_VIEWED];
+        });
+        runtime.record(HAMSTER_EVENTS.MANUAL_REVEAL, { sourceElement: button, debug: true });
+        refresh();
+        break;
+      case "quest-complete":
+        updateState((state) => { state.activeQuestId = "wake-in-three"; });
+        runtime.record(HAMSTER_EVENTS.TIMER_COMPLETED, { durationMs: 3 * 60 * 1000, timeBand: "day", debug: true });
+        refresh();
+        break;
+      case "weather-offer":
+        runtime.closeEncounter();
+        updateState((state) => {
+          state.activeQuestId = null;
+          state.completedQuestIds["wake-in-three"] = Date.now() - 21 * 60 * 60 * 1000;
+          delete state.completedQuestIds["fetch-the-weather"];
+          delete state.seenEncounterIds["quest-weather-offer"];
+          delete state.lastEncounterAtByEvent[HAMSTER_EVENTS.MANUAL_REVEAL];
+          delete state.lastEncounterAtByEvent[HAMSTER_EVENTS.PAGE_VIEWED];
+        });
+        runtime.record(HAMSTER_EVENTS.MANUAL_REVEAL, { sourceElement: button, debug: true });
+        refresh();
+        break;
+      case "weather-wet":
+      case "weather-dry":
+        updateState((state) => {
+          state.activeQuestId = "fetch-the-weather";
+          ["quest-weather-wet-night", "quest-weather-wet", "quest-weather-dry"].forEach(id => delete state.seenEncounterIds[id]);
+        });
+        runtime.record(HAMSTER_EVENTS.WEATHER_CHECKED, {
+          wet: button.dataset.action === "weather-wet",
+          timeBand: "day",
+          debug: true,
+        });
+        refresh();
         break;
       case "relationship":
         updateState((state) => { state.relationshipCount += 1; });

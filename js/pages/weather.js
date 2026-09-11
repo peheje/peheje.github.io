@@ -1,4 +1,5 @@
 import { mountSiteShell } from "../site.js";
+import { HAMSTER_EVENTS, signalHamsterEvent } from "../hamster/runtime.js";
 import SunCalc from "../lib/suncalc.js";
 import { createScrollableTabBar } from "../scrollable-tabs.js";
 import { createRainMock } from "./weather-rain-mock.js";
@@ -143,6 +144,36 @@ function getWeatherInfo(symbolCode) {
   return WEATHER_SYMBOLS[cleanCode] || { emoji: "❔", desc: `Unrecognised forecast (${cleanCode})` };
 }
 
+function weatherTimeBand(hour) {
+  if (hour < 6 || hour >= 22) return "night";
+  if (hour < 11) return "morning";
+  if (hour < 17) return "day";
+  return "evening";
+}
+
+function signalWeatherChecked(data) {
+  const timeseries = data?.properties?.timeseries || [];
+  const now = new Date();
+  const today = getLocationDateString(now);
+  const hour = getLocationHour(now);
+  const current = timeseries.find(item => {
+    const itemDate = new Date(item.time);
+    return getLocationDateString(itemDate) === today && getLocationHour(itemDate) === hour;
+  }) || timeseries[0];
+  if (!current) return;
+
+  const symbolCode = current.data.next_1_hours?.summary?.symbol_code || "";
+  const precipitation = current.data.next_1_hours?.details?.precipitation_amount || 0;
+  const wet = precipitation > 0 || /rain|snow|sleet|thunder/i.test(symbolCode);
+  signalHamsterEvent(HAMSTER_EVENTS.WEATHER_CHECKED, {
+    wet,
+    symbolCode,
+    temperature: current.data.instant.details.air_temperature,
+    location: currentLoc.name,
+    timeBand: weatherTimeBand(hour),
+  });
+}
+
 function getWindDirectionLabel(deg) {
   const directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
   const val = Math.floor((deg / 22.5) + 0.5);
@@ -276,10 +307,10 @@ function setupRadarLifecycle() {
 }
 
 function scheduleForecastDraw() {
-  if (forecastDrawFrame || !forecastData) return;
+  if (forecastDrawFrame || !forecastData || headerSwipe) return;
   forecastDrawFrame = window.requestAnimationFrame(() => {
     forecastDrawFrame = null;
-    drawForecastCurves();
+    if (!headerSwipe) drawForecastCurves();
   });
 }
 
@@ -855,25 +886,426 @@ function updateHeaderDates() {
   });
 }
 
-// Helper to trigger CSS slide transitions on canvases
-function triggerGraphAnimation(direction) {
-  const canvases = document.querySelectorAll(".canvas-container canvas");
-  const animClass = direction === "next" ? "animate-slide-right" : "animate-slide-left";
-  
-  canvases.forEach(canvas => {
-    if (!canvas) return;
-    canvas.classList.remove("animate-slide-right", "animate-slide-left");
-    // force reflow to restart animation
-    void canvas.offsetWidth;
-    canvas.classList.add(animClass);
+let dayTransitionFrame = null;
+let dayTransitionTargets = [];
+let swipeCapture = false;
+let headerSwipe = null;
+let preparedSwipe = null;
+let preparingSwipe = false;
+
+// Opt-in, on-device swipe instrumentation. Enable with ?swipeDebug=1 to see
+// where main-thread time actually goes during a gesture; the production path
+// pays nothing but the `enabled` checks. Reports are per gesture, so a phone
+// trace can say whether frames, gesture setup, or the final redraw dominate.
+function swipeDebugRequested(search) {
+  try {
+    return new URLSearchParams(search).get("swipeDebug") === "1";
+  } catch {
+    return false;
+  }
+}
+
+const SWIPE_DEBUG = swipeDebugRequested(window.location.search);
+
+const swipeDebug = {
+  enabled: SWIPE_DEBUG, open: false, start: 0, count: 0, frameHandle: null,
+  lastFrame: 0, frameDeltas: [], phases: [], longTasks: [], panel: null
+};
+
+function swipeDebugPanel() {
+  if (swipeDebug.panel) return swipeDebug.panel;
+  const panel = document.createElement("div");
+  panel.id = "swipe-debug";
+  panel.style.cssText = "position:fixed;left:8px;top:8px;z-index:99999;pointer-events:none;"
+    + "background:rgba(0,0,0,.75);color:#b6ffb6;font:10px/1.35 monospace;padding:6px 8px;"
+    + "border-radius:6px;white-space:pre;max-width:62vw;";
+  document.body.appendChild(panel);
+  swipeDebug.panel = panel;
+  return panel;
+}
+
+function swipeDebugRecord(name, ms) {
+  if (swipeDebug.enabled) swipeDebug.phases.push({ name, ms, at: performance.now() });
+}
+
+function swipeDebugTick(timestamp) {
+  if (swipeDebug.lastFrame) {
+    const delta = timestamp - swipeDebug.lastFrame;
+    if (delta > 0) swipeDebug.frameDeltas.push(delta);
+  }
+  swipeDebug.lastFrame = timestamp;
+  if (swipeDebug.open) swipeDebug.frameHandle = requestAnimationFrame(swipeDebugTick);
+}
+
+function swipeDebugBegin() {
+  if (!swipeDebug.enabled || swipeDebug.open) return;
+  swipeDebug.open = true;
+  swipeDebug.start = performance.now();
+  swipeDebug.lastFrame = 0;
+  swipeDebug.frameDeltas = [];
+  if (swipeDebug.frameHandle === null) swipeDebug.frameHandle = requestAnimationFrame(swipeDebugTick);
+}
+
+function swipeDebugFinish(note) {
+  if (!swipeDebug.enabled || !swipeDebug.open) return;
+  swipeDebug.open = false;
+  if (swipeDebug.frameHandle !== null) {
+    cancelAnimationFrame(swipeDebug.frameHandle);
+    swipeDebug.frameHandle = null;
+  }
+  swipeDebug.count++;
+  const end = performance.now();
+  const deltas = swipeDebug.frameDeltas;
+  const worstFrame = deltas.length ? Math.max(...deltas) : 0;
+  const slowFrames = deltas.filter(delta => delta > 20).length;
+  const phases = {};
+  for (const phase of swipeDebug.phases) {
+    if (phase.at < swipeDebug.start || phase.at > end) continue;
+    const entry = phases[phase.name] || (phases[phase.name] = { count: 0, worst: 0 });
+    entry.count++;
+    entry.worst = Math.max(entry.worst, phase.ms);
+  }
+  const tasks = swipeDebug.longTasks.filter(task =>
+    task.start + task.duration >= swipeDebug.start && task.start <= end);
+  const worstTask = tasks.length ? Math.round(Math.max(...tasks.map(task => task.duration))) : 0;
+  const lines = [
+    `swipe #${swipeDebug.count}${note ? ` (${note})` : ""}`,
+    `window ${Math.round(end - swipeDebug.start)}ms · frames ${deltas.length}`
+      + ` · worst ${Math.round(worstFrame)}ms · >20ms ${slowFrames}`
+  ];
+  for (const [name, entry] of Object.entries(phases)) {
+    lines.push(`${name} ${Math.round(entry.worst)}ms × ${entry.count}`);
+  }
+  lines.push(`longtasks ${tasks.length}${worstTask ? ` · worst ${worstTask}ms` : ""}`);
+  swipeDebugPanel().textContent = lines.join("\n");
+}
+
+// Dev/test seam: lets the verifier drive reports and inspect the recorder
+// without depending on gesture timing.
+if (SWIPE_DEBUG || window.__weatherTest) {
+  window.__weatherSwipeDebug = {
+    state: swipeDebug, begin: swipeDebugBegin, record: swipeDebugRecord, finish: swipeDebugFinish,
+    requested: swipeDebugRequested
+  };
+}
+
+if (SWIPE_DEBUG && typeof PerformanceObserver === "function") {
+  try {
+    new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) {
+        swipeDebug.longTasks.push({ start: entry.startTime, duration: entry.duration });
+      }
+    }).observe({ entryTypes: ["longtask"] });
+  } catch { /* longtask is not observable everywhere; the rest still works. */ }
+}
+
+function swipePreparationKey() {
+  return JSON.stringify([activeRangeMode, weatherLoadId,
+    document.documentElement.className, window.devicePixelRatio,
+    swipeCanvases().map(canvas => {
+      const rect = canvas.getBoundingClientRect();
+      return [canvas.id, rect.width, rect.height];
+    })]);
+}
+
+function getPreparedSwipe() {
+  if (preparedSwipe?.key !== swipePreparationKey() ||
+      preparedSwipe.forecast !== forecastData || preparedSwipe.tide !== tideData) return null;
+  if (!preparedSwipe.days[activeTab] ||
+      (activeTab > 0 && !preparedSwipe.days[activeTab - 1]) ||
+      (activeTab + 1 < getForecastDayCount() && !preparedSwipe.days[activeTab + 1])) return null;
+  return {
+    current: preparedSwipe.days[activeTab],
+    prev: preparedSwipe.days[activeTab - 1] || null,
+    next: preparedSwipe.days[activeTab + 1] || null
+  };
+}
+
+if (window.__weatherTest) {
+  window.__weatherSwipeReady = () => Boolean(getPreparedSwipe());
+  window.__weatherSwipeCacheSize = () => Object.keys(preparedSwipe?.days || {}).length;
+}
+
+function prepareSwipeDays() {
+  if (swipeCapture || preparingSwipe ||
+      !forecastData || getPreparedSwipe()) return;
+  // Keep only the neighboring days of charts currently on screen.
+  if (headerSwipe) return;
+  const key = swipePreparationKey();
+  const savedHover = hoverHour;
+  const savedPinned = currentTimePinned;
+  const restoreCanvases = new Set(swipeCanvases());
+  const debugStarted = swipeDebug.enabled ? performance.now() : 0;
+  preparingSwipe = true;
+  try {
+    hoverHour = null;
+    currentTimePinned = false;
+    const reusable = preparedSwipe?.key === key && preparedSwipe.forecast === forecastData &&
+      preparedSwipe.tide === tideData ? preparedSwipe.days : {};
+    const days = {};
+    for (let index = Math.max(0, activeTab - 1);
+      index <= Math.min(getForecastDayCount() - 1, activeTab + 1); index++) {
+      days[index] = reusable[index] || captureSwipeDay(index);
+    }
+    preparedSwipe = { key, forecast: forecastData, tide: tideData, days };
+  } finally {
+    hoverHour = savedHover;
+    currentTimePinned = savedPinned;
+    // Capture only changes visible swipe charts. Restore those in the same
+    // task before paint; offscreen charts and the moon are already intact.
+    drawForecastCurves(restoreCanvases);
+    preparingSwipe = false;
+    if (debugStarted) swipeDebugRecord("prep", performance.now() - debugStarted);
+  }
+}
+
+function swipeCanvases() {
+  return [uvCanvas, tempCanvas, rainCanvas, windCanvas, tideCanvas, cloudsCanvas]
+    .filter(canvas => canvas && isSwipeCanvasVisible(canvas));
+}
+
+function isSwipeCanvasVisible(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight &&
+    rect.top + rect.height > 0 && rect.left < window.innerWidth && rect.left + rect.width > 0;
+}
+
+function captureSwipeDay(index) {
+  if (window.__weatherTest) window.__weatherSwipeCaptures = (window.__weatherSwipeCaptures || 0) + 1;
+  const savedTab = activeTab;
+  const savedMode = activeRangeMode;
+  try {
+    activeTab = index;
+    if (index > 0 && activeRangeMode === "focus") activeRangeMode = "day";
+    ensureRangeModeAvailable();
+    swipeCapture = true;
+    swipeCanvases().forEach(canvas => { canvas.__swipeFrame = null; });
+    drawForecastCurves();
+    return swipeCanvases().map(canvas => {
+      const data = snapshotGraph(canvas);
+      const frame = canvas.__swipeFrame || snapshotGraph(canvas);
+      if (!canvas.__swipeFrame) data.getContext("2d").clearRect(0, 0, data.width, data.height);
+      delete canvas.__swipeFrame;
+      return { canvas, frame, data };
+    });
+  } finally {
+    activeTab = savedTab;
+    activeRangeMode = savedMode;
+    swipeCapture = false;
+  }
+}
+
+function mountSwipeLayers(swipe) {
+  const debugStarted = swipeDebug.enabled ? performance.now() : 0;
+  swipe.layers = [];
+  swipe.current.forEach(({ canvas, frame, data }, index) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.top >= window.innerHeight || rect.top + rect.height <= 0 ||
+        rect.left >= window.innerWidth || rect.left + rect.width <= 0) return;
+    const right = canvas === rainCanvas ? 38 : 15;
+    const width = rect.width - 38 - right;
+    const height = rect.height - 55;
+    if (width <= 0 || height <= 0) return;
+    // Paint the stationary frame once. Cached canvases become compositor
+    // layers; dragging only changes their shared track's transform.
+    const ctx = canvas.getContext("2d");
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(frame, 0, 0);
+    ctx.restore();
+    const viewport = document.createElement("div");
+    viewport.className = "weather-swipe-viewport";
+    viewport.setAttribute("aria-hidden", "true");
+    viewport.style.cssText = `position:absolute;left:38px;top:25px;width:${width}px;height:${height}px;overflow:hidden;pointer-events:none;`;
+    const track = document.createElement("div");
+    track.className = "weather-swipe-track";
+    track.style.cssText = "position:absolute;inset:0;will-change:transform;transform:translate3d(0,0,0);";
+    [swipe.prev?.[index].data, data, swipe.next?.[index].data].forEach((image, slot) => {
+      if (!image) return;
+      const page = document.createElement("div");
+      page.style.cssText = `position:absolute;top:0;left:${(slot - 1) * 100}%;width:100%;height:100%;overflow:hidden;`;
+      image.style.cssText = `position:absolute;left:-38px;top:-25px;width:${rect.width}px;height:${rect.height}px;pointer-events:none;`;
+      page.appendChild(image);
+      track.appendChild(page);
+    });
+    viewport.appendChild(track);
+    canvas.parentElement.appendChild(viewport);
+    swipe.layers.push({ viewport, track });
   });
+  if (debugStarted) swipeDebugRecord("mount", performance.now() - debugStarted);
+}
+
+// Track progress is expressed in viewport widths: -1 shows the next day,
+// +1 the previous one, 0 the current chart.
+function swipeProgress(swipe, offset) {
+  const neighbor = offset < 0 ? swipe.next : swipe.prev;
+  const distance = neighbor ? offset : offset * 0.18;
+  return Math.max(-1, Math.min(1, distance / swipe.width));
+}
+
+function setSwipeProgress(swipe, progress) {
+  const transform = `translate3d(${progress * 100}%,0,0)`;
+  for (const { track } of swipe.layers) track.style.transform = transform;
+}
+
+function paintHeaderSwipe(swipe, offset) {
+  setSwipeProgress(swipe, swipeProgress(swipe, offset));
+}
+
+function removeSwipeLayers(swipe) {
+  for (const animation of swipe.anims || []) animation.cancel();
+  swipe.anims = [];
+  for (const { viewport } of swipe.layers || []) {
+    viewport.querySelectorAll("canvas").forEach(canvas => canvas.remove());
+    viewport.remove();
+  }
+  swipe.layers = [];
+}
+
+function cancelHeaderSwipe() {
+  if (!headerSwipe) return;
+  swipeDebugFinish("cancelled");
+  if (headerSwipe.frame !== null) {
+    cancelAnimationFrame(headerSwipe.frame);
+    headerSwipe.frame = null;
+  }
+  removeSwipeLayers(headerSwipe);
+  headerSwipe = null;
+}
+
+// The snap back/forward is handed to the compositor so it keeps running at
+// display refresh rate even while the main thread is finishing the
+// destination redraw. A settling swipe is no longer a chain of JS frames that
+// one slow task can stall.
+const SWIPE_SETTLE_MS = 220;
+const SWIPE_SETTLE_EASING = "cubic-bezier(0.33, 1, 0.68, 1)";
+
+function finishSettledSwipe(swipe) {
+  if (headerSwipe !== swipe) return;
+  const debugStarted = swipeDebug.enabled ? performance.now() : 0;
+  headerSwipe = null;
+  removeSwipeLayers(swipe);
+  drawForecastCurves();
+  if (debugStarted) swipeDebugRecord("settleCleanup", performance.now() - debugStarted);
+  swipeDebugFinish();
+}
+
+function settleHeaderSwipe(commit) {
+  const swipe = headerSwipe;
+  if (!swipe) return;
+  if (swipe.frame !== null) {
+    cancelAnimationFrame(swipe.frame);
+    swipe.frame = null;
+  }
+  const direction = swipe.offset < 0 ? 1 : -1;
+  const available = direction === 1 ? swipe.next : swipe.prev;
+  const target = commit && available ? -direction * swipe.width : 0;
+  const from = swipeProgress(swipe, swipe.offset);
+  const to = swipeProgress(swipe, target);
+  swipe.settling = true;
+  // Commit navigation on release, so another gesture starts from the accepted
+  // destination even if this visual transition is still running.
+  if (target) changeDay(activeTab + direction, false, true);
+
+  const tracks = (swipe.layers || []).map(layer => layer.track);
+  if (!tracks.length) {
+    finishSettledSwipe(swipe);
+    return;
+  }
+
+  if (typeof tracks[0].animate === "function") {
+    swipe.anims = tracks.map(track => track.animate(
+      [{ transform: `translate3d(${from * 100}%,0,0)` },
+        { transform: `translate3d(${to * 100}%,0,0)` }],
+      { duration: SWIPE_SETTLE_MS, easing: SWIPE_SETTLE_EASING, fill: "forwards" }
+    ));
+    // Cancelling rejects `finished`; both outcomes land in the same cleanup,
+    // which ignores a swipe that is no longer the active one.
+    Promise.all(swipe.anims.map(animation => animation.finished))
+      .then(() => finishSettledSwipe(swipe), () => finishSettledSwipe(swipe));
+    return;
+  }
+
+  // Fallback for engines without the Web Animations API.
+  const started = performance.now();
+  const paint = now => {
+    const t = Math.min(1, (now - started) / SWIPE_SETTLE_MS);
+    setSwipeProgress(swipe, from + (to - from) * (1 - (1 - t) ** 3));
+    if (t < 1) swipe.frame = requestAnimationFrame(paint);
+    else {
+      swipe.frame = null;
+      finishSettledSwipe(swipe);
+    }
+  };
+  swipe.frame = requestAnimationFrame(paint);
+}
+
+function snapshotGraph(canvas) {
+  const snapshot = document.createElement("canvas");
+  snapshot.width = canvas.width;
+  snapshot.height = canvas.height;
+  snapshot.getContext("2d").drawImage(canvas, 0, 0);
+  return snapshot;
+}
+
+function finishDayTransition() {
+  if (dayTransitionFrame !== null) cancelAnimationFrame(dayTransitionFrame);
+  dayTransitionFrame = null;
+  for (const { canvas, next } of dayTransitionTargets) {
+    const ctx = canvas.getContext("2d");
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(next, 0, 0);
+    ctx.restore();
+  }
+  dayTransitionTargets = [];
+}
+
+// Blend only the plot pixels; the surrounding axes never translate or fade.
+function transitionGraphs(previous) {
+  dayTransitionTargets = previous.map(({ canvas, image }) => ({
+    canvas, image, next: snapshotGraph(canvas)
+  }));
+  const started = performance.now();
+  const paint = now => {
+    const progress = Math.min(1, (now - started) / 240);
+    const blend = progress * progress * (3 - 2 * progress);
+    for (const { canvas, image, next } of dayTransitionTargets) {
+      const ctx = canvas.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+      const right = canvas === rainCanvas ? 38 : 15;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.beginPath();
+      ctx.rect(38 * dpr, 25 * dpr,
+        canvas.width - (38 + right) * dpr, canvas.height - 55 * dpr);
+      ctx.clip();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = 1 - blend;
+      ctx.drawImage(image, 0, 0);
+      // Add premultiplied pixels so unchanged grid lines retain their opacity.
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = blend;
+      ctx.drawImage(next, 0, 0);
+      ctx.restore();
+    }
+    if (progress < 1) dayTransitionFrame = requestAnimationFrame(paint);
+    else finishDayTransition();
+  };
+  paint(started);
 }
 
 // Helper to transition active forecast day
-function changeDay(newIndex) {
+function changeDay(newIndex, animate = true, deferDraw = false) {
   if (newIndex < 0 || newIndex >= getForecastDayCount()) return;
   if (activeTab !== newIndex) {
-    const direction = newIndex > activeTab ? "next" : "prev";
+    const previous = !animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? []
+      : [uvCanvas, tempCanvas, rainCanvas, windCanvas, tideCanvas, cloudsCanvas]
+        .filter(canvas => canvas && canvas.getBoundingClientRect().width > 0)
+        .map(canvas => ({ canvas, image: snapshotGraph(canvas) }));
     activeTab = newIndex;
 
     // A rolling 12-hour focus is meaningful only for the current day. Once a
@@ -890,14 +1322,12 @@ function changeDay(newIndex) {
     // Sync header navigation arrows
     updateHeaderArrows();
 
-    // Trigger visual transitions
-    triggerGraphAnimation(direction);
-
     hoverHour = null;
     currentTimePinned = false;
     // Keep both tab bars, date labels, and graph data in sync after a day
     // change. The 12-hour mode may have been reset above.
-    updateRangeUI();
+    updateRangeUI(!deferDraw);
+    if (previous.length) transitionGraphs(previous);
   }
 }
 
@@ -1102,8 +1532,11 @@ function updateDashboardUI(data, fullRender = true) {
   }
 }
 
-// Draw all forecast curves simultaneously
-function drawForecastCurves() {
+// Draw the forecast, optionally restricting restoration to captured canvases.
+function drawForecastCurves(canvases = null) {
+  const debugStarted = swipeDebug.enabled ? performance.now() : 0;
+  if (!swipeCapture) cancelHeaderSwipe();
+  finishDayTransition();
   if (!forecastData) return;
 
   const timeseries = forecastData.properties.timeseries;
@@ -1114,22 +1547,76 @@ function drawForecastCurves() {
   const found = dayPoints.some(point => point.temp !== null);
   if (!found) return;
 
-  drawSingleCurve(uvCanvas, "uv", dayPoints);
-  drawSingleCurve(tempCanvas, "temp", dayPoints);
-  drawSingleCurve(rainCanvas, "rain", dayPoints);
-  drawSingleCurve(windCanvas, "wind", dayPoints);
+  const drawCurve = (canvas, ...args) => {
+    if (!canvases || canvases.has(canvas)) drawSingleCurve(canvas, ...args);
+  };
+  drawCurve(uvCanvas, "uv", dayPoints);
+  drawCurve(tempCanvas, "temp", dayPoints);
+  drawCurve(rainCanvas, "rain", dayPoints);
+  drawCurve(windCanvas, "wind", dayPoints);
 
   const tidePoints = getContinuousTideSeries(finalDayIndex)
     .filter(point => point.hour >= Math.floor(start) && point.hour <= end);
   const tideFound = tidePoints.some(point => point.value !== null);
-  drawSingleCurve(tideCanvas, "tide", tidePoints, tideFound);
-  drawSingleCurve(cloudsCanvas, "clouds", dayPoints);
-  drawSingleCurve(moonCanvas, "moon", dayPoints);
+  drawCurve(tideCanvas, "tide", tidePoints, tideFound);
+  drawCurve(cloudsCanvas, "clouds", dayPoints);
+  drawCurve(moonCanvas, "moon", dayPoints);
+  if (debugStarted) swipeDebugRecord("draw", performance.now() - debugStarted);
+  prepareSwipeDays();
 }
+
+// Keep the visually significant samples when several hourly values would land
+// within the same few horizontal pixels. The complete series remains available
+// to the synchronized inspector and tooltips.
+function sampleCurvePoints(points, targetCount) {
+  if (points.length <= targetCount || targetCount < 3) return points;
+
+  const sampled = [points[0]];
+  const bucketWidth = (points.length - 2) / (targetCount - 2);
+  let anchorIndex = 0;
+
+  for (let bucket = 0; bucket < targetCount - 2; bucket++) {
+    const candidateStart = Math.floor(bucket * bucketWidth) + 1;
+    const candidateEnd = Math.min(Math.floor((bucket + 1) * bucketWidth) + 1, points.length - 1);
+    const nextStart = Math.floor((bucket + 1) * bucketWidth) + 1;
+    const nextEnd = Math.min(Math.floor((bucket + 2) * bucketWidth) + 1, points.length);
+    const nextPoints = points.slice(nextStart, nextEnd);
+    const averageNext = nextPoints.reduce(
+      (average, point) => ({ x: average.x + point.x, y: average.y + point.y }),
+      { x: 0, y: 0 }
+    );
+    const divisor = nextPoints.length || 1;
+    averageNext.x /= divisor;
+    averageNext.y /= divisor;
+
+    const anchor = points[anchorIndex];
+    let selectedIndex = candidateStart;
+    let largestArea = -1;
+    for (let index = candidateStart; index < candidateEnd; index++) {
+      const candidate = points[index];
+      const area = Math.abs(
+        (anchor.x - averageNext.x) * (candidate.y - anchor.y) -
+        (anchor.x - candidate.x) * (averageNext.y - anchor.y)
+      );
+      if (area > largestArea) {
+        largestArea = area;
+        selectedIndex = index;
+      }
+    }
+    sampled.push(points[selectedIndex]);
+    anchorIndex = selectedIndex;
+  }
+
+  sampled.push(points.at(-1));
+  return sampled;
+}
+
+if (window.__weatherTest) window.__weatherSampleCurvePoints = sampleCurvePoints;
 
 // Canvas rendering helper for a single curve parameters
 function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   if (!canvas) return;
+  if (swipeCapture && (paramType === "moon" || !isSwipeCanvasVisible(canvas))) return;
   canvas.__currentValueHitTarget = null;
   canvas.classList.remove("current-value-pinned");
   if (window.__weatherTest) {
@@ -1138,11 +1625,13 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     canvas.__testAnnotations = {
       sunEvents: [],
       windArrowHours: [],
-      dayBoundaryHours: []
+      dayBoundaryHours: [],
+      timeTickHours: []
     };
   }
 
-  // Use native devicePixelRatio for ultra-sharp canvas rendering on high-density mobile displays.
+  // Keep canvas output sharp at the device's native pixel density. Multi-day
+  // performance is handled by sampling curve geometry below instead.
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return;
@@ -1368,7 +1857,10 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     const e = Math.floor(viewEndHour);
     const interval = rangeMode.currentOnly
       ? 2
-      : (rangeMode.hours <= 48 ? 6 : (rangeMode.hours <= 96 ? 12 : 24));
+      : ([2, 4, 6, 8, 12, 24, 48].find(candidate => {
+          const maxTickCount = Math.max(2, Math.floor(graphW / 72));
+          return candidate >= (e - s) / maxTickCount;
+        }) || 48);
     const tickHours = new Set();
     for (let hr = s; hr <= e; hr++) {
       if (hr % interval === 0) {
@@ -1383,6 +1875,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     hoursToShow = Array.from(tickHours).sort((a, b) => a - b);
   }
 
+  if (window.__weatherTest) canvas.__testAnnotations.timeTickHours = hoursToShow;
+
   hoursToShow.forEach(hr => {
     const x = getX(hr);
     const localHour = ((hr % 24) + 24) % 24;
@@ -1394,6 +1888,11 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     ctx.fillText(label, x, H - paddingB + 8);
   });
   ctx.restore();
+
+  if (swipeCapture) {
+    canvas.__swipeFrame = snapshotGraph(canvas);
+    ctx.clearRect(0, 0, W, H);
+  }
 
   // Build coordinate points using availability for the graph being rendered.
   const points = dayPoints.filter(p => {
@@ -1452,15 +1951,26 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     : [];
 
   // Keep disconnected source ranges separate if a provider value is missing.
-  const segments = [];
+  const sourceSegments = [];
   points.forEach(point => {
-    const previous = segments.at(-1)?.at(-1);
+    const previous = sourceSegments.at(-1)?.at(-1);
     if (!previous || point.hour !== previous.hour + 1) {
-      segments.push([point]);
+      sourceSegments.push([point]);
     } else {
-      segments.at(-1).push(point);
+      sourceSegments.at(-1).push(point);
     }
   });
+  const displayPointLimit = rangeMode.hours > 24
+    ? Math.min(48, Math.max(24, Math.floor(graphW / 8)))
+    : points.length;
+  const segments = paramType === "rain"
+    ? sourceSegments
+    : sourceSegments.map(segment => {
+        const segmentLimit = Math.max(3, Math.round(displayPointLimit * segment.length / points.length));
+        return sampleCurvePoints(segment, segmentLimit);
+      });
+  const displayPoints = segments.flat();
+  if (window.__weatherTest) canvas.__testRenderedPointCount = displayPoints.length;
 
   // Clip content area horizontally (between paddingL and W - paddingR)
   ctx.save();
@@ -1706,7 +2216,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     // Small circles identify provider-supplied hourly forecast values.
     ctx.save();
     ctx.fillStyle = lineGrad;
-    points.forEach(point => {
+    displayPoints.forEach(point => {
       ctx.beginPath();
       ctx.arc(point.x, point.y, 2.5, 0, 2 * Math.PI);
       ctx.fill();
@@ -2134,12 +2644,12 @@ function getZoomWindow() {
   return { start: dayStart, end: dayStart + rangeMode.hours - 1 };
 }
 
-function updateRangeUI() {
+function updateRangeUI(draw = true) {
   ensureRangeModeAvailable();
   rangeTabs.setActive(activeRangeMode);
   updateDayRangeCoverage();
   updateHeaderDates();
-  drawForecastCurves();
+  if (draw) drawForecastCurves();
 }
 
 function handleTouchStart(e) {
@@ -2323,6 +2833,7 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false, fo
       setLoaderState(false);
     }
     updateDashboardUI(forecastData);
+    signalWeatherChecked(forecastData);
     if (forecastData.isStale) {
       showError("Showing the most recently cached forecast because the live forecast service is unavailable.");
     }
@@ -2516,33 +3027,84 @@ function setupHeaderNavigation() {
       });
     }
 
-    // Touch swipe gesture handling on header (ignoring the arrow buttons)
-    let touchStartX = 0;
-    let touchEndX = 0;
+    let gesture = null;
+    header.addEventListener("pointerdown", e => {
+      if (!e.isPrimary || e.button !== 0 || !forecastData ||
+          e.target.closest("button, a")) return;
+      swipeDebugBegin();
+      if (headerSwipe) drawForecastCurves();
+      const debugPrep = swipeDebug.enabled ? performance.now() : 0;
+      prepareSwipeDays();
+      if (debugPrep) swipeDebugRecord("pointerdownPrep", performance.now() - debugPrep);
+      gesture = { id: e.pointerId, x: e.clientX, y: e.clientY,
+        lastX: e.clientX, lastTime: performance.now(), velocity: 0, dragging: false };
+    });
 
-    header.addEventListener("touchstart", (e) => {
-      if (e.target.closest(".nav-arrow")) {
-        touchStartX = 0; // invalidate
-        return;
+    header.addEventListener("pointermove", e => {
+      if (!gesture || gesture.id !== e.pointerId) return;
+      const dx = e.clientX - gesture.x;
+      const dy = e.clientY - gesture.y;
+      if (!gesture.dragging) {
+        if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) {
+          gesture = null;
+          return;
+        }
+        if (Math.abs(dx) < 8) return;
+        gesture.dragging = true;
+        header.setPointerCapture(e.pointerId);
+        finishDayTransition();
+        hoverHour = null;
+        currentTimePinned = false;
+        const prepared = getPreparedSwipe();
+        if (prepared) {
+          const { current, prev, next } = prepared;
+          headerSwipe = { current, prev, next, offset: 0, frame: null,
+            width: Math.max(1, header.getBoundingClientRect().width - 53) };
+          mountSwipeLayers(headerSwipe);
+        }
       }
-      touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
+      gesture.offset = dx;
+      if (!headerSwipe || headerSwipe.settling) return;
+      const now = performance.now();
+      gesture.velocity = (e.clientX - gesture.lastX) / Math.max(1, now - gesture.lastTime);
+      gesture.lastX = e.clientX;
+      gesture.lastTime = now;
+      headerSwipe.offset = Math.max(-headerSwipe.width, Math.min(headerSwipe.width, dx));
+      if (headerSwipe.frame === null) {
+        headerSwipe.frame = requestAnimationFrame(() => {
+          if (!headerSwipe) return;
+          headerSwipe.frame = null;
+          paintHeaderSwipe(headerSwipe, headerSwipe.offset);
+        });
+      }
+    });
 
-    header.addEventListener("touchend", (e) => {
-      if (touchStartX === 0 || e.target.closest(".nav-arrow")) {
-        return;
+    const release = (e, cancelled = false) => {
+      if (!gesture || gesture.id !== e.pointerId) return;
+      if (gesture.dragging && headerSwipe) {
+        const { offset, width } = headerSwipe;
+        const velocity = performance.now() - gesture.lastTime < 100 ? gesture.velocity : 0;
+        const commit = !cancelled && (Math.abs(offset) > width * 0.25 ||
+          (Math.abs(offset) > 12 && Math.abs(velocity) > 0.45 && velocity * offset > 0));
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          const index = activeTab + (offset < 0 ? 1 : -1);
+          cancelHeaderSwipe();
+          if (commit && index >= 0 && index < getForecastDayCount()) changeDay(index, false);
+          else drawForecastCurves();
+        } else settleHeaderSwipe(commit);
       }
-      touchEndX = e.changedTouches[0].screenX;
-      
-      const threshold = 60; // minimum swipe distance in pixels
-      if (touchEndX < touchStartX - threshold) {
-        // Swiped left -> Next Day
-        changeDay(activeTab + 1);
-      } else if (touchEndX > touchStartX + threshold) {
-        // Swiped right -> Previous Day
-        changeDay(activeTab - 1);
-      }
-    }, { passive: true });
+      gesture = null;
+      prepareSwipeDays();
+      if (header.hasPointerCapture(e.pointerId)) header.releasePointerCapture(e.pointerId);
+    };
+    header.addEventListener("pointerup", e => release(e));
+    header.addEventListener("pointercancel", e => release(e, true));
+    header.addEventListener("lostpointercapture", e => {
+      // Touch starts with implicit capture on the actual child under the
+      // finger (often the date span). Transferring it to the header emits a
+      // bubbling loss event from that child; the header still owns the drag.
+      if (e.target === header) release(e, true);
+    });
   });
 
   updateHeaderArrows();
@@ -2954,6 +3516,11 @@ function initWeatherPage() {
   window.addEventListener("resize", () => {
     scheduleForecastDraw();
   });
+  let swipeScrollTimer = null;
+  window.addEventListener("scroll", () => {
+    clearTimeout(swipeScrollTimer);
+    swipeScrollTimer = setTimeout(() => prepareSwipeDays(), 120);
+  }, { passive: true });
 
   // Bind synced mouse/touch event listeners across all canvases
   [uvCanvas, tempCanvas, rainCanvas, windCanvas, tideCanvas, cloudsCanvas].forEach(canvas => {

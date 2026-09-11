@@ -44,15 +44,10 @@ export function createHamsterView({ document, window }) {
     const copy = document.createElement("div");
     copy.className = "hamster-reveal-copy";
 
-    const kicker = document.createElement("p");
-    kicker.className = "hamster-reveal-kicker";
-    kicker.textContent = encounter.kicker || "";
-
     const quote = document.createElement("p");
     quote.className = "hamster-reveal-quote";
     quote.textContent = encounter.text;
 
-    if (encounter.kicker) copy.append(kicker);
     copy.append(quote);
 
     if (!isCameo) {

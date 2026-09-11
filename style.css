@@ -1691,19 +1691,19 @@ body.page-loaded .app-shell > *:not(.display-none) {
     gap: 10px;
 }
 
+/* A little brass ring: a door to the site's travelling companion. */
 .hamster-secret {
     position: relative;
-    width: 24px;
-    min-width: 24px;
-    height: 24px;
-    min-height: 24px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
     padding: 0;
     border: 0;
     border-radius: 50%;
-    color: var(--accent);
+    color: #b88a36;
     background: transparent;
     box-shadow: none;
-    opacity: 0.7;
 }
 
 .hamster-secret::before,
@@ -1711,44 +1711,38 @@ body.page-loaded .app-shell > *:not(.display-none) {
     content: "";
     position: absolute;
     inset: 50% auto auto 50%;
-    width: 5px;
-    height: 5px;
+    width: 18px;
+    height: 18px;
+    border: 2px solid currentColor;
     border-radius: 50%;
-    background: currentColor;
     transform: translate(-50%, -50%);
     transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
-.hamster-secret::after {
-    width: 15px;
-    height: 15px;
-    border: 1px solid currentColor;
-    background: transparent;
+.hamster-secret::before {
+    width: 12px;
+    height: 12px;
+    border-width: 1px;
     opacity: 0.45;
 }
 
 button.hamster-secret:hover,
 button.hamster-secret[aria-expanded="true"] {
-    color: var(--accent-2);
-    opacity: 1;
+    color: #d4a84e;
+    background: rgba(184, 138, 54, 0.1);
     transform: none;
     filter: none;
     box-shadow: none;
 }
 
-button.hamster-secret:active {
-    transform: none;
-}
-
-.hamster-secret:hover::before,
-.hamster-secret[aria-expanded="true"]::before {
-    transform: translate(-50%, -50%) scale(1.35);
+.hamster-secret:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 .hamster-secret:hover::after,
 .hamster-secret[aria-expanded="true"]::after {
-    transform: translate(-50%, -50%) scale(1.16);
-    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(1.12);
 }
 
 .hamster-reveal {
@@ -1782,6 +1776,241 @@ button.hamster-secret:active {
     bottom: clamp(18px, 4vw, 36px);
     pointer-events: none;
     transform: translate(18px, 10px) scale(0.94);
+}
+
+/* ---- The Burrow ---- */
+
+.burrow-shell {
+    --burrow-ink: #d9d3c3;
+    --burrow-muted: #aaa38f;
+    --burrow-gold: #caa85e;
+    position: relative;
+    isolation: isolate;
+    max-width: 1120px;
+    min-height: 62vh;
+    padding: 0;
+    color: var(--burrow-ink);
+}
+
+.burrow-shell [hidden] { display: none !important; }
+
+.burrow-door {
+    display: grid;
+    justify-items: center;
+    max-width: 520px;
+    margin: 9vh auto;
+    text-align: center;
+}
+
+.burrow-keyhole {
+    width: 56px;
+    height: 74px;
+    margin-bottom: 20px;
+    border: 1px solid var(--burrow-gold);
+    border-radius: 50% 50% 12px 12px;
+    background: radial-gradient(circle at 50% 34%, #080b09 0 7px, transparent 8px), rgba(202, 168, 94, 0.05);
+    box-shadow: 0 0 28px rgba(202, 168, 94, 0.12);
+}
+
+.burrow-room {
+    position: relative;
+    isolation: isolate;
+    aspect-ratio: 3 / 2;
+    min-height: 340px;
+    border: 1px solid rgba(213, 190, 133, 0.22);
+    border-radius: 30px 30px 12px 12px;
+    background: #111612 url("/burrow-chamber-v1.webp") center / cover no-repeat;
+    box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.34), 0 18px 42px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+}
+
+.burrow-door h2 {
+    margin: 0 0 8px;
+    color: var(--burrow-ink);
+    font-weight: 400;
+}
+
+.burrow-door p { color: var(--burrow-muted); }
+
+.burrow-shell .burrow-hamster,
+.burrow-shell .burrow-room-button,
+.burrow-shell .burrow-room-cloak,
+.burrow-shell .burrow-room-seed {
+    min-width: 0;
+    min-height: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.burrow-shell .burrow-hamster:focus-visible,
+.burrow-shell .burrow-room-button:focus-visible,
+.burrow-shell .burrow-room-cloak:focus-visible,
+.burrow-shell .burrow-room-seed:focus-visible {
+    outline: 0;
+    filter: brightness(1.2) drop-shadow(0 0 5px rgba(230, 198, 117, 0.72));
+}
+
+.burrow-scene {
+    --burrow-hamster-x: 0px;
+    --burrow-hamster-y: 0px;
+    --burrow-button-x: 0px;
+    --burrow-button-turn: 0deg;
+    --burrow-cloak-turn: 0deg;
+    --burrow-board-lift: 0px;
+    --burrow-board-turn: 0deg;
+    position: absolute;
+    z-index: 3;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    perspective: 300px;
+    touch-action: pan-y;
+}
+
+.burrow-scene.is-armed { touch-action: none; }
+
+.burrow-hamster {
+    position: absolute;
+    z-index: 2;
+    right: 16%;
+    bottom: 34%;
+    padding: 0;
+    border: 0;
+    border-radius: 48% 48% 42% 42%;
+    background: transparent;
+    box-shadow: none;
+    transform: translate(var(--burrow-hamster-x), var(--burrow-hamster-y));
+    transition: transform 0.15s ease-out;
+}
+
+.burrow-shell .burrow-hamster:hover,
+.burrow-shell .burrow-hamster:active {
+    transform: translate(var(--burrow-hamster-x), var(--burrow-hamster-y));
+    filter: none;
+    box-shadow: none;
+}
+
+.burrow-hamster img {
+    display: block;
+    width: clamp(46px, 7vw, 82px);
+    height: clamp(46px, 7vw, 82px);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    object-fit: contain;
+    background: transparent;
+    opacity: 0.88;
+    filter: invert(78%) sepia(23%) saturate(719%) hue-rotate(358deg) brightness(84%) drop-shadow(0 3px 8px rgba(0, 0, 0, 0.8));
+}
+
+.burrow-room-button {
+    position: absolute;
+    z-index: 3;
+    left: 51%;
+    bottom: 20%;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent url("/burrow-brass-button.webp") center / clamp(18px, 2.4vw, 28px) auto no-repeat;
+    box-shadow: none;
+    transform: translateX(var(--burrow-button-x)) rotate(var(--burrow-button-turn));
+    transition: transform 0.15s ease-out;
+}
+
+.burrow-shell .burrow-room-button:hover,
+.burrow-shell .burrow-room-button:active,
+.burrow-shell .burrow-room-cloak:hover,
+.burrow-shell .burrow-room-cloak:active,
+.burrow-shell .burrow-room-seed:hover,
+.burrow-shell .burrow-room-seed:active {
+    filter: brightness(1.18);
+    box-shadow: none;
+}
+
+.burrow-shell .burrow-room-button:hover,
+.burrow-shell .burrow-room-button:active { transform: translateX(var(--burrow-button-x)) rotate(var(--burrow-button-turn)); }
+
+.burrow-shell .burrow-room-cloak:hover,
+.burrow-shell .burrow-room-cloak:active { transform: rotate(var(--burrow-cloak-turn)); }
+
+.burrow-shell .burrow-room-seed:hover,
+.burrow-shell .burrow-room-seed:active { transform: rotate(31deg) scale(1.08); }
+
+.burrow-room-cloak {
+    position: absolute;
+    z-index: 1;
+    top: 23%;
+    left: 14.5%;
+    width: clamp(48px, 7vw, 78px);
+    height: clamp(82px, 12vw, 132px);
+    padding: 0;
+    border: 0;
+    background: transparent url("/burrow-travel-cloak.webp") center / contain no-repeat;
+    transform-origin: 50% 0;
+    transform: rotate(var(--burrow-cloak-turn));
+    transition: transform 0.2s ease-out;
+}
+
+.burrow-room-cloak.is-wet {
+    filter: saturate(0.72) brightness(0.72) hue-rotate(9deg) drop-shadow(0 4px 3px rgba(99, 164, 161, 0.2));
+}
+
+.burrow-room-seed {
+    position: absolute;
+    z-index: 4;
+    right: 19%;
+    bottom: 14%;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent url("/burrow-black-seed.webp") center / 18px auto no-repeat;
+    box-shadow: none;
+    transform: rotate(31deg);
+}
+
+.burrow-floorboard {
+    position: absolute;
+    z-index: 0;
+    right: 7.5%;
+    bottom: 8.5%;
+    width: 22%;
+    height: 13%;
+    border: 1px solid rgba(202, 168, 94, 0.16);
+    border-radius: 4px;
+    clip-path: polygon(6% 18%, 93% 0, 100% 78%, 0 100%);
+    background: linear-gradient(155deg, rgba(95, 69, 39, 0.28), rgba(14, 17, 14, 0.48));
+    transform-origin: 0 50%;
+    transform: translateY(var(--burrow-board-lift)) rotate(var(--burrow-board-turn));
+    transition: transform 0.12s ease-out, border-color 0.25s ease;
+}
+
+.burrow-scene.is-discovered .burrow-floorboard { transform: translateY(-12px) rotate(3deg); }
+
+.burrow-voice {
+    max-width: 520px;
+    min-height: 1.4em;
+    margin: 12px auto 0;
+    color: var(--burrow-muted);
+    font-size: 0.9rem;
+    text-align: center;
+    animation: burrow-secret-arrival 0.45s ease both;
+}
+
+@keyframes burrow-secret-arrival {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 0.78; transform: translateY(0); }
+}
+
+@media (max-width: 680px) {
+    .burrow-room { min-height: 0; border-radius: 20px 20px 10px 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .burrow-hamster,
+    .burrow-room-button,
+    .burrow-room-cloak { transition: none; }
 }
 
 .hamster-reveal-cameo.is-visible {
@@ -1823,34 +2052,11 @@ button.hamster-secret:active {
     min-width: 0;
 }
 
-.hamster-reveal-kicker {
-    margin: 0;
-    color: var(--accent-2);
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
-
-.hamster-reveal h2 {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 1.18rem;
-    line-height: 1.1;
-}
-
 .hamster-reveal-quote {
     margin: 0 0 4px;
     font-family: var(--font-display);
     font-size: 1rem;
     font-weight: 700;
-    line-height: 1.35;
-}
-
-.hamster-reveal-copy > p:not(.hamster-reveal-kicker):not(.hamster-reveal-quote) {
-    margin: 0 0 4px;
-    color: var(--muted);
-    font-size: 0.8rem;
     line-height: 1.35;
 }
 

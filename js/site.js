@@ -100,6 +100,13 @@ const sites = [
     category: "Map",
   },
   {
+    url: "/burrow.html",
+    name: "The Burrow",
+    about: "A room behind a door too small for you.",
+    category: "Hamster",
+    requiresHamsterUnlock: true,
+  },
+  {
     url: "https://twitter.com/peheje",
     name: "Contact",
     about: "",
@@ -109,11 +116,21 @@ const sites = [
 const internalSites = sites.filter(
   (site) =>
     site.url.startsWith("/") &&
+    (!site.requiresHamsterUnlock || hamsterBurrowUnlocked()) &&
     !(
       window.location.hostname.includes("github.io") &&
       site.url === "/gentrail.html"
     ),
 );
+
+function hamsterBurrowUnlocked() {
+  try {
+    const state = JSON.parse(window.localStorage.getItem("peheje-hamster-state-v1") || "{}");
+    return Boolean(state.completedQuestIds?.["wake-in-three"]);
+  } catch {
+    return false;
+  }
+}
 const themes = [
   { key: "warm", className: "theme-warm", label: "W", title: "Warm theme" },
   { key: "blue", className: "theme-blue", label: "B", title: "Blue theme" },
@@ -737,7 +754,7 @@ export function mountSiteShell() {
 
     const hamsterRuntime = startHamster({
       page: site.url,
-      triggerParent: site.url === "/compare.html" ? titleRow : null,
+      triggerParent: titleRow,
     });
     mountHamsterDebug({ runtime: hamsterRuntime, document, window });
   }

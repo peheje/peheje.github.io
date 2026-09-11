@@ -716,23 +716,6 @@
             opacity: 0.85;
         }
 
-        @keyframes slideInRight {
-            from { opacity: 0.5; transform: translateX(16px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes slideInLeft {
-            from { opacity: 0.5; transform: translateX(-16px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        .animate-slide-right {
-            animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        .animate-slide-left {
-            animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
         .error-message {
             color: var(--danger);
             background: var(--notice-bg);
