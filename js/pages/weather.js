@@ -184,19 +184,52 @@ function getLocationTimeZone() {
   return currentLoc.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
+// Intl.DateTimeFormat construction is expensive and dominates zoned time math:
+// a single desktop day navigation used to build thousands of identical
+// formatters. Keep exactly one formatter per IANA timezone instead.
+const zonedPartsFormatters = new Map();
+const ZONED_PARTS_CACHE_LIMIT = 2048;
+const zonedPartsCache = new Map();
+
+function getZonedPartsFormatter(timeZone) {
+  let formatter = zonedPartsFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23"
+    });
+    zonedPartsFormatters.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
+// The moon strip needs a short weekday for every slot on every redraw. Asking
+// toLocaleDateString for it builds a new formatter per call, the same cost the
+// zoned-date path avoids, so keep one UTC weekday formatter instead.
+let utcWeekdayFormatter = null;
+
+function formatUtcWeekday(date) {
+  if (!utcWeekdayFormatter) {
+    utcWeekdayFormatter = new Intl.DateTimeFormat("en", { weekday: "short", timeZone: "UTC" });
+  }
+  return utcWeekdayFormatter.format(date);
+}
+
 function getZonedParts(date, timeZone = getLocationTimeZone()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  return {
+  const key = `${date.getTime()}|${timeZone}`;
+  const cached = zonedPartsCache.get(key);
+  if (cached) return cached;
+
+  const values = Object.fromEntries(
+    getZonedPartsFormatter(timeZone).formatToParts(date).map(({ type, value }) => [type, value])
+  );
+  const parts = {
     year: Number(values.year),
     month: Number(values.month),
     day: Number(values.day),
@@ -204,6 +237,14 @@ function getZonedParts(date, timeZone = getLocationTimeZone()) {
     minute: Number(values.minute),
     second: Number(values.second)
   };
+  // Zoned parts depend only on the instant and timezone, and one redraw asks
+  // for the same few hundred instants once per chart. Keeping the converted
+  // result makes repeat lookups a Map hit instead of another formatToParts.
+  // The rolling forecast window stays far below this bound; clear rather than
+  // grow if a caller ever feeds a much larger stream of instants.
+  if (zonedPartsCache.size >= ZONED_PARTS_CACHE_LIMIT) zonedPartsCache.clear();
+  zonedPartsCache.set(key, parts);
+  return parts;
 }
 
 // Helper to format selected-location YYYY-MM-DD.
@@ -3774,8 +3815,7 @@ function renderMoonPhaseCard(ctx, W, H, computedStyle, textColor, mutedColor, ac
     const dayIndex = centerDayIndex + offset;
     const date = offset === 0 ? targetDate : getLocationDayDate(dayIndex, 12, 0);
     const parts = getZonedParts(date);
-    const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day))
-      .toLocaleDateString("en", { weekday: "short", timeZone: "UTC" });
+    const weekday = formatUtcWeekday(new Date(Date.UTC(parts.year, parts.month - 1, parts.day)));
     return {
       slot,
       offset,
