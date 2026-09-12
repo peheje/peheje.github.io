@@ -155,15 +155,12 @@ function sampleColorScale(scale, value) {
 }
 
 // Build a vertical canvas gradient that maps a value axis to a color scale.
-// `fade` lowers the alpha toward the bottom so the same gradient can double as
-// the area fill under the curve.
-function buildValueGradient(ctx, { bottom, top, min, max, scale, maxAlpha = 1, fade = false }) {
+function buildValueGradient(ctx, { bottom, top, min, max, scale }) {
   const span = (max - min) || 1;
   const gradient = ctx.createLinearGradient(0, bottom, 0, top); // 0 = min, 1 = max
   const addStop = (value, rgb) => {
     const pos = Math.min(1, Math.max(0, (value - min) / span));
-    const alpha = fade ? maxAlpha * pos : maxAlpha;
-    gradient.addColorStop(pos, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`);
+    gradient.addColorStop(pos, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 1)`);
   };
   addStop(min, sampleColorScale(scale, min));
   addStop(max, sampleColorScale(scale, max));
@@ -2292,49 +2289,8 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     }
   } else {
     // ---- Draw Curves for UV / Temperature ----
-    // 3. Draw gradient area under the curve. Temperature, UV, and sea level use
-    // the value-mapped vertical gradient so the fill hue tracks the data too.
-    ctx.save();
-    let fillGrad;
-    if (paramType === "wind") {
-      fillGrad = ctx.createLinearGradient(0, paddingT, 0, H - paddingB);
-      fillGrad.addColorStop(0, "rgba(0, 245, 212, 0.25)");
-      fillGrad.addColorStop(1, "rgba(0, 245, 212, 0.0)");
-    } else if (paramType === "clouds") {
-      fillGrad = ctx.createLinearGradient(0, paddingT, 0, H - paddingB);
-      fillGrad.addColorStop(0, "rgba(96, 165, 250, 0.25)");
-      fillGrad.addColorStop(1, "rgba(96, 165, 250, 0.0)");
-    } else {
-      const fillAlpha = paramType === "uv" ? 0.35 : (paramType === "tide" ? 0.25 : 0.3);
-      fillGrad = buildValueGradient(ctx, {
-        bottom: curveBottom,
-        top: curveTop,
-        min: curveMin,
-        max: curveMax,
-        scale: curveScale,
-        maxAlpha: fillAlpha,
-        fade: true
-      });
-    }
-    ctx.fillStyle = fillGrad;
-
-    segments.filter(segment => segment.length > 1).forEach(segment => {
-      ctx.beginPath();
-      ctx.moveTo(segment[0].x, H - paddingB);
-      ctx.lineTo(segment[0].x, segment[0].y);
-      for (let i = 0; i < segment.length - 1; i++) {
-        const p0 = segment[i];
-        const p1 = segment[i + 1];
-        const xc = (p0.x + p1.x) / 2;
-        const yc = (p0.y + p1.y) / 2;
-        ctx.quadraticCurveTo(p0.x, p0.y, xc, yc);
-      }
-      ctx.lineTo(segment.at(-1).x, segment.at(-1).y);
-      ctx.lineTo(segment.at(-1).x, H - paddingB);
-      ctx.closePath();
-      ctx.fill();
-    });
-    ctx.restore();
+    // Note: the area fill under the curve was removed; only the line (and the
+    // UV clear-sky/wind-gust overlays) is drawn now.
 
     // Clear-sky UV is a reference ceiling: the solid curve remains the
     // cloud-adjusted forecast used by the current UV card and safety advice.
