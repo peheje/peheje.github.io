@@ -44,6 +44,7 @@ let hoverHour = null; // Currently hovered hour on the canvas (0-23)
 let currentTimePinned = false;
 let radarSource = "";
 let radarIsInViewport = false;
+let radarActivated = false;
 let radarObserver = null;
 let forecastDrawFrame = null;
 let clockTimer = null;
@@ -103,6 +104,91 @@ const UV_LEVELS = [
 
 function getUVLevel(val) {
   return UV_LEVELS.find(level => val <= level.max);
+}
+
+// Value-mapped color scales. Anchors are absolute values, so a given
+// temperature, UV index, or tide height always looks the same no matter which
+// day or range is on screen. The gradient axis is vertical (the value), never
+// horizontal (time), which is what the old time-based ramp got wrong.
+function hexToRgb(hex) {
+  const value = parseInt(hex.slice(1), 16);
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+}
+
+const TEMP_COLOR_SCALE = [
+  { v: -15, rgb: [59, 130, 246] },  // deep blue
+  { v: 0, rgb: [56, 189, 248] },    // cyan
+  { v: 12, rgb: [52, 211, 153] },   // green
+  { v: 22, rgb: [251, 191, 36] },   // amber
+  { v: 30, rgb: [249, 115, 22] },   // orange
+  { v: 38, rgb: [239, 68, 68] }     // red
+];
+
+// Reuse the WHO UV safety colors declared above so the curve matches the card.
+const UV_COLOR_SCALE = [0, 3, 6, 8, 11].map((v, index) => ({ v, rgb: hexToRgb(UV_LEVELS[index].color) }));
+
+const TIDE_COLOR_SCALE = [
+  { v: -250, rgb: [12, 74, 110] },  // deep navy (low water)
+  { v: -100, rgb: [0, 119, 182] },
+  { v: 0, rgb: [0, 180, 216] },     // cyan
+  { v: 100, rgb: [72, 202, 228] },
+  { v: 250, rgb: [186, 230, 253] }  // pale (high water)
+];
+
+function sampleColorScale(scale, value) {
+  if (value <= scale[0].v) return scale[0].rgb;
+  const last = scale[scale.length - 1];
+  if (value >= last.v) return last.rgb;
+  for (let i = 1; i < scale.length; i++) {
+    const a = scale[i - 1];
+    const b = scale[i];
+    if (value <= b.v) {
+      const f = (value - a.v) / (b.v - a.v);
+      return [
+        Math.round(a.rgb[0] + (b.rgb[0] - a.rgb[0]) * f),
+        Math.round(a.rgb[1] + (b.rgb[1] - a.rgb[1]) * f),
+        Math.round(a.rgb[2] + (b.rgb[2] - a.rgb[2]) * f)
+      ];
+    }
+  }
+  return last.rgb;
+}
+
+// Build a vertical canvas gradient that maps a value axis to a color scale.
+// `fade` lowers the alpha toward the bottom so the same gradient can double as
+// the area fill under the curve.
+function buildValueGradient(ctx, { bottom, top, min, max, scale, maxAlpha = 1, fade = false }) {
+  const span = (max - min) || 1;
+  const gradient = ctx.createLinearGradient(0, bottom, 0, top); // 0 = min, 1 = max
+  const addStop = (value, rgb) => {
+    const pos = Math.min(1, Math.max(0, (value - min) / span));
+    const alpha = fade ? maxAlpha * pos : maxAlpha;
+    gradient.addColorStop(pos, `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`);
+  };
+  addStop(min, sampleColorScale(scale, min));
+  addStop(max, sampleColorScale(scale, max));
+  scale.forEach(anchor => {
+    if (anchor.v > min && anchor.v < max) addStop(anchor.v, anchor.rgb);
+  });
+  return gradient;
+}
+
+function colorScaleCss(scale, value) {
+  const [r, g, b] = sampleColorScale(scale, value);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+// Stretch a scale so its first and last anchor land on min/max. Used for
+// temperature, where the palette should cover whatever range is on screen
+// rather than a fixed physical range that leaves mild days uniformly green.
+function stretchScale(scale, min, max) {
+  const lo = scale[0].v;
+  const hi = scale[scale.length - 1].v;
+  const span = (hi - lo) || 1;
+  return scale.map(anchor => ({
+    v: min + ((anchor.v - lo) / span) * (max - min),
+    rgb: anchor.rgb
+  }));
 }
 
 // Weather Symbols mapping
@@ -324,9 +410,15 @@ function updateRadarResource() {
   const radarCard = document.querySelector(".graph-card[data-key='radar']");
   if (!radarIframe) return;
 
-  const shouldLoad = radarSource && document.visibilityState === "visible" &&
-    radarIsInViewport && !radarCard?.classList.contains("minimized");
+  const minimized = radarCard?.classList.contains("minimized");
+  // The first time the card scrolls into view we load the embed and remember
+  // it. After that, scrolling away no longer tears it down, so the Windy map
+  // keeps its state. The iframe is only unloaded when the tab is hidden or the
+  // card is explicitly minimized.
+  const shouldLoad = Boolean(radarSource) && document.visibilityState === "visible" &&
+    !minimized && (radarActivated || radarIsInViewport);
   if (shouldLoad) {
+    radarActivated = true;
     if (radarIframe.src !== radarSource) radarIframe.src = radarSource;
   } else if (radarIframe.getAttribute("src")) {
     radarIframe.src = "";
@@ -806,7 +898,10 @@ function getDayNameAndDate(i) {
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const parts = getZonedParts(getLocationDayDate(i));
   const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
-  const dayName = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[weekday]);
+  const weekdayName = daysOfWeek[weekday];
+  // "Today"/"Tomorrow" hide the weekday. Annotate them so the plain-weekday
+  // tabs that follow can be placed without counting days in your head.
+  const dayName = (i === 0) ? `Today · ${weekdayName}` : ((i === 1) ? `Tomorrow · ${weekdayName}` : weekdayName);
   const dateStr = `${parts.day}/${parts.month}`;
   return `${dayName} ${dateStr}`;
 }
@@ -1418,7 +1513,9 @@ function renderDayTabs() {
   for (let i = 0; i < forecastDays; i++) {
     const parts = getZonedParts(getLocationDayDate(i));
     const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
-    const dayName = (i === 0) ? "Today" : ((i === 1) ? "Tomorrow" : daysOfWeek[weekday]);
+    const weekdayName = daysOfWeek[weekday];
+    // Mirror the graph titles: keep the weekday visible on Today/Tomorrow.
+    const dayName = (i === 0) ? `Today · ${weekdayName}` : ((i === 1) ? `Tomorrow · ${weekdayName}` : weekdayName);
     const dateStr = `${parts.day}/${parts.month}`;
     const coverage = getDayRangeCoverage(i);
     items.push({
@@ -1737,7 +1834,6 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   const mutedColor = computedStyle.getPropertyValue("--muted").trim() || "#c4a882";
   const gridColor = computedStyle.getPropertyValue("--line").trim() || "rgba(200, 160, 120, 0.15)";
   const accentColor = computedStyle.getPropertyValue("--accent").trim() || "#e8a045";
-  const accent2Color = computedStyle.getPropertyValue("--accent-2").trim() || "#d4763a";
   const clearSkyUvColor = computedStyle.getPropertyValue("--uv-clear-sky").trim() || "#8a5a00";
   ctx.clearRect(0, 0, W, H);
 
@@ -1919,7 +2015,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   if (paramType === "rain" && !hideAxisLabels) {
     ctx.save();
     ctx.fillStyle = "rgba(192, 132, 252, 0.9)";
-    ctx.font = "8px sans-serif";
+    ctx.font = "10px sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     [0, 50, 100].forEach(probVal => {
@@ -2029,6 +2125,33 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   });
 
   if (points.length === 0) return;
+
+  // Color mapping for the value curves. UV and sea level use fixed physical
+  // scales (the UV palette is a WHO safety scale). Temperature is normalized to
+  // the plotted range, so the warmest hour of the chart is red and the coldest
+  // is blue instead of a mild day staying uniformly green.
+  let curveScale = TEMP_COLOR_SCALE;
+  let curveMin = minScaleY;
+  let curveMax = maxScaleY;
+  let curveBottom = H - paddingB;
+  let curveTop = paddingT;
+  if (paramType === "temp") {
+    const temps = points.map(point => point.val);
+    curveMin = Math.min(...temps);
+    curveMax = Math.max(...temps);
+    if (curveMax - curveMin < 1) {
+      const mid = (curveMax + curveMin) / 2;
+      curveMin = mid - 0.5;
+      curveMax = mid + 0.5;
+    }
+    curveBottom = getY(curveMin);
+    curveTop = getY(curveMax);
+    curveScale = stretchScale(TEMP_COLOR_SCALE, curveMin, curveMax);
+  } else if (paramType === "uv") {
+    curveScale = UV_COLOR_SCALE;
+  } else if (paramType === "tide") {
+    curveScale = TIDE_COLOR_SCALE;
+  }
 
   const clearSkyUvPoints = paramType === "uv"
     ? dayPoints
@@ -2169,24 +2292,29 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     }
   } else {
     // ---- Draw Curves for UV / Temperature ----
-    // 3. Draw gradient area under the curve
+    // 3. Draw gradient area under the curve. Temperature, UV, and sea level use
+    // the value-mapped vertical gradient so the fill hue tracks the data too.
     ctx.save();
-    const fillGrad = ctx.createLinearGradient(0, paddingT, 0, H - paddingB);
-    if (paramType === "uv") {
-      fillGrad.addColorStop(0, "rgba(232, 160, 69, 0.35)");
-      fillGrad.addColorStop(1, "rgba(232, 160, 69, 0.0)");
-    } else if (paramType === "wind") {
+    let fillGrad;
+    if (paramType === "wind") {
+      fillGrad = ctx.createLinearGradient(0, paddingT, 0, H - paddingB);
       fillGrad.addColorStop(0, "rgba(0, 245, 212, 0.25)");
       fillGrad.addColorStop(1, "rgba(0, 245, 212, 0.0)");
-    } else if (paramType === "tide") {
-      fillGrad.addColorStop(0, "rgba(0, 180, 216, 0.25)");
-      fillGrad.addColorStop(1, "rgba(0, 180, 216, 0.0)");
     } else if (paramType === "clouds") {
+      fillGrad = ctx.createLinearGradient(0, paddingT, 0, H - paddingB);
       fillGrad.addColorStop(0, "rgba(96, 165, 250, 0.25)");
       fillGrad.addColorStop(1, "rgba(96, 165, 250, 0.0)");
-    } else { // temp
-      fillGrad.addColorStop(0, "rgba(212, 90, 90, 0.3)"); // Reddish tint
-      fillGrad.addColorStop(1, "rgba(212, 90, 90, 0.0)");
+    } else {
+      const fillAlpha = paramType === "uv" ? 0.35 : (paramType === "tide" ? 0.25 : 0.3);
+      fillGrad = buildValueGradient(ctx, {
+        bottom: curveBottom,
+        top: curveTop,
+        min: curveMin,
+        max: curveMax,
+        scale: curveScale,
+        maxAlpha: fillAlpha,
+        fade: true
+      });
     }
     ctx.fillStyle = fillGrad;
 
@@ -2262,23 +2390,25 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
     // 4. Draw curve line stroke
     ctx.save();
-    const lineGrad = ctx.createLinearGradient(paddingL, 0, W - paddingR, 0);
-    if (paramType === "uv") {
-      lineGrad.addColorStop(0, accentColor);
-      lineGrad.addColorStop(1, accent2Color);
-    } else if (paramType === "wind") {
+    let lineGrad;
+    if (paramType === "wind") {
+      lineGrad = ctx.createLinearGradient(paddingL, 0, W - paddingR, 0);
       lineGrad.addColorStop(0, "#00f5d4");
       lineGrad.addColorStop(1, "#00bbf9");
-    } else if (paramType === "tide") {
-      lineGrad.addColorStop(0, "#0077b6");
-      lineGrad.addColorStop(1, "#00f5d4");
     } else if (paramType === "clouds") {
+      lineGrad = ctx.createLinearGradient(paddingL, 0, W - paddingR, 0);
       lineGrad.addColorStop(0, "#60a5fa");
       lineGrad.addColorStop(1, "#94a3b8");
-    } else { // temp
-      lineGrad.addColorStop(0, "#38d4ff"); // Cool blue on left (night)
-      lineGrad.addColorStop(0.5, accentColor); // Warm midday
-      lineGrad.addColorStop(1, "#ff6b8b");  // Pinkish-red evening
+    } else {
+      // Temperature, UV, and sea level are read from the vertical axis, so color
+      // the curve by value there instead of by time across the window.
+      lineGrad = buildValueGradient(ctx, {
+        bottom: curveBottom,
+        top: curveTop,
+        min: curveMin,
+        max: curveMax,
+        scale: curveScale
+      });
     }
     
     ctx.strokeStyle = lineGrad;
@@ -2335,7 +2465,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
           ctx.lineWidth = 1.5;
           ctx.setLineDash([4, 4]);
           ctx.beginPath();
-          ctx.moveTo(x, showLabel ? paddingT + 32 : paddingT);
+          ctx.moveTo(x, showLabel ? paddingT + 36 : paddingT);
           ctx.lineTo(x, H - paddingB);
           ctx.stroke();
           ctx.restore();
@@ -2351,7 +2481,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
           ctx.save();
           ctx.fillStyle = textColor;
-          ctx.font = "bold 9px sans-serif";
+          ctx.font = "bold 11px sans-serif";
           const nearLeft = x < paddingL + 28;
           const nearRight = x > W - paddingR - 28;
           const labelX = nearLeft ? paddingL + 4 : (nearRight ? W - paddingR - 4 : x);
@@ -2359,7 +2489,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
           ctx.textBaseline = "top";
           const timeStr = `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
           ctx.fillText(eventName, labelX, paddingT + 5);
-          ctx.fillText(timeStr, labelX, paddingT + 17);
+          ctx.fillText(timeStr, labelX, paddingT + 19);
           ctx.restore();
         };
 
@@ -2571,7 +2701,13 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
       // Hover highlighted dot
       ctx.save();
-      ctx.fillStyle = paramType === "rain" ? "#38d4ff" : (paramType === "temp" ? "#ff6b8b" : (paramType === "wind" ? "#00f5d4" : accentColor));
+      const hoverScale = (paramType === "uv" || paramType === "tide" || paramType === "temp") ? curveScale : null;
+      const hoverValue = paramType === "uv" ? hpUv : (paramType === "tide" ? hpTideValue : hpTemp);
+      ctx.fillStyle = paramType === "rain"
+        ? "#38d4ff"
+        : (paramType === "wind"
+          ? "#00f5d4"
+          : (hoverScale && Number.isFinite(hoverValue) ? colorScaleCss(hoverScale, hoverValue) : accentColor));
       ctx.strokeStyle = textColor;
       ctx.lineWidth = 2;
       ctx.beginPath();
