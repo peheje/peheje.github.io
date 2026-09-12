@@ -892,6 +892,7 @@ let swipeCapture = false;
 let headerSwipe = null;
 let preparedSwipe = null;
 let preparingSwipe = false;
+const swipeSnapshotPool = [];
 
 // Opt-in, on-device swipe instrumentation. Enable with ?swipeDebug=1 to see
 // where main-thread time actually goes during a gesture; the production path
@@ -1024,6 +1025,10 @@ function getPreparedSwipe() {
 if (window.__weatherTest) {
   window.__weatherSwipeReady = () => Boolean(getPreparedSwipe());
   window.__weatherSwipeCacheSize = () => Object.keys(preparedSwipe?.days || {}).length;
+  window.__weatherSwipeSnapshotState = () => ({
+    active: Object.values(preparedSwipe?.days || {}).flatMap(day => day.flatMap(({ frame, data }) => [frame, data])),
+    spare: [...swipeSnapshotPool]
+  });
 }
 
 function prepareSwipeDays() {
@@ -1042,13 +1047,39 @@ function prepareSwipeDays() {
     currentTimePinned = false;
     const reusable = preparedSwipe?.key === key && preparedSwipe.forecast === forecastData &&
       preparedSwipe.tide === tideData ? preparedSwipe.days : {};
+    const first = Math.max(0, activeTab - 1);
+    const last = Math.min(getForecastDayCount() - 1, activeTab + 1);
     const days = {};
-    for (let index = Math.max(0, activeTab - 1);
-      index <= Math.min(getForecastDayCount() - 1, activeTab + 1); index++) {
-      days[index] = reusable[index] || captureSwipeDay(index);
+    const retained = new Set();
+    for (let index = first; index <= last; index++) {
+      if (!reusable[index]) continue;
+      days[index] = reusable[index];
+      for (const { frame, data } of days[index]) {
+        retained.add(frame);
+        retained.add(data);
+      }
+    }
+    // No layers are mounted while preparing. Recycle only entries that the
+    // next cache will not retain, before allocating their replacements.
+    for (const day of Object.values(preparedSwipe?.days || {})) {
+      for (const { frame, data } of day) {
+        if (!retained.has(frame)) swipeSnapshotPool.push(frame);
+        if (!retained.has(data)) swipeSnapshotPool.push(data);
+      }
+    }
+    preparedSwipe = null;
+    for (let index = first; index <= last; index++) {
+      days[index] ||= captureSwipeDay(index);
     }
     preparedSwipe = { key, forecast: forecastData, tide: tideData, days };
   } finally {
+    // Keep spare canvas objects for reuse, but release their pixel buffers
+    // when fewer charts are visible. At most six charts × three days × two
+    // layers can be active or pooled; scrolling does not grow generations.
+    for (const canvas of swipeSnapshotPool) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
     hoverHour = savedHover;
     currentTimePinned = savedPinned;
     // Capture only changes visible swipe charts. Restore those in the same
@@ -1082,8 +1113,8 @@ function captureSwipeDay(index) {
     swipeCanvases().forEach(canvas => { canvas.__swipeFrame = null; });
     drawForecastCurves();
     return swipeCanvases().map(canvas => {
-      const data = snapshotGraph(canvas);
-      const frame = canvas.__swipeFrame || snapshotGraph(canvas);
+      const data = snapshotSwipeGraph(canvas);
+      const frame = canvas.__swipeFrame || snapshotSwipeGraph(canvas);
       if (!canvas.__swipeFrame) data.getContext("2d").clearRect(0, 0, data.width, data.height);
       delete canvas.__swipeFrame;
       return { canvas, frame, data };
@@ -1241,12 +1272,18 @@ function settleHeaderSwipe(commit) {
   swipe.frame = requestAnimationFrame(paint);
 }
 
-function snapshotGraph(canvas) {
-  const snapshot = document.createElement("canvas");
-  snapshot.width = canvas.width;
-  snapshot.height = canvas.height;
-  snapshot.getContext("2d").drawImage(canvas, 0, 0);
+function snapshotGraph(canvas, snapshot = document.createElement("canvas")) {
+  if (snapshot.width !== canvas.width) snapshot.width = canvas.width;
+  if (snapshot.height !== canvas.height) snapshot.height = canvas.height;
+  const ctx = snapshot.getContext("2d");
+  // Reused snapshots can contain opaque pixels where the new plot is clear.
+  ctx.clearRect(0, 0, snapshot.width, snapshot.height);
+  ctx.drawImage(canvas, 0, 0);
   return snapshot;
+}
+
+function snapshotSwipeGraph(canvas) {
+  return snapshotGraph(canvas, swipeSnapshotPool.pop());
 }
 
 function finishDayTransition() {
@@ -1890,7 +1927,7 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
   ctx.restore();
 
   if (swipeCapture) {
-    canvas.__swipeFrame = snapshotGraph(canvas);
+    canvas.__swipeFrame = snapshotSwipeGraph(canvas);
     ctx.clearRect(0, 0, W, H);
   }
 
@@ -3512,9 +3549,20 @@ function initWeatherPage() {
     }
   });
 
-  // Redraw canvases on resize, coalesced with hover/theme draw requests.
+  // Mobile browser controls can resize the viewport height while scrolling
+  // without resizing any chart. Reuse those pixels instead of rasterizing all
+  // forecasts again; actual layout and pixel-density changes still redraw.
   window.addEventListener("resize", () => {
-    scheduleForecastDraw();
+    const dpr = window.devicePixelRatio || 1;
+    const resized = [uvCanvas, tempCanvas, rainCanvas, windCanvas, tideCanvas, cloudsCanvas, moonCanvas]
+      .some(canvas => {
+        if (!canvas) return false;
+        const rect = canvas.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 &&
+          (canvas.width !== Math.floor(rect.width * dpr) ||
+           canvas.height !== Math.floor(rect.height * dpr));
+      });
+    if (resized) scheduleForecastDraw();
   });
   let swipeScrollTimer = null;
   window.addEventListener("scroll", () => {
