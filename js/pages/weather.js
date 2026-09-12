@@ -1883,6 +1883,13 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     return H - paddingB - (Math.min(100, Math.max(0, prob)) / 100) * graphH;
   };
 
+  // Axis labels describe the day this frame was captured for. While another
+  // day's plot slides over that frame they are simply wrong, so swipe frames
+  // omit the text and keep only the grid; the settled redraw, which runs after
+  // the gesture, restores labels for the day that is actually shown.
+  const hideAxisLabels = swipeCapture;
+  if (window.__weatherTest) canvas.__testFrameLabelsDrawn = !hideAxisLabels;
+
   // 1. Draw horizontal grid lines and labels
   ctx.save();
   ctx.strokeStyle = gridColor;
@@ -1901,13 +1908,15 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     ctx.stroke();
 
     ctx.setLineDash([]);
-    ctx.fillStyle = paramType === "rain" ? "rgba(56, 178, 255, 0.9)" : mutedColor;
-    ctx.fillText(val, paddingL - 8, y);
+    if (!hideAxisLabels) {
+      ctx.fillStyle = paramType === "rain" ? "rgba(56, 178, 255, 0.9)" : mutedColor;
+      ctx.fillText(val, paddingL - 8, y);
+    }
   });
   ctx.restore();
 
   // Right Y-axis labels for Rain Chance (%)
-  if (paramType === "rain") {
+  if (paramType === "rain" && !hideAxisLabels) {
     ctx.save();
     ctx.fillStyle = "rgba(192, 132, 252, 0.9)";
     ctx.font = "8px sans-serif";
@@ -1962,12 +1971,17 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
     const label = isDayBoundary
       ? getDayNameAndDate(Math.floor(hr / 24))
       : `${String(localHour).padStart(2, '0')}:00`;
-    ctx.textAlign = x < paddingL + 35 ? "left" : (x > W - paddingR - 35 ? "right" : "center");
-    ctx.fillText(label, x, H - paddingB + 8);
+    if (!hideAxisLabels) {
+      ctx.textAlign = x < paddingL + 35 ? "left" : (x > W - paddingR - 35 ? "right" : "center");
+      ctx.fillText(label, x, H - paddingB + 8);
+    }
   });
   ctx.restore();
 
   if (swipeCapture) {
+    // Test hook: proves the frame captured for the swipe animation is the one
+    // that omitted axis labels.
+    if (window.__weatherTest) canvas.__testFrameLabelsHidden = hideAxisLabels;
     canvas.__swipeFrame = snapshotSwipeGraph(canvas);
     ctx.clearRect(0, 0, W, H);
   }
