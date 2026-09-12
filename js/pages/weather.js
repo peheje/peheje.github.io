@@ -3038,29 +3038,33 @@ function getGPSLocation() {
   );
 }
 
-// Tab handlers
-function setupTabs() {
-  // Tabs are dynamically handled inside renderDayTabs
-}
-
 // Setup Graph Headers and swipe navigation
 function setupHeaderNavigation() {
   const headers = document.querySelectorAll(".graph-header");
   headers.forEach(header => {
     const prevBtn = header.querySelector(".prev-day");
     const nextBtn = header.querySelector(".next-day");
+    const title = header.querySelector(".curve-title");
+    const datedTitle = title?.querySelector(".graph-date") ? title : null;
+
+    if (datedTitle) {
+      datedTitle.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        changeDay(0, false);
+      });
+    }
 
     if (prevBtn) {
       prevBtn.addEventListener("click", (e) => {
         e.preventDefault();
-        changeDay(activeTab - 1);
+        changeDay(activeTab - 1, false);
       });
     }
 
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
         e.preventDefault();
-        changeDay(activeTab + 1);
+        changeDay(activeTab + 1, false);
       });
     }
 
@@ -3512,9 +3516,6 @@ function initWeatherPage() {
   // Initial data load uses a fresh cache immediately and refreshes only once
   // the provider's expiry has passed.
   loadWeatherData(currentLoc.lat, currentLoc.lon, currentLoc.name, false, currentLoc.isGps);
-
-  // Setup tab switches
-  setupTabs();
 
   // Setup header chevron click and swipe day navigation
   setupHeaderNavigation();

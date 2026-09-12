@@ -316,7 +316,6 @@ a { color: inherit; text-decoration: none; }
     min-width: 0;
 }
 
-.three-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .place-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .when-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; min-width: 0; }
 
@@ -754,7 +753,6 @@ a { color: inherit; text-decoration: none; }
     .builder-card { padding-inline: 16px; }
     .form-step { padding: 24px 0; }
     .step-heading { margin-bottom: 15px; }
-    .three-options { gap: 7px; }
     .place-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
     .when-grid { gap: 7px; }
     .option { min-height: 70px; padding-inline: 3px; }
@@ -771,7 +769,6 @@ a { color: inherit; text-decoration: none; }
 
 @media (max-width: 340px) {
     .local-badge { max-width: 92px; white-space: normal; text-align: right; line-height: 1.2; }
-    .three-options { grid-template-columns: 1fr; }
     .place-grid { grid-template-columns: 1fr; }
     .when-grid { grid-template-columns: 1fr; }
     .option { min-height: 52px; flex-direction: row; gap: 9px; }
