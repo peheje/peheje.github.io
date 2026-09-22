@@ -242,7 +242,7 @@ function signalWeatherChecked(data) {
   const current = timeseries.find(item => {
     const itemDate = new Date(item.time);
     return getLocationDateString(itemDate) === today && getLocationHour(itemDate) === hour;
-  }) || timeseries[0];
+  });
   if (!current) return;
 
   const symbolCode = current.data.next_1_hours?.summary?.symbol_code || "";
@@ -1599,10 +1599,6 @@ function updateDashboardUI(data, fullRender = true) {
     }
   }
 
-  if (!currentForecast && timeseries.length > 0) {
-    currentForecast = timeseries[0];
-  }
-
   if (currentForecast) {
     const details = currentForecast.data.instant.details;
 
@@ -1668,23 +1664,35 @@ function updateDashboardUI(data, fullRender = true) {
     } else {
       precipValue.textContent = `${(precip ?? 0).toFixed(1)} mm`;
     }
+  } else {
+    document.getElementById("weather-emoji").textContent = "❔";
+    document.getElementById("temp-value").textContent = "--°C";
+    document.getElementById("weather-desc").textContent = "Current forecast unavailable";
+    document.getElementById("wind-value").textContent = "-- m/s";
+    document.getElementById("wind-gust-value").textContent = "-- m/s";
+    document.getElementById("precip-value").textContent = "-- mm";
+    document.getElementById("uv-value").textContent = "--";
+    document.getElementById("uv-label").textContent = "Unavailable";
+    document.getElementById("uv-circle").className = "uv-hero-circle uv-circle-small";
+    document.getElementById("uv-advice").className = "uv-advice";
+    document.getElementById("uv-advice").textContent = "Current UV forecast unavailable.";
   }
 
   if (fullRender) {
     // Calculate Max UV Today
     const todayData = getDailyTimeseries(timeseries, 0).data;
     let maxUV = 0;
-    let maxUVHour = 12;
+    let maxUVHour = null;
 
     todayData.forEach(h => {
-      if (h.uv > maxUV) {
+      if (Number.isFinite(h.uv) && (maxUVHour === null || h.uv > maxUV)) {
         maxUV = h.uv;
         maxUVHour = h.hour;
       }
     });
 
-    document.getElementById("uv-max").textContent = maxUV.toFixed(1);
-    document.getElementById("uv-max-time").textContent = `${String(maxUVHour).padStart(2, '0')}:00`;
+    document.getElementById("uv-max").textContent = maxUVHour === null ? "--" : maxUV.toFixed(1);
+    document.getElementById("uv-max-time").textContent = maxUVHour === null ? "--:--" : `${String(maxUVHour).padStart(2, '0')}:00`;
 
     renderDayTabs();
     drawForecastCurves();
@@ -1695,10 +1703,10 @@ function updateDashboardUI(data, fullRender = true) {
       const lastUpdatedEl = document.getElementById("last-updated");
       if (lastUpdatedEl) {
         const date = new Date(data.lastUpdated);
-        const { hour, minute } = getZonedParts(date);
+        const { year, month, day, hour, minute } = getZonedParts(date);
         const hours = String(hour).padStart(2, '0');
         const minutes = String(minute).padStart(2, '0');
-        lastUpdatedEl.textContent = `Updated: ${hours}:${minutes}`;
+        lastUpdatedEl.textContent = `Updated: ${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} ${hours}:${minutes}`;
       }
     }
   }
@@ -3019,7 +3027,9 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false, fo
     updateDashboardUI(forecastData);
     signalWeatherChecked(forecastData);
     if (forecastData.isStale) {
-      showError("Showing the most recently cached forecast because the live forecast service is unavailable.");
+      const date = new Date(forecastData.lastUpdated);
+      const updated = Number.isFinite(date.getTime()) ? date.toLocaleString("en-GB", { timeZone }) : "an unknown date";
+      showError(`Live forecast unavailable. Showing cached forecast from ${updated}. Current conditions are unavailable if that forecast has no data for this hour.`);
     }
 
     // Fetch tide data independently in the background
@@ -3152,7 +3162,7 @@ function getGPSLocation() {
       const lat = position.coords.latitude;
       const lon = position.coords.longitude;
       
-      let locName = "GPS Location";
+      const weatherLoad = loadWeatherData(lat, lon, "GPS Location", false, true, false, gpsIntent);
       try {
         const response = await fetch(`${GEOCODING_URL}/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`);
         if (response.ok) {
@@ -3160,15 +3170,15 @@ function getGPSLocation() {
           const addr = data.address || {};
           const city = addr.city || addr.town || addr.village || addr.suburb || addr.municipality || addr.county || addr.state;
           if (city) {
-            locName = city;
+            await weatherLoad;
+            if (gpsIntent === locationIntentId && currentLoc.isGps && currentLoc.lat === lat && currentLoc.lon === lon) {
+              saveLocation({ ...currentLoc, name: city });
+              locationDisplay.textContent = city;
+            }
           }
         }
       } catch (err) {
         console.warn("Reverse geocoding failed", err);
-      }
-      
-      if (gpsIntent === locationIntentId) {
-        loadWeatherData(lat, lon, locName, false, true, false, gpsIntent);
       }
     },
     err => {
