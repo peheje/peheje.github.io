@@ -2021,16 +2021,16 @@ button.hamster-secret[aria-expanded="true"] {
 .hamster-visitor {
     position: relative;
     flex: 0 0 auto;
-    width: 68px;
-    height: 76px;
+    width: 96px;
+    height: 104px;
 }
 
 .hamster-visitor::after {
     content: "";
     position: absolute;
     bottom: 3px;
-    left: 8px;
-    width: 52px;
+    left: 20px;
+    width: 62px;
     height: 7px;
     border-radius: 50%;
     background: var(--text);
@@ -2041,8 +2041,8 @@ button.hamster-secret[aria-expanded="true"] {
 .hamster-reveal img {
     position: relative;
     z-index: 1;
-    width: 68px;
-    height: 68px;
+    width: 96px;
+    height: 96px;
     object-fit: contain;
     transform-origin: 50% 90%;
 }
@@ -2052,7 +2052,7 @@ button.hamster-secret[aria-expanded="true"] {
 }
 
 @keyframes hamster-look {
-    45% { transform: rotate(-4deg) translateY(-1px); }
+    45% { transform: rotate(-2deg); }
 }
 
 .hamster-reveal[data-activity="sorting"] img,
@@ -2068,9 +2068,9 @@ button.hamster-secret[aria-expanded="true"] {
     content: "";
     position: absolute;
     z-index: 3;
-    left: 12px;
+    left: 31px;
     bottom: 13px;
-    width: 40px;
+    width: 53px;
     height: 23px;
     border: 1px solid var(--line);
     border-radius: 50% 50% 8px 8px;
@@ -2081,17 +2081,29 @@ button.hamster-secret[aria-expanded="true"] {
 .hamster-visitor-cloak {
     position: absolute;
     z-index: 2;
-    left: 27px;
-    top: 36px;
-    width: 29px;
-    height: 24px;
-    border: 1px solid #8d743f;
-    border-radius: 4px 8px 14px 8px;
-    background: #a59668;
-    transform: rotate(-12deg);
+    left: 77px;
+    bottom: 8px;
+    width: 17px;
+    height: 20px;
+    background: #777059;
+    clip-path: polygon(8% 0, 73% 5%, 93% 40%, 100% 84%, 77% 77%, 70% 100%, 49% 85%, 29% 94%, 20% 61%, 0 35%);
+    transform: rotate(-6deg);
 }
 
-.hamster-visitor-cloak.is-wet { background: #66746b; }
+.hamster-visitor-cloak.is-wet { background: #464f45; }
+
+.hamster-visitor-cloak::after {
+    content: "";
+    position: absolute;
+    top: 7px;
+    left: 8px;
+    width: 6px;
+    height: 13px;
+    border-left: 1px solid #ada184;
+    border-right: 1px solid #30392f;
+    transform: rotate(-10deg);
+    opacity: 0.65;
+}
 
 .hamster-visitor-button,
 .hamster-visitor-seed {
@@ -2101,18 +2113,18 @@ button.hamster-secret[aria-expanded="true"] {
 }
 
 .hamster-visitor-button {
-    top: 40px;
-    left: 30px;
-    width: 7px;
-    height: 7px;
+    top: 39px;
+    left: 53px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
-    background: #d6b464;
-    box-shadow: inset 0 0 0 1px #f1d699;
+    background: #9c8957;
+    box-shadow: inset 0 0 0 1px #c1ae79;
 }
 
 .hamster-visitor-seed {
-    top: 48px;
-    left: 17px;
+    top: 79px;
+    left: 35px;
     width: 7px;
     height: 11px;
     border-radius: 65% 35% 60% 40%;
@@ -2131,17 +2143,17 @@ button.hamster-secret[aria-expanded="true"] {
 @keyframes hamster-arrival {
     0% {
         opacity: 0;
-        transform: translate(18px, 4px) rotate(5deg) scale(0.9);
+        transform: translate(16px, 0) rotate(2deg);
     }
     35% {
         opacity: 1;
-        transform: translate(10px, -3px) rotate(-3deg);
+        transform: translate(10px, -1px) rotate(-1deg);
     }
     65% {
-        transform: translate(4px, 0) rotate(2deg);
+        transform: translate(4px, 0) rotate(1deg);
     }
     82% {
-        transform: translate(0, -2px) rotate(-1deg);
+        transform: translate(0, -1px) rotate(-1deg);
     }
     100% {
         opacity: 1;

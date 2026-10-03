@@ -152,8 +152,8 @@ export function createHamsterView({ document, window }) {
     const visitor = document.createElement("div");
     visitor.className = "hamster-visitor";
     const image = document.createElement("img");
-    image.src = "/hamster-visitor.svg";
-    image.alt = "A tiny travelling hamster";
+    image.src = "/hamster-knight.webp";
+    image.alt = "A weary hamster knight carrying a battered sword";
     visitor.append(image);
     if (keepsakes["rain-darkened-cloak"] || keepsakes["sun-warmed-cloak"]) {
       const cloak = document.createElement("span");
