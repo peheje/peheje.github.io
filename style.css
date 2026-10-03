@@ -1751,15 +1751,13 @@ button.hamster-secret[aria-expanded="true"] {
     top: 92px;
     right: max(24px, calc((100vw - 1400px) / 2 + 24px));
     display: flex;
-    align-items: center;
-    gap: 14px;
+    align-items: flex-end;
+    gap: 12px;
     width: min(340px, calc(100vw - 32px));
-    padding: 14px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-md);
+    padding: 0;
     color: var(--text);
-    background: linear-gradient(145deg, var(--modal-bg-1), var(--modal-bg-2));
-    box-shadow: var(--shadow-lg);
+    background: transparent;
+    box-shadow: none;
     opacity: 0;
     transform: translateY(-8px) scale(0.97);
     transition: opacity 0.22s ease, transform 0.22s ease;
@@ -1774,8 +1772,11 @@ button.hamster-secret[aria-expanded="true"] {
     top: auto;
     right: max(20px, calc((100vw - 1400px) / 2 + 20px));
     bottom: clamp(18px, 4vw, 36px);
-    pointer-events: none;
     transform: translate(18px, 10px) scale(0.94);
+}
+
+.hamster-reveal[data-closing="true"] {
+    pointer-events: none;
 }
 
 /* ---- The Burrow ---- */
@@ -2017,28 +2018,130 @@ button.hamster-secret[aria-expanded="true"] {
     transform: translate(0, 0) scale(1);
 }
 
-.hamster-reveal img {
+.hamster-visitor {
+    position: relative;
     flex: 0 0 auto;
     width: 68px;
+    height: 76px;
+}
+
+.hamster-visitor::after {
+    content: "";
+    position: absolute;
+    bottom: 3px;
+    left: 8px;
+    width: 52px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text);
+    opacity: 0.14;
+    filter: blur(3px);
+}
+
+.hamster-reveal img {
+    position: relative;
+    z-index: 1;
+    width: 68px;
     height: 68px;
-    padding: 10px;
-    border-radius: 18px;
     object-fit: contain;
-    background: linear-gradient(145deg, var(--accent), var(--accent-2));
+    transform-origin: 50% 90%;
 }
 
 .hamster-reveal-cameo.is-visible img {
-    animation: hamster-arrival 0.55s cubic-bezier(0.2, 0.8, 0.25, 1.2) both;
+    animation: hamster-arrival 0.85s ease-out both, hamster-look 1.1s ease-in-out 3s;
+}
+
+@keyframes hamster-look {
+    45% { transform: rotate(-4deg) translateY(-1px); }
+}
+
+.hamster-reveal[data-activity="sorting"] img,
+.hamster-reveal[data-activity="listening"] img {
+    animation: hamster-look 1.1s ease-in-out 0.4s;
+}
+
+.hamster-reveal[data-activity="sleeping"] img {
+    transform: translateY(7px) rotate(8deg) scaleY(0.85);
+}
+
+.hamster-reveal[data-activity="sleeping"] .hamster-visitor::before {
+    content: "";
+    position: absolute;
+    z-index: 3;
+    left: 12px;
+    bottom: 13px;
+    width: 40px;
+    height: 23px;
+    border: 1px solid var(--line);
+    border-radius: 50% 50% 8px 8px;
+    background: var(--modal-bg-2);
+    transform: rotate(5deg);
+}
+
+.hamster-visitor-cloak {
+    position: absolute;
+    z-index: 2;
+    left: 27px;
+    top: 36px;
+    width: 29px;
+    height: 24px;
+    border: 1px solid #8d743f;
+    border-radius: 4px 8px 14px 8px;
+    background: #a59668;
+    transform: rotate(-12deg);
+}
+
+.hamster-visitor-cloak.is-wet { background: #66746b; }
+
+.hamster-visitor-button,
+.hamster-visitor-seed {
+    position: absolute;
+    z-index: 3;
+    border: 1px solid #8d743f;
+}
+
+.hamster-visitor-button {
+    top: 40px;
+    left: 30px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #d6b464;
+    box-shadow: inset 0 0 0 1px #f1d699;
+}
+
+.hamster-visitor-seed {
+    top: 48px;
+    left: 17px;
+    width: 7px;
+    height: 11px;
+    border-radius: 65% 35% 60% 40%;
+    background: #c5a369;
+    transform: rotate(30deg);
+}
+
+.hamster-visitor-seed.is-black { background: #34342b; }
+
+.hamster-activity {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--muted);
 }
 
 @keyframes hamster-arrival {
     0% {
         opacity: 0;
-        transform: translateY(12px) rotate(7deg) scale(0.78);
+        transform: translate(18px, 4px) rotate(5deg) scale(0.9);
+    }
+    35% {
+        opacity: 1;
+        transform: translate(10px, -3px) rotate(-3deg);
     }
     65% {
-        opacity: 1;
-        transform: translateY(-2px) rotate(-2deg) scale(1.04);
+        transform: translate(4px, 0) rotate(2deg);
+    }
+    82% {
+        transform: translate(0, -2px) rotate(-1deg);
     }
     100% {
         opacity: 1;
@@ -2047,9 +2150,29 @@ button.hamster-secret[aria-expanded="true"] {
 }
 
 .hamster-reveal-copy {
+    position: relative;
     display: grid;
     gap: 3px;
     min-width: 0;
+    flex: 1;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: linear-gradient(145deg, var(--modal-bg-1), var(--modal-bg-2));
+    box-shadow: var(--shadow-lg);
+}
+
+.hamster-reveal-copy::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    bottom: 28px;
+    width: 10px;
+    height: 10px;
+    border-left: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: var(--modal-bg-1);
+    transform: rotate(45deg);
 }
 
 .hamster-reveal-quote {
@@ -2060,11 +2183,12 @@ button.hamster-secret[aria-expanded="true"] {
     line-height: 1.35;
 }
 
-.hamster-reveal-close {
+.hamster-reveal-close,
+.hamster-reveal-recall {
     justify-self: start;
     min-width: auto;
-    min-height: auto;
-    padding: 3px 0;
+    min-height: 44px;
+    padding: 8px 4px;
     border: 0;
     color: var(--accent-2);
     background: transparent;
@@ -2072,7 +2196,8 @@ button.hamster-secret[aria-expanded="true"] {
     font-size: 0.75rem;
 }
 
-.hamster-reveal-close:hover {
+.hamster-reveal-close:hover,
+.hamster-reveal-recall:hover {
     color: var(--text);
     box-shadow: none;
     filter: none;
@@ -2527,6 +2652,8 @@ body.tool-picker-active {
 
     .hamster-reveal-cameo {
         top: auto;
+        left: auto;
+        width: min(340px, calc(100vw - 24px));
         bottom: max(14px, env(safe-area-inset-bottom));
     }
 
@@ -2556,6 +2683,8 @@ body.tool-picker-active {
         transition: none;
     }
 
+    .hamster-reveal img,
+    .hamster-reveal[data-activity] img,
     .hamster-reveal-cameo.is-visible img {
         animation: none;
     }

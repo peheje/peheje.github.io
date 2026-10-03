@@ -31,6 +31,35 @@ export function createHamsterRuntime({
   let currentPage = "";
   let started = false;
 
+  function markRead(id) {
+    const state = repository.load();
+    if (state.lastEncounterId !== id || !state.lastEncounterUnread) return;
+    state.lastEncounterUnread = false;
+    repository.save(state);
+  }
+
+  function recall(context = {}) {
+    const state = repository.load();
+    const encounter = catalog.find(line => line.id === state.lastEncounterId);
+    if (!encounter) return false;
+    markRead(encounter.id);
+    view.show({ ...encounter, presentation: "dialog" }, { ...context, keepsakes: state.keepsakes });
+    return true;
+  }
+
+  function visit(context) {
+    const state = repository.load();
+    if (state.lastEncounterUnread && recall(context)) return;
+    const result = record(HAMSTER_EVENTS.MANUAL_REVEAL, context);
+    if (result.encounter) return;
+    view.showQuiet({
+      ...context,
+      timeBand: getTimeBand(new Date(now())),
+      keepsakes: result.state.keepsakes,
+      onRecall: result.state.lastEncounterId ? () => recall(context) : null,
+    });
+  }
+
   function record(type, detail = {}) {
     const timestamp = now();
     const context = {
@@ -44,7 +73,11 @@ export function createHamsterRuntime({
       { catalog, policies, now: timestamp, random },
     );
     repository.save(result.state);
-    if (result.encounter) view.show(result.encounter, context);
+    if (result.encounter) view.show(result.encounter, {
+      ...context,
+      keepsakes: result.state.keepsakes,
+      onRead: () => markRead(result.encounter.id),
+    });
     return result;
   }
 
@@ -63,7 +96,7 @@ export function createHamsterRuntime({
 
     if (triggerParent) {
       view.mountTrigger(triggerParent, (context) => {
-        record(HAMSTER_EVENTS.MANUAL_REVEAL, context);
+        visit(context);
       });
     }
   }
@@ -72,7 +105,8 @@ export function createHamsterRuntime({
     if (!started) return;
     started = false;
     eventTarget.removeEventListener(HAMSTER_EVENT_NAME, receive);
-    view.close();
+    if (view.destroy) view.destroy();
+    else view.close();
   }
 
   function getState() {

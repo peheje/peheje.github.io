@@ -1,4 +1,4 @@
-export const HAMSTER_STATE_VERSION = 5;
+export const HAMSTER_STATE_VERSION = 6;
 
 const stageThresholds = [0, 4, 10];
 
@@ -27,6 +27,8 @@ export function createHamsterState(now = Date.now()) {
     createdAt: now,
     updatedAt: now,
     lastSeenAt: null,
+    lastEncounterId: null,
+    lastEncounterUnread: false,
     encounterCount: 0,
     relationshipCount: 0,
     activeQuestId: null,
@@ -51,6 +53,8 @@ export function normalizeHamsterState(value, now = Date.now()) {
     createdAt: Number.isFinite(source.createdAt) ? source.createdAt : now,
     updatedAt: Number.isFinite(source.updatedAt) ? source.updatedAt : now,
     lastSeenAt: Number.isFinite(source.lastSeenAt) ? source.lastSeenAt : null,
+    lastEncounterId: typeof source.lastEncounterId === "string" ? source.lastEncounterId : null,
+    lastEncounterUnread: source.lastEncounterUnread === true,
     encounterCount: safeCount(source.encounterCount),
     relationshipCount: safeCount(source.relationshipCount),
     activeQuestId: typeof source.activeQuestId === "string" ? source.activeQuestId : null,
@@ -150,6 +154,8 @@ export function recordHamsterEvent(stateValue, event, options) {
   const encounter = chooseCandidate(candidates, state, random);
   if (!encounter) return { state, encounter: null };
   state.encounterCount += 1;
+  state.lastEncounterId = encounter.id;
+  state.lastEncounterUnread = encounter.presentation === "cameo";
   state.seenEncounterIds[encounter.id] = safeCount(state.seenEncounterIds[encounter.id]) + 1;
   state.lastEncounterAtByEvent[type] = now;
 
