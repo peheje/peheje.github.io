@@ -1,0 +1,60 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Tuner · peheje</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+
+<body>
+    <div id="menu"></div>
+    <main class="app-shell">
+        <section class="actions tuner-instruments" role="group" aria-label="Instrument">
+            <button type="button" data-instrument="guitar" aria-pressed="true">Guitar</button>
+            <button type="button" data-instrument="ukulele" aria-pressed="false">Ukulele</button>
+        </section>
+
+        <section class="tuner-panel" aria-label="Tuning meter">
+            <p id="tuner-mode" class="notice">Auto · nearest string</p>
+            <p class="tuner-note"><span id="tuner-note">–</span><sub id="tuner-octave"></sub></p>
+            <p id="tuner-frequency" class="tuner-frequency">Play one open string</p>
+            <div class="tuner-meter" aria-hidden="true">
+                <div class="tuner-sweetspot"></div>
+                <div id="tuner-ticks" class="tuner-ticks"></div>
+                <div id="tuner-needle" class="tuner-needle"></div>
+            </div>
+            <div class="tuner-scale" aria-hidden="true"><span>−50¢</span><span>flat · sharp</span><span>+50¢</span></div>
+            <p id="tuner-direction" class="tuner-direction" role="status" aria-live="polite">Ready when you are</p>
+        </section>
+
+        <section id="tuner-strings" class="tuner-strings" role="group" aria-label="Lock a target string"></section>
+
+        <section class="actions tuner-mic-actions">
+            <button id="tuner-start" type="button">Start microphone</button>
+            <button id="tuner-stop" type="button" class="red display-none">Stop</button>
+        </section>
+
+        <section class="ab">
+            <div class="inline-block">
+                <label for="tuner-a4">Reference A4 (Hz):</label>
+                <input id="tuner-a4" type="number" min="430" max="450" step="1" value="440" data-stepper="true">
+            </div>
+
+            <div class="inline-block">
+                <label>How it works</label>
+                <p id="tuner-status" class="result-line">Tap Start, then allow microphone access. Audio stays on this device.</p>
+                <p class="result-line">Pluck one open string and let it ring. The nearest string is picked automatically; tap a string to lock it when it is far out of tune.</p>
+                <p class="result-line">Green means within 5 cents. The screen stays awake while listening.</p>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="js/pages/tuner.js"></script>
+</body>
+
+</html>

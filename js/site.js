@@ -76,6 +76,12 @@ const sites = [
     category: "Health",
   },
   {
+    url: "/tuner.html",
+    name: "Tuner",
+    about: "Tune a guitar (standard) or ukulele (high G) with your microphone.",
+    category: "Music",
+  },
+  {
     url: "/poe.html",
     name: "Poe",
     about: "Parse Poe AI usage CSV files locally and inspect points, costs, and usage patterns.",
