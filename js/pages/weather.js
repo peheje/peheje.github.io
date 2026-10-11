@@ -38,6 +38,7 @@ const rainMock = createRainMock();
 let currentLoc = { ...DEFAULT_LOC };
 let forecastData = null;
 let tideData = null;
+let tempNormals = null; // 12 monthly mean temperatures (°C) for currentLoc
 let activeTab = 0; // 0 for Today, 1 for Tomorrow, then future start dates.
 let activeRangeMode = "day";
 let hoverHour = null; // Currently hovered hour on the canvas (0-23)
@@ -116,12 +117,14 @@ function hexToRgb(hex) {
 }
 
 const TEMP_COLOR_SCALE = [
-  { v: -15, rgb: [59, 130, 246] },  // deep blue
-  { v: 0, rgb: [56, 189, 248] },    // cyan
-  { v: 12, rgb: [52, 211, 153] },   // green
-  { v: 22, rgb: [251, 191, 36] },   // amber
-  { v: 30, rgb: [249, 115, 22] },   // orange
-  { v: 38, rgb: [239, 68, 68] }     // red
+  { v: -10, rgb: [167, 139, 250] }, // violet: hard frost
+  { v: 0, rgb: [56, 189, 248] },    // ice blue: freezing
+  { v: 5, rgb: [94, 234, 212] },    // teal: cold
+  { v: 10, rgb: [134, 239, 172] },  // green: cool
+  { v: 15, rgb: [253, 224, 71] },   // yellow: mild
+  { v: 20, rgb: [251, 146, 60] },   // orange: warm
+  { v: 25, rgb: [244, 63, 94] },    // red: hot
+  { v: 30, rgb: [190, 18, 60] }     // deep red: very hot
 ];
 
 // Reuse the WHO UV safety colors declared above so the curve matches the card.
@@ -175,17 +178,77 @@ function colorScaleCss(scale, value) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Stretch a scale so its first and last anchor land on min/max. Used for
-// temperature, where the palette should cover whatever range is on screen
-// rather than a fixed physical range that leaves mild days uniformly green.
-function stretchScale(scale, min, max) {
-  const lo = scale[0].v;
-  const hi = scale[scale.length - 1].v;
-  const span = (hi - lo) || 1;
-  return scale.map(anchor => ({
-    v: min + ((anchor.v - lo) / span) * (max - min),
-    rgb: anchor.rgb
-  }));
+// Temperature colors relative to the climate normal (°C above/below the mean
+// for this time of year at this location). Anchors are offsets and get shifted
+// by the normal before drawing. "?tempcolors=fixed" keeps the absolute scale.
+const TEMP_ANOMALY_SCALE = [
+  { v: -10, rgb: [99, 102, 241] },  // indigo: much colder than normal
+  { v: -5, rgb: [56, 189, 248] },   // blue: cold
+  { v: 0, rgb: [74, 222, 128] },    // green: normal
+  { v: 2.5, rgb: [250, 204, 21] },  // yellow: a bit warm
+  { v: 5, rgb: [251, 146, 60] },    // orange: warm
+  { v: 10, rgb: [239, 68, 68] }     // red: much warmer than normal
+];
+const USE_TEMP_NORMALS = new URLSearchParams(window.location.search).get("tempcolors") !== "fixed";
+const NORMALS_SCHEMA_VERSION = 1;
+const NORMALS_START_YEAR = 1996;
+const NORMALS_END_YEAR = 2025;
+
+// Monthly means change on a climate timescale, so they are cached per
+// location without expiry (cleared only by resetWeatherStorage).
+async function fetchTempNormals(lat, lon, signal) {
+  const cacheKey = `${CACHE_PREFIX}normals_${lat.toFixed(2)}_${lon.toFixed(2)}`;
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey));
+    if (cached?.schemaVersion === NORMALS_SCHEMA_VERSION) return cached.data;
+  } catch (err) {
+    console.warn("Cached normals parsing error:", err);
+  }
+
+  const params = new URLSearchParams({
+    latitude: lat.toFixed(2),
+    longitude: lon.toFixed(2),
+    start_date: `${NORMALS_START_YEAR}-01-01`,
+    end_date: `${NORMALS_END_YEAR}-12-31`,
+    daily: "temperature_2m_mean",
+    timezone: "auto"
+  });
+  const response = await fetch(`https://archive-api.open-meteo.com/v1/archive?${params}`, { signal });
+  if (!response.ok) {
+    throw new Error(`Open-Meteo Archive API returned status ${response.status}`);
+  }
+  const payload = await response.json();
+  const sums = new Array(12).fill(0);
+  const counts = new Array(12).fill(0);
+  payload.daily.time.forEach((day, index) => {
+    const value = payload.daily.temperature_2m_mean[index];
+    if (value === null || value === undefined) return;
+    const month = Number(day.slice(5, 7)) - 1;
+    sums[month] += value;
+    counts[month] += 1;
+  });
+  if (counts.some(count => count === 0)) throw new Error("Incomplete climate normals");
+  const data = sums.map((sum, month) => sum / counts[month]);
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify({ schemaVersion: NORMALS_SCHEMA_VERSION, data }));
+  } catch (err) {
+    console.warn("Could not cache normals:", err);
+  }
+  return data;
+}
+
+// Normal temperature for a forecast hour, interpolated between monthly means
+// (each treated as the value mid-month) so colors shift smoothly over days.
+function getTempNormalAt(hour) {
+  if (!tempNormals) return null;
+  const dayIndex = Math.floor(hour / 24);
+  const { month, day } = getZonedParts(getLocationDayDate(dayIndex));
+  const position = (month - 1) + (day - 15.5) / 30.4;
+  const lower = Math.floor(position);
+  const f = position - lower;
+  const a = tempNormals[(lower + 12) % 12];
+  const b = tempNormals[(lower + 13) % 12];
+  return a + (b - a) * f;
 }
 
 // Weather Symbols mapping
@@ -2131,28 +2194,22 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
 
   if (points.length === 0) return;
 
-  // Color mapping for the value curves. UV and sea level use fixed physical
-  // scales (the UV palette is a WHO safety scale). Temperature is normalized to
-  // the plotted range, so the warmest hour of the chart is red and the coldest
-  // is blue instead of a mild day staying uniformly green.
+  // Color mapping for the value curves. Scales are tied to real values (the
+  // UV palette is a WHO safety scale). Temperature is colored relative to the
+  // local monthly normal once it has loaded, else by the absolute scale.
   let curveScale = TEMP_COLOR_SCALE;
-  let curveMin = minScaleY;
-  let curveMax = maxScaleY;
-  let curveBottom = H - paddingB;
-  let curveTop = paddingT;
-  if (paramType === "temp") {
-    const temps = points.map(point => point.val);
-    curveMin = Math.min(...temps);
-    curveMax = Math.max(...temps);
-    if (curveMax - curveMin < 1) {
-      const mid = (curveMax + curveMin) / 2;
-      curveMin = mid - 0.5;
-      curveMax = mid + 0.5;
+  let tempNormal = null;
+  if (paramType === "temp" && USE_TEMP_NORMALS && points.length > 0) {
+    tempNormal = getTempNormalAt(points[Math.floor(points.length / 2)].hour);
+    if (tempNormal !== null) {
+      curveScale = TEMP_ANOMALY_SCALE.map(anchor => ({ v: anchor.v + tempNormal, rgb: anchor.rgb }));
     }
-    curveBottom = getY(curveMin);
-    curveTop = getY(curveMax);
-    curveScale = stretchScale(TEMP_COLOR_SCALE, curveMin, curveMax);
-  } else if (paramType === "uv") {
+  }
+  const curveMin = minScaleY;
+  const curveMax = maxScaleY;
+  const curveBottom = H - paddingB;
+  const curveTop = paddingT;
+  if (paramType === "uv") {
     curveScale = UV_COLOR_SCALE;
   } else if (paramType === "tide") {
     curveScale = TIDE_COLOR_SCALE;
@@ -2718,6 +2775,10 @@ function drawSingleCurve(canvas, paramType, dayPoints, dataFound = true) {
         boxColor = "#ff6b8b";
         tooltipLines.push(timeLine);
         tooltipLines.push(`Temp: ${hp.temp !== null ? hp.temp.toFixed(1) : "--"}\u00B0C`);
+        if (tempNormal !== null && hp.temp !== null) {
+          const diff = hp.temp - tempNormal;
+          tooltipLines.push(`Normal: ${tempNormal.toFixed(1)}\u00B0C (${diff >= 0 ? "+" : ""}${diff.toFixed(1)})`);
+        }
         tooltipLines.push(`Weather: ${emojiInfo.emoji}`);
       } else if (paramType === "rain") {
         boxColor = "#38d4ff";
@@ -3030,6 +3091,19 @@ async function loadWeatherData(lat, lon, name, silent = false, isGps = false, fo
       const date = new Date(forecastData.lastUpdated);
       const updated = Number.isFinite(date.getTime()) ? date.toLocaleString("en-GB", { timeZone }) : "an unknown date";
       showError(`Live forecast unavailable. Showing cached forecast from ${updated}. Current conditions are unavailable if that forecast has no data for this hour.`);
+    }
+
+    // Climate normals color the temperature curve; until they load (or if the
+    // archive is unreachable) the absolute temperature scale is used.
+    tempNormals = null;
+    if (USE_TEMP_NORMALS && !isHappyDOM()) {
+      fetchTempNormals(lat, lon, controller.signal).then(data => {
+        if (loadId !== weatherLoadId || locationIntent !== locationIntentId) return;
+        tempNormals = data;
+        drawForecastCurves();
+      }).catch(err => {
+        if (err.name !== "AbortError") console.warn("Failed to load temperature normals:", err);
+      });
     }
 
     // Fetch tide data independently in the background
