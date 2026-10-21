@@ -13,7 +13,7 @@ import {
 const settingsKey = "tuner-settings";
 const inTuneCents = 5;
 const closeCents = 20;
-const minRms = 0.008;
+const minRms = 0.004; // iPad mics run quiet with auto gain off
 const minClarity = 0.85;
 const silentFramesBeforeClear = 30;
 
@@ -196,13 +196,14 @@ function initTunerPage() {
     }
     startButton.disabled = true;
     try {
-      // Create the context before any await so it counts as part of the tap.
-      // Created later, Chrome can leave it suspended and the tuner hears silence.
+      // Create and resume the context before any await so it counts as part of the tap.
+      // Otherwise Safari (iPad/iPhone) and Chrome can leave it suspended, and the tuner hears silence.
       audioContext = new AudioContext();
+      audioContext.resume().catch(() => {});
       stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
-      audioContext.resume().catch(() => {});
+      await audioContext.resume().catch(() => {});
       const startedContext = audioContext;
       const startedStream = stream;
       const [track] = stream.getAudioTracks();
@@ -246,7 +247,7 @@ function initTunerPage() {
     } catch (error) {
       stop();
       statusElement.textContent = error.name === "NotAllowedError"
-        ? "Microphone blocked. Tap the icon left of the address bar → Permissions → Microphone → Allow, then reload."
+        ? "Microphone blocked. Allow it in the browser's site settings (Safari: aA in the address bar → Website Settings → Microphone), then reload."
         : `Could not access the microphone: ${error.message}`;
     } finally {
       startButton.disabled = false;
