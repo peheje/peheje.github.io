@@ -1390,6 +1390,14 @@ html.theme-dusk :is(.tuner-panel, .tuner-strings) {
     justify-content: center;
 }
 
+.tuner-debug {
+    margin: 4px 0 10px;
+    text-align: center;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--notice-text);
+}
+
 .tuner-strings button {
     display: grid;
     gap: 2px;

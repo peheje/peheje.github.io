@@ -63,6 +63,9 @@ function initTunerPage() {
   const modeElement = document.getElementById("tuner-mode");
   const stringsElement = document.getElementById("tuner-strings");
   const statusElement = document.getElementById("tuner-status");
+  const debugElement = document.getElementById("tuner-debug");
+  let lastDebugUpdate = 0;
+  let permissionTimer = 0;
   const startButton = document.getElementById("tuner-start");
   const stopButton = document.getElementById("tuner-stop");
   const a4Input = document.getElementById("tuner-a4");
@@ -200,10 +203,18 @@ function initTunerPage() {
       // Otherwise Safari (iPad/iPhone) and Chrome can leave it suspended, and the tuner hears silence.
       audioContext = new AudioContext();
       audioContext.resume().catch(() => {});
+      debugElement.textContent = "Asking for microphone permission…";
+      permissionTimer = setTimeout(() => {
+        debugElement.textContent = "Still waiting for microphone permission. Look for a prompt, or check that the browser app itself may use the microphone in your phone's settings.";
+      }, 5000);
       stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
-      await audioContext.resume().catch(() => {});
+      clearTimeout(permissionTimer);
+      debugElement.textContent = `Mic granted · audio ${audioContext.state}`;
+      // Never await resume(): if the browser won't start audio, its promise can stay
+      // pending forever and the page would hang. The listen loop reports the state instead.
+      audioContext.resume().catch(() => {});
       const startedContext = audioContext;
       const startedStream = stream;
       const [track] = stream.getAudioTracks();
@@ -245,7 +256,9 @@ function initTunerPage() {
       clearReading();
       frameRequest = requestAnimationFrame(listen);
     } catch (error) {
+      clearTimeout(permissionTimer);
       stop();
+      debugElement.textContent = `Error: ${error.name}`;
       statusElement.textContent = error.name === "NotAllowedError"
         ? "Microphone blocked. Allow it in the browser's site settings (Safari: aA in the address bar → Website Settings → Microphone), then reload."
         : `Could not access the microphone: ${error.message}`;
@@ -259,6 +272,7 @@ function initTunerPage() {
     stream?.getTracks().forEach((track) => track.stop());
     audioContext?.close();
     wakeLock?.release();
+    debugElement.textContent = "Mic off";
     stream = null;
     audioContext = null;
     analyser = null;
@@ -291,6 +305,13 @@ function initTunerPage() {
     }
     if (sumOfSquares > 0) {
       silentRestarts = 0;
+    }
+    const now = performance.now();
+    if (now - lastDebugUpdate > 250) {
+      lastDebugUpdate = now;
+      const level = rms > 0 ? `${(20 * Math.log10(rms)).toFixed(0)} dB` : "silent";
+      const hint = audioContext.state !== "running" ? " · tap Stop then Start" : rms === 0 ? " · no sound arriving" : "";
+      debugElement.textContent = `Audio ${audioContext.state} · ${Math.round(audioContext.sampleRate / 100) / 10} kHz · input ${level}${hint}`;
     }
     const result = rms > minRms ? detectPitch(sampleBuffer, audioContext.sampleRate) : null;
 
