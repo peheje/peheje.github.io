@@ -14,11 +14,6 @@
 <body>
     <div id="menu"></div>
     <main class="app-shell">
-        <section class="actions tuner-mic-actions">
-            <button id="tuner-start" type="button">Start microphone</button>
-            <button id="tuner-stop" type="button" class="red display-none">Stop</button>
-        </section>
-
         <section class="actions tuner-instruments" role="group" aria-label="Instrument">
             <button type="button" data-instrument="guitar" aria-pressed="true">Guitar</button>
             <button type="button" data-instrument="ukulele" aria-pressed="false">Ukulele</button>
@@ -38,6 +33,11 @@
         </section>
 
         <section id="tuner-strings" class="tuner-strings" role="group" aria-label="Lock a target string"></section>
+
+        <section class="actions tuner-mic-actions">
+            <button id="tuner-start" type="button">Start microphone</button>
+            <button id="tuner-stop" type="button" class="red display-none">Stop</button>
+        </section>
 
         <section class="ab">
             <div class="inline-block">
