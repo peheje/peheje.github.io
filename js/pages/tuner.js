@@ -13,7 +13,7 @@ import {
 const settingsKey = "tuner-settings";
 const inTuneCents = 5;
 const closeCents = 20;
-const minRms = 0.004;
+const minRms = 0.008;
 const minClarity = 0.85;
 const silentFramesBeforeClear = 30;
 
@@ -51,6 +51,9 @@ function initTunerPage() {
   let recentFrequencies = [];
   let silentFrames = 0;
   let deadFrames = 0;
+  let silentRestarts = 0;
+  let restarting = false;
+  let resumeOnReturn = false;
 
   const noteElement = document.getElementById("tuner-note");
   const octaveElement = document.getElementById("tuner-octave");
@@ -170,25 +173,57 @@ function initTunerPage() {
     }
   }
 
+  // The OS can take the mic away (a call, voice assistant, another app) without
+  // the page noticing. Rebuild the whole audio chain when that happens.
+  async function restart(reason) {
+    if (restarting) {
+      return;
+    }
+    restarting = true;
+    stop();
+    statusElement.textContent = `${reason} Reconnecting…`;
+    try {
+      await start();
+    } finally {
+      restarting = false;
+    }
+  }
+
   async function start() {
     if (!navigator.mediaDevices?.getUserMedia) {
       statusElement.textContent = "Microphone access needs a secure page (https or localhost) and a browser that supports it.";
       return;
     }
     startButton.disabled = true;
-    // Create the audio context inside the tap, before any await. Safari (iPad/iPhone)
-    // otherwise starts it suspended, and a suspended context only delivers silence.
-    audioContext = new AudioContext();
-    audioContext.resume();
     try {
+      // Create the context before any await so it counts as part of the tap.
+      // Created later, Chrome can leave it suspended and the tuner hears silence.
+      audioContext = new AudioContext();
       stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
-      await audioContext.resume();
-      // iOS can interrupt the context (calls, Siri, other audio); pick back up afterwards.
+      audioContext.resume().catch(() => {});
+      const startedContext = audioContext;
+      const startedStream = stream;
+      const [track] = stream.getAudioTracks();
+      track.addEventListener("ended", () => {
+        if (stream === startedStream) {
+          restart("Microphone was taken by another app.");
+        }
+      });
+      track.addEventListener("mute", () => {
+        if (stream === startedStream) {
+          statusElement.textContent = "Microphone paused by the system (another app may be using it).";
+        }
+      });
+      track.addEventListener("unmute", () => {
+        if (stream === startedStream) {
+          statusElement.textContent = "Listening. Audio is analysed on this device and never uploaded.";
+        }
+      });
       audioContext.addEventListener("statechange", () => {
-        if (audioContext && audioContext.state !== "running" && audioContext.state !== "closed") {
-          audioContext.resume().catch(() => {});
+        if (audioContext === startedContext && startedContext.state !== "running" && startedContext.state !== "closed") {
+          startedContext.resume().catch(() => {});
         }
       });
       const source = audioContext.createMediaStreamSource(stream);
@@ -206,12 +241,13 @@ function initTunerPage() {
       stopButton.classList.remove("display-none");
       statusElement.textContent = "Listening. Audio is analysed on this device and never uploaded.";
       requestWakeLock();
-      deadFrames = 0;
       clearReading();
       frameRequest = requestAnimationFrame(listen);
     } catch (error) {
       stop();
-      statusElement.textContent = `Could not access the microphone: ${error.message}`;
+      statusElement.textContent = error.name === "NotAllowedError"
+        ? "Microphone blocked. Tap the icon left of the address bar → Permissions → Microphone → Allow, then reload."
+        : `Could not access the microphone: ${error.message}`;
     } finally {
       startButton.disabled = false;
     }
@@ -226,6 +262,7 @@ function initTunerPage() {
     audioContext = null;
     analyser = null;
     recentFrequencies = [];
+    deadFrames = 0;
     startButton.classList.remove("display-none");
     stopButton.classList.add("display-none");
     statusElement.textContent = "Microphone off. Tap Start to tune again.";
@@ -239,15 +276,20 @@ function initTunerPage() {
       sumOfSquares += sample * sample;
     }
     const rms = Math.sqrt(sumOfSquares / sampleBuffer.length);
-
-    // Exact silence for ~3 s means no audio is arriving at all (not just a quiet room).
-    deadFrames = rms === 0 ? deadFrames + 1 : 0;
-    if (deadFrames === 180) {
-      statusElement.textContent = audioContext.state === "running"
-        ? "No sound is reaching the tuner. Check that no other app is using the microphone, then tap Stop and Start."
-        : `Audio is ${audioContext.state}. Tap Stop, then Start again.`;
-    } else if (deadFrames === 0 && statusElement.textContent.startsWith("No sound")) {
-      statusElement.textContent = "Listening. Audio is analysed on this device and never uploaded.";
+    // A live mic always has some noise; exact silence for ~3 s means the stream died.
+    deadFrames = sumOfSquares === 0 ? deadFrames + 1 : 0;
+    if (deadFrames > 180) {
+      if (silentRestarts < 3) {
+        silentRestarts += 1;
+        restart("Microphone went silent.");
+      } else {
+        stop();
+        statusElement.textContent = "Microphone keeps going silent. Close other apps using it, then tap Start.";
+      }
+      return;
+    }
+    if (sumOfSquares > 0) {
+      silentRestarts = 0;
     }
     const result = rms > minRms ? detectPitch(sampleBuffer, audioContext.sampleRate) : null;
 
@@ -292,10 +334,18 @@ function initTunerPage() {
 
   startButton.addEventListener("click", start);
   stopButton.addEventListener("click", stop);
+  // Release the mic in the background, and pick it back up on return.
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && stream) {
       stop();
+      resumeOnReturn = true;
+    } else if (!document.hidden && resumeOnReturn) {
+      resumeOnReturn = false;
+      start();
     }
+  });
+  stopButton.addEventListener("click", () => {
+    resumeOnReturn = false;
   });
 
   initNumberSteppers();
