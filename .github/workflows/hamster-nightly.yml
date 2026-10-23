@@ -1,0 +1,71 @@
+name: Merge nightly hamster
+
+# The nightly Claude routine can only push claude/* branches. This merges
+# claude/nightly into master when it changes nothing but hamster/nightly.json
+# and that file passes the validator already live on master. Scheduled
+# workflows run master's copy of this file, so the branch cannot change it.
+# Source: peheje_fable deploys skip .github/, so this file lives only here.
+on:
+  schedule:
+    - cron: "23 2,3,4,6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: hamster-nightly
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Merge claude/nightly
+        id: merge
+        run: |
+          set -euo pipefail
+          FILE=hamster/nightly.json
+          if ! git ls-remote --exit-code --heads origin claude/nightly >/dev/null; then
+            echo "No claude/nightly branch yet."; exit 0
+          fi
+          git fetch origin claude/nightly
+          BRANCH=$(git rev-parse FETCH_HEAD)
+          if git merge-base --is-ancestor "$BRANCH" HEAD; then
+            echo "Nothing new on claude/nightly."; exit 0
+          fi
+          CHANGED=$(git diff --name-only "HEAD...$BRANCH")
+          if [ "$CHANGED" != "$FILE" ]; then
+            echo "::error::claude/nightly changes more than $FILE:"; echo "$CHANGED"; exit 1
+          fi
+          TMP=$(mktemp -d)
+          cp js/hamster/nightly.js js/hamster/catalog.js "$TMP/"
+          echo '{"type":"module"}' > "$TMP/package.json"
+          git show "$BRANCH:$FILE" > "$TMP/nightly.json"
+          cat > "$TMP/check.js" <<'JS'
+          import { readFileSync } from "node:fs";
+          import { validateNightly } from "./nightly.js";
+          const errors = validateNightly(JSON.parse(readFileSync(new URL("./nightly.json", import.meta.url), "utf8")));
+          if (errors.length) { console.error(errors.join("\n")); process.exit(1); }
+          console.log("nightly.json ok");
+          JS
+          node "$TMP/check.js"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit -m "Merge nightly hamster" "$BRANCH"
+          git push origin HEAD:master
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+
+      # Pushes made with the workflow token may not start a Pages build on
+      # their own, so ask for one explicitly.
+      - name: Request Pages build
+        if: steps.merge.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "::warning::Pages build request failed"
