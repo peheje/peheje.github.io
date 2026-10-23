@@ -1,4 +1,5 @@
 import { hamsterKeepsakes } from "../hamster/catalog.js";
+import { loadNightly, nightlyNotes } from "../hamster/nightly.js";
 import { createHamsterRepository } from "../hamster/storage.js";
 import { mountSiteShell } from "../site.js";
 
@@ -41,6 +42,40 @@ function renderRoom(state, voice) {
   button.addEventListener("click", () => inspect("brass-button"));
   cloak.addEventListener("click", () => inspect(hasWetCloak ? "rain-darkened-cloak" : "sun-warmed-cloak"));
   seed.addEventListener("click", () => inspect("black-seed"));
+}
+
+function formatNightDate(date) {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { day: "numeric", month: "long" });
+}
+
+function renderNotes(notes) {
+  const list = document.getElementById("burrow-notes-list");
+  list.replaceChildren(...notes.map(note => {
+    const item = document.createElement("li");
+    const text = document.createElement("p");
+    text.textContent = note.text;
+    const meta = document.createElement("small");
+    meta.textContent = `${note.source} · ${formatNightDate(note.date)}`;
+    item.append(text, meta);
+    return item;
+  }));
+  document.getElementById("burrow-notes").hidden = notes.length === 0;
+}
+
+function renderShelf(state) {
+  const items = Object.values(state.shelf)
+    .filter(item => item && typeof item.name === "string" && typeof item.description === "string")
+    .sort((a, b) => (b.at || 0) - (a.at || 0));
+  const list = document.getElementById("burrow-shelf-list");
+  list.replaceChildren(...items.map(keepsake => {
+    const item = document.createElement("li");
+    const name = document.createElement("strong");
+    name.textContent = keepsake.name;
+    item.append(name, `. ${keepsake.description}`);
+    return item;
+  }));
+  document.getElementById("burrow-shelf").hidden = items.length === 0;
 }
 
 function setupMotionSecret(repository, initialState, voice) {
@@ -152,7 +187,11 @@ function renderBurrow() {
   const voice = document.getElementById("burrow-voice");
   voice.textContent = activityForHour(new Date().getHours());
   renderRoom(state, voice);
+  renderShelf(state);
   setupMotionSecret(repository, state, voice);
+  loadNightly().then(doc => {
+    if (doc) renderNotes(nightlyNotes(doc));
+  });
 }
 
 renderBurrow();

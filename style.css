@@ -2198,6 +2198,40 @@ button.hamster-secret[aria-expanded="true"] {
     animation: burrow-secret-arrival 0.45s ease both;
 }
 
+.burrow-ledger {
+    max-width: 560px;
+    margin: 28px auto 0;
+    color: var(--text);
+}
+
+.burrow-ledger h2 {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.burrow-ledger ol,
+.burrow-ledger ul {
+    display: grid;
+    gap: 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.burrow-ledger li {
+    padding-left: 12px;
+    border-left: 2px solid rgba(202, 168, 94, 0.35);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.burrow-ledger p { margin: 0 0 2px; }
+.burrow-ledger small { color: var(--muted); }
+
 @keyframes burrow-secret-arrival {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 0.78; transform: translateY(0); }

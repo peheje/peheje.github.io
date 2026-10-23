@@ -1,4 +1,4 @@
-export const HAMSTER_STATE_VERSION = 6;
+export const HAMSTER_STATE_VERSION = 7;
 
 const stageThresholds = [0, 4, 10];
 
@@ -32,8 +32,10 @@ export function createHamsterState(now = Date.now()) {
     encounterCount: 0,
     relationshipCount: 0,
     activeQuestId: null,
+    activeQuestExpiresAt: null,
     completedQuestIds: {},
     keepsakes: {},
+    shelf: {},
     secrets: {},
     eventCounts: {},
     lastEventAtByEvent: {},
@@ -58,8 +60,10 @@ export function normalizeHamsterState(value, now = Date.now()) {
     encounterCount: safeCount(source.encounterCount),
     relationshipCount: safeCount(source.relationshipCount),
     activeQuestId: typeof source.activeQuestId === "string" ? source.activeQuestId : null,
+    activeQuestExpiresAt: Number.isFinite(source.activeQuestExpiresAt) ? source.activeQuestExpiresAt : null,
     completedQuestIds: { ...safeRecord(source.completedQuestIds) },
     keepsakes: { ...safeRecord(source.keepsakes) },
+    shelf: { ...safeRecord(source.shelf) },
     secrets: { ...safeRecord(source.secrets) },
     eventCounts: { ...safeRecord(source.eventCounts) },
     lastEventAtByEvent: { ...safeRecord(source.lastEventAtByEvent) },
@@ -79,7 +83,10 @@ function chooseCandidate(candidates, state, random) {
   const unseen = candidates.filter((candidate) => !state.seenEncounterIds[candidate.id]);
   if (unseen.length === 0) return null;
   const highestPriority = Math.max(...unseen.map((candidate) => safeCount(candidate.priority)));
-  const pool = unseen.filter((candidate) => safeCount(candidate.priority) === highestPriority);
+  let pool = unseen.filter((candidate) => safeCount(candidate.priority) === highestPriority);
+  // Dated lines (nightly ones) prefer the newest night over an older backlog.
+  const newest = Math.max(...pool.map((candidate) => (Number.isFinite(candidate.availableFrom) ? candidate.availableFrom : -Infinity)));
+  if (Number.isFinite(newest)) pool = pool.filter((candidate) => candidate.availableFrom === newest);
   const index = Math.min(pool.length - 1, Math.floor(Math.max(0, random()) * pool.length));
   return pool[index] || null;
 }
@@ -99,6 +106,10 @@ export function recordHamsterEvent(stateValue, event, options) {
 
   state.updatedAt = now;
   state.lastSeenAt = now;
+  if (state.activeQuestId && Number.isFinite(state.activeQuestExpiresAt) && now >= state.activeQuestExpiresAt) {
+    state.activeQuestId = null;
+    state.activeQuestExpiresAt = null;
+  }
   state.eventCounts[type] = eventCount;
   state.lastEventAtByEvent[type] = now;
 
@@ -119,6 +130,8 @@ export function recordHamsterEvent(stateValue, event, options) {
     if (candidate.event !== type || safeCount(candidate.stage) > stage) return false;
     if (candidate.page && candidate.page !== page) return false;
     if (safeCount(candidate.minAgeMs) > now - state.createdAt) return false;
+    if (Number.isFinite(candidate.availableFrom) && now < candidate.availableFrom) return false;
+    if (Number.isFinite(candidate.availableUntil) && now >= candidate.availableUntil) return false;
     if (safeCount(candidate.minDistinctPages) > Object.keys(state.pageVisits).length) return false;
     if (candidate.requiresEvent) {
       const requiredCount = safeCount(state.eventCounts[candidate.requiresEvent]);
@@ -159,11 +172,22 @@ export function recordHamsterEvent(stateValue, event, options) {
   state.seenEncounterIds[encounter.id] = safeCount(state.seenEncounterIds[encounter.id]) + 1;
   state.lastEncounterAtByEvent[type] = now;
 
-  if (encounter.startsQuest) state.activeQuestId = encounter.startsQuest;
+  if (encounter.startsQuest) {
+    state.activeQuestId = encounter.startsQuest;
+    state.activeQuestExpiresAt = safeCount(encounter.questExpiresAfterMs) > 0 ? now + safeCount(encounter.questExpiresAfterMs) : null;
+  }
   if (encounter.completesQuest) {
     state.completedQuestIds[encounter.completesQuest] = now;
-    if (state.activeQuestId === encounter.completesQuest) state.activeQuestId = null;
+    if (state.activeQuestId === encounter.completesQuest) {
+      state.activeQuestId = null;
+      state.activeQuestExpiresAt = null;
+    }
     if (encounter.awardsKeepsake) state.keepsakes[encounter.awardsKeepsake] = now;
+    // Nightly keepsakes outlive the file that described them.
+    if (encounter.awardsKeepsake && encounter.keepsakeDetails) {
+      const { name, description } = encounter.keepsakeDetails;
+      state.shelf[encounter.awardsKeepsake] = { name, description, at: now };
+    }
   }
 
   const relationshipCooldownMs = safeCount(policy.relationshipCooldownMs);

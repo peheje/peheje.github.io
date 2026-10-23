@@ -12,6 +12,7 @@ export const hamsterEventPolicies = Object.freeze({
     relationshipCooldownMs: 20 * 60 * 60 * 1000,
   },
   [HAMSTER_EVENTS.MEMORY_CORRECT]: {
+    bypassCooldownWithActiveQuest: true,
     displayCooldownMs: 20 * 60 * 60 * 1000,
     relationshipCooldownMs: 20 * 60 * 60 * 1000,
   },

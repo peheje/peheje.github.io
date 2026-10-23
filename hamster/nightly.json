@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "nights": [
+    {
+      "date": "2026-10-23",
+      "text": "Someone has started leaving things under the door at night. Seven minutes of quiet, please. I want to hear who it is.",
+      "note": {
+        "text": "I went to the woods because I wished to live deliberately.",
+        "source": "Henry David Thoreau, Walden (1854)"
+      },
+      "quest": {
+        "kind": "timer",
+        "minutes": 7,
+        "done": "Seven minutes, and a soft scrape at the door. Only a moth with a letter. It would not say who sent it.",
+        "keepsake": {
+          "name": "A moth-light letter",
+          "description": "Unsigned. Smells faintly of rain and somebody else's kitchen."
+        }
+      }
+    }
+  ]
+}

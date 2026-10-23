@@ -4,6 +4,7 @@ import {
   hamsterEventPolicies,
 } from "./catalog.js";
 import { recordHamsterEvent } from "./model.js";
+import { loadNightly, nightlyEncounters } from "./nightly.js";
 import { createHamsterRepository } from "./storage.js";
 import { createHamsterView } from "./view.js";
 
@@ -23,13 +24,21 @@ export function createHamsterRuntime({
   repository,
   view,
   eventTarget,
-  catalog = hamsterEncounters,
+  catalog: baseCatalog = hamsterEncounters,
   policies = hamsterEventPolicies,
   now = Date.now,
   random = Math.random,
 }) {
   let currentPage = "";
   let started = false;
+  let catalog = baseCatalog;
+
+  // Nightly lines arrive after start; ids already in the catalog win.
+  function addEncounters(encounters) {
+    const known = new Set(catalog.map(line => line.id));
+    const fresh = encounters.filter(line => !known.has(line.id));
+    if (fresh.length) catalog = [...catalog, ...fresh];
+  }
 
   function markRead(id) {
     const state = repository.load();
@@ -119,6 +128,7 @@ export function createHamsterRuntime({
   }
 
   return {
+    addEncounters,
     closeEncounter: view.close,
     getState,
     record,
@@ -146,8 +156,12 @@ export function startHamster({ page, triggerParent = null }) {
     });
   }
 
-  browserRuntime.start({ page, triggerParent });
-  return browserRuntime;
+  const runtime = browserRuntime;
+  runtime.start({ page, triggerParent });
+  loadNightly().then(doc => {
+    if (doc) runtime.addEncounters(nightlyEncounters(doc));
+  });
+  return runtime;
 }
 
 export function signalHamsterEvent(type, context = {}) {
