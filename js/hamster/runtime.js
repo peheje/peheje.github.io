@@ -3,7 +3,7 @@ import {
   hamsterEncounters,
   hamsterEventPolicies,
 } from "./catalog.js";
-import { recordHamsterEvent } from "./model.js";
+import { recordHamsterChoice, recordHamsterEvent } from "./model.js";
 import { loadNightly, nightlyEncounters } from "./nightly.js";
 import { createHamsterRepository } from "./storage.js";
 import { createHamsterView } from "./view.js";
@@ -47,12 +47,29 @@ export function createHamsterRuntime({
     repository.save(state);
   }
 
+  function choose(id, optionIndex) {
+    const encounter = catalog.find(line => line.id === id);
+    if (!encounter?.choice) return null;
+    const state = recordHamsterChoice(repository.load(), encounter, optionIndex, now());
+    repository.save(state);
+    return state.choices[id] || null;
+  }
+
+  function choiceFor(encounter, state) {
+    if (!encounter?.choice) return null;
+    return {
+      options: encounter.choice.options.map(option => option.label),
+      chosen: state.choices[encounter.id] || null,
+      onChoose: index => choose(encounter.id, index),
+    };
+  }
+
   function recall(context = {}) {
     const state = repository.load();
     const encounter = catalog.find(line => line.id === state.lastEncounterId);
     if (!encounter) return false;
     markRead(encounter.id);
-    view.show({ ...encounter, presentation: "dialog" }, { ...context, keepsakes: state.keepsakes });
+    view.show({ ...encounter, presentation: "dialog" }, { ...context, keepsakes: state.keepsakes, choice: choiceFor(encounter, state) });
     return true;
   }
 
@@ -85,6 +102,7 @@ export function createHamsterRuntime({
     if (result.encounter) view.show(result.encounter, {
       ...context,
       keepsakes: result.state.keepsakes,
+      choice: choiceFor(result.encounter, result.state),
       onRead: () => markRead(result.encounter.id),
     });
     return result;
@@ -129,6 +147,7 @@ export function createHamsterRuntime({
 
   return {
     addEncounters,
+    choose,
     closeEncounter: view.close,
     getState,
     record,

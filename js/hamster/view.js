@@ -124,8 +124,8 @@ export function createHamsterView({ document, window }) {
     }, revealTransitionMs);
   }
 
-  function show(encounter, { sourceElement = null, keepsakes = {}, onRead = null, onRecall = null, debug = false } = {}) {
-    const options = { sourceElement, keepsakes, onRead, onRecall, debug };
+  function show(encounter, { sourceElement = null, keepsakes = {}, onRead = null, onRecall = null, choice = null, debug = false } = {}) {
+    const options = { sourceElement, keepsakes, onRead, onRecall, choice, debug };
     const isCameo = encounter.presentation === "cameo";
     if (isCameo && !debug && (document.hidden || isEditing() || panel || hasModal())) {
       queueCameo(encounter, options);
@@ -184,6 +184,40 @@ export function createHamsterView({ document, window }) {
     quote.textContent = encounter.text;
 
     copy.append(quote);
+    if (choice) {
+      const showReply = picked => {
+        const answer = document.createElement("p");
+        answer.className = "hamster-reveal-answer";
+        answer.textContent = `You: ${picked.label}`;
+        const reply = document.createElement("p");
+        reply.className = "hamster-reveal-quote hamster-reveal-reply";
+        reply.textContent = picked.reply;
+        return [answer, reply];
+      };
+      if (choice.chosen) {
+        copy.append(...showReply(choice.chosen));
+      } else {
+        const choices = document.createElement("div");
+        choices.className = "hamster-reveal-choices";
+        choice.options.forEach((label, index) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "hamster-reveal-choice";
+          button.textContent = label;
+          button.addEventListener("click", event => {
+            onRead?.();
+            const picked = choice.onChoose(index);
+            if (!picked) return;
+            const [answer, reply] = showReply(picked);
+            choices.replaceWith(answer, reply);
+            // Keyboard answers keep focus in the bubble; taps should not draw a focus ring.
+            if (event.detail === 0) nextPanel.querySelector(".hamster-reveal-close")?.focus();
+          });
+          choices.append(button);
+        });
+        copy.append(choices);
+      }
+    }
     if (onRecall) {
       const recall = document.createElement("button");
       recall.type = "button";
@@ -209,7 +243,9 @@ export function createHamsterView({ document, window }) {
       if (event.key === "Escape") close();
     };
     const closeOnOutside = (event) => {
-      if (panel === nextPanel && !nextPanel.contains(event.target) && event.target !== sourceElement) {
+      // composedPath keeps the click inside even when its button was just replaced.
+      const inside = event.composedPath?.().includes(nextPanel) || nextPanel.contains(event.target);
+      if (panel === nextPanel && !inside && event.target !== sourceElement) {
         close();
       }
     };

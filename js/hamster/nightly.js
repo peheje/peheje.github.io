@@ -9,6 +9,7 @@ export const NIGHTLY_MAX_NIGHTS = 60;
 
 const dayMs = 24 * 60 * 60 * 1000;
 const lineDays = 3;
+const laterDays = 14;
 const questHours = 48;
 const timeBands = ["morning", "day", "evening", "night"];
 const questKinds = ["timer", "weather", "memory"];
@@ -40,6 +41,32 @@ function parseDate(value) {
   const date = new Date(year, month - 1, day);
   if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
   return date;
+}
+
+function validateChoice(choice, where, errors) {
+  if (!isRecord(choice)) {
+    errors.push(`${where}: must be an object`);
+    return;
+  }
+  checkKeys(choice, ["options"], where, errors);
+  if (!Array.isArray(choice.options) || choice.options.length !== 2) {
+    errors.push(`${where}.options: expected exactly two options`);
+    return;
+  }
+  choice.options.forEach((option, index) => {
+    const at = `${where}.options[${index}]`;
+    if (!isRecord(option)) {
+      errors.push(`${at}: must be an object`);
+      return;
+    }
+    checkKeys(option, ["label", "reply", "later"], at, errors);
+    checkText(option.label, 2, 28, `${at}.label`, errors);
+    checkText(option.reply, 8, 160, `${at}.reply`, errors);
+    if (option.later !== undefined) checkText(option.later, 8, 160, `${at}.later`, errors);
+  });
+  if (choice.options.every(isRecord) && choice.options[0].label === choice.options[1].label) {
+    errors.push(`${where}.options: the two labels must differ`);
+  }
 }
 
 function validateQuest(quest, where, errors) {
@@ -87,7 +114,7 @@ export function validateNightly(doc) {
       errors.push(`${where}: must be an object`);
       return;
     }
-    checkKeys(night, ["date", "text", "note", "quest"], where, errors);
+    checkKeys(night, ["date", "text", "note", "quest", "choice"], where, errors);
     if (!parseDate(night.date)) errors.push(`${where}.date: expected a real YYYY-MM-DD date`);
     else if (seen.has(night.date)) errors.push(`${where}.date: duplicate ${night.date}`);
     seen.add(night.date);
@@ -102,6 +129,8 @@ export function validateNightly(doc) {
       }
     }
     if (night.quest !== undefined) validateQuest(night.quest, `${where}.quest`, errors);
+    if (night.choice !== undefined) validateChoice(night.choice, `${where}.choice`, errors);
+    if (night.quest !== undefined && night.choice !== undefined) errors.push(`${where}: a night has a quest or a choice, not both`);
   });
   return errors;
 }
@@ -127,6 +156,21 @@ export function nightlyEncounters(doc) {
       availableUntil: availableFrom + lineDays * dayMs,
       text: night.text,
     };
+    if (night.choice) {
+      line.choice = { options: night.choice.options.map(({ label, reply }) => ({ label, reply })) };
+      // A follow-up, a day later, about whichever answer was picked.
+      const later = night.choice.options.flatMap((option, index) => option.later ? [{
+        id: `${id}-later-${index}`,
+        event: HAMSTER_EVENTS.MANUAL_REVEAL,
+        stage: 0,
+        priority: 5,
+        requiresChoice: { id, option: index },
+        minTimeSinceChoiceMs: 20 * 60 * 60 * 1000,
+        availableUntil: availableFrom + laterDays * dayMs,
+        text: option.later,
+      }] : []);
+      return [line, ...later];
+    }
     if (!night.quest) return [line];
 
     const { quest } = night;

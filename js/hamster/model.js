@@ -36,6 +36,7 @@ export function createHamsterState(now = Date.now()) {
     completedQuestIds: {},
     keepsakes: {},
     shelf: {},
+    choices: {},
     secrets: {},
     eventCounts: {},
     lastEventAtByEvent: {},
@@ -64,6 +65,7 @@ export function normalizeHamsterState(value, now = Date.now()) {
     completedQuestIds: { ...safeRecord(source.completedQuestIds) },
     keepsakes: { ...safeRecord(source.keepsakes) },
     shelf: { ...safeRecord(source.shelf) },
+    choices: { ...safeRecord(source.choices) },
     secrets: { ...safeRecord(source.secrets) },
     eventCounts: { ...safeRecord(source.eventCounts) },
     lastEventAtByEvent: { ...safeRecord(source.lastEventAtByEvent) },
@@ -146,6 +148,11 @@ export function recordHamsterEvent(stateValue, event, options) {
       if (now - completedAt < safeCount(candidate.minTimeSinceCompletedQuestMs)) return false;
     }
     if (candidate.requiresKeepsake && !state.keepsakes[candidate.requiresKeepsake]) return false;
+    if (candidate.requiresChoice) {
+      const picked = safeRecord(state.choices[candidate.requiresChoice.id]);
+      if (picked.option !== candidate.requiresChoice.option || !Number.isFinite(picked.at)) return false;
+      if (now - picked.at < safeCount(candidate.minTimeSinceChoiceMs)) return false;
+    }
     if (candidate.startsQuest) {
       if (state.activeQuestId) return false;
       if (state.completedQuestIds[candidate.startsQuest]) return false;
@@ -205,4 +212,20 @@ export function recordHamsterEvent(stateValue, event, options) {
       relationshipStage: relationshipStage(state.relationshipCount),
     },
   };
+}
+
+// Saves the visitor's answer to a question line. The first answer stands.
+export function recordHamsterChoice(stateValue, encounter, optionIndex, now = Date.now()) {
+  const state = normalizeHamsterState(stateValue, now);
+  const option = encounter?.choice?.options?.[optionIndex];
+  if (!option || state.choices[encounter.id]) return state;
+  state.choices[encounter.id] = {
+    option: optionIndex,
+    label: option.label,
+    question: encounter.text,
+    reply: option.reply,
+    at: now,
+  };
+  state.updatedAt = now;
+  return state;
 }

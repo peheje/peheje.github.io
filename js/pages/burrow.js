@@ -63,6 +63,25 @@ function renderNotes(notes) {
   document.getElementById("burrow-notes").hidden = notes.length === 0;
 }
 
+function renderRoad(state) {
+  const picks = Object.entries(state.choices)
+    .filter(([, pick]) => pick && typeof pick.question === "string" && typeof pick.label === "string")
+    .sort(([, a], [, b]) => (b.at || 0) - (a.at || 0))
+    .slice(0, 7);
+  const list = document.getElementById("burrow-road-list");
+  list.replaceChildren(...picks.map(([id, pick]) => {
+    const item = document.createElement("li");
+    const question = document.createElement("p");
+    question.textContent = pick.question;
+    const meta = document.createElement("small");
+    const date = /^nightly-(\d{4}-\d{2}-\d{2})$/.exec(id)?.[1];
+    meta.textContent = date ? `You chose: ${pick.label} · ${formatNightDate(date)}` : `You chose: ${pick.label}`;
+    item.append(question, meta);
+    return item;
+  }));
+  document.getElementById("burrow-road").hidden = picks.length === 0;
+}
+
 function renderShelf(state) {
   const items = Object.values(state.shelf)
     .filter(item => item && typeof item.name === "string" && typeof item.description === "string")
@@ -187,6 +206,7 @@ function renderBurrow() {
   const voice = document.getElementById("burrow-voice");
   voice.textContent = activityForHour(new Date().getHours());
   renderRoom(state, voice);
+  renderRoad(state);
   renderShelf(state);
   setupMotionSecret(repository, state, voice);
   loadNightly().then(doc => {
