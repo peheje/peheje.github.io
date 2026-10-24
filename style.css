@@ -2230,6 +2230,22 @@ button.hamster-secret[aria-expanded="true"] {
 }
 
 .burrow-ledger p { margin: 0 0 2px; }
+
+.burrow-carry {
+    margin: 36px auto 0;
+    text-align: center;
+}
+
+.burrow-shell .burrow-carry button {
+    min-width: auto;
+    min-height: 44px;
+    padding: 8px 4px;
+    border: 0;
+    color: var(--muted);
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.75rem;
+}
 .burrow-ledger small { color: var(--muted); }
 
 @keyframes burrow-secret-arrival {

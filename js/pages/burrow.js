@@ -1,6 +1,6 @@
 import { hamsterKeepsakes } from "../hamster/catalog.js";
 import { loadNightly, nightlyNotes } from "../hamster/nightly.js";
-import { createHamsterRepository } from "../hamster/storage.js";
+import { createHamsterRepository, decodeCarryCode, encodeCarryCode } from "../hamster/storage.js";
 import { mountSiteShell } from "../site.js";
 
 const motionSecretId = "shifted-floorboard";
@@ -194,9 +194,36 @@ function setupMotionSecret(repository, initialState, voice) {
   }
 }
 
+// Opening burrow.html#carry=... offers to bring that hamster into this browser.
+function receiveCarriedHamster(repository) {
+  const match = /^#carry=(.+)$/.exec(window.location.hash);
+  if (!match) return;
+  window.history.replaceState(null, "", window.location.pathname);
+  const carried = decodeCarryCode(match[1]);
+  if (!carried) {
+    window.alert("That link does not carry a hamster.");
+    return;
+  }
+  if (window.confirm("Bring this hamster here? It replaces the hamster in this browser.")) repository.save(carried);
+}
+
+function setupCarryLink(repository, voice) {
+  document.getElementById("burrow-carry").addEventListener("click", async () => {
+    const url = `${window.location.origin}/burrow.html#carry=${encodeCarryCode(repository.load())}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "The hamster", url });
+      else await navigator.clipboard.writeText(url);
+      voice.textContent = "Open the link in your other browser. The hamster will follow.";
+    } catch (error) {
+      if (error?.name !== "AbortError") window.prompt("Copy this link to your other browser:", url);
+    }
+  });
+}
+
 function renderBurrow() {
   mountSiteShell();
   const repository = createRepository();
+  receiveCarriedHamster(repository);
   const state = repository.load();
   const unlocked = Boolean(state.completedQuestIds["wake-in-three"]);
   document.getElementById("burrow-locked").hidden = unlocked;
@@ -208,6 +235,7 @@ function renderBurrow() {
   renderRoom(state, voice);
   renderRoad(state);
   renderShelf(state);
+  setupCarryLink(repository, voice);
   setupMotionSecret(repository, state, voice);
   loadNightly().then(doc => {
     if (doc) renderNotes(nightlyNotes(doc));

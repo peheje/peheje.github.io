@@ -32,6 +32,9 @@ export function createHamsterRuntime({
   let currentPage = "";
   let started = false;
   let catalog = baseCatalog;
+  // "Go on" can ask for a couple more lines in one sitting.
+  const extraLinesPerVisit = 2;
+  let extraLines = 0;
 
   // Nightly lines arrive after start; ids already in the catalog win.
   function addEncounters(encounters) {
@@ -73,7 +76,15 @@ export function createHamsterRuntime({
     return true;
   }
 
+  function goOn(context) {
+    if (extraLines >= extraLinesPerVisit) return;
+    extraLines += 1;
+    const result = record(HAMSTER_EVENTS.MANUAL_REVEAL, context, { more: true });
+    if (!result.encounter) view.showQuiet({ ...context, timeBand: "done", random, keepsakes: result.state.keepsakes });
+  }
+
   function visit(context) {
+    extraLines = 0;
     const state = repository.load();
     if (state.lastEncounterUnread && recall(context)) return;
     const result = record(HAMSTER_EVENTS.MANUAL_REVEAL, context);
@@ -87,7 +98,7 @@ export function createHamsterRuntime({
     });
   }
 
-  function record(type, detail = {}) {
+  function record(type, detail = {}, { more = false } = {}) {
     const timestamp = now();
     const context = {
       localHour: new Date(timestamp).getHours(),
@@ -97,7 +108,7 @@ export function createHamsterRuntime({
     const result = recordHamsterEvent(
       repository.load(),
       { type, page: currentPage, detail: context },
-      { catalog, policies, now: timestamp, random },
+      { catalog, policies, now: timestamp, random, ignoreDisplayCooldown: more },
     );
     repository.save(result.state);
     if (result.encounter) view.show(result.encounter, {
@@ -105,6 +116,7 @@ export function createHamsterRuntime({
       keepsakes: result.state.keepsakes,
       choice: choiceFor(result.encounter, result.state),
       onRead: () => markRead(result.encounter.id),
+      onMore: type === HAMSTER_EVENTS.MANUAL_REVEAL && extraLines < extraLinesPerVisit ? () => goOn(detail) : null,
     });
     return result;
   }

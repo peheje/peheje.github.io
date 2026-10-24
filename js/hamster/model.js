@@ -120,6 +120,7 @@ export function recordHamsterEvent(stateValue, event, options) {
     policies = {},
     now = Date.now(),
     random = Math.random,
+    ignoreDisplayCooldown = false,
   } = options;
   const state = normalizeHamsterState(stateValue, now);
   const type = typeof event?.type === "string" ? event.type : "unknown";
@@ -144,7 +145,7 @@ export function recordHamsterEvent(stateValue, event, options) {
   const displayCooldownMs = safeCount(policy.displayCooldownMs);
   const cooldownEvents = policy.sharedCooldownEvents || [type];
   const bypassDisplayCooldown = policy.bypassCooldownWithActiveQuest && state.activeQuestId;
-  if (!bypassDisplayCooldown && cooldownEvents.some((key) => !cooldownElapsed(state.lastEncounterAtByEvent[key], displayCooldownMs, now))) {
+  if (!bypassDisplayCooldown && !ignoreDisplayCooldown && cooldownEvents.some((key) => !cooldownElapsed(state.lastEncounterAtByEvent[key], displayCooldownMs, now))) {
     return { state, encounter: null };
   }
 

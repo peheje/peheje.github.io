@@ -31,3 +31,23 @@ export function createHamsterRepository({ storage, now = Date.now } = {}) {
 
   return { load, save };
 }
+
+// A carry code moves progress between browsers by link, with no account.
+export function encodeCarryCode(state) {
+  const bytes = new TextEncoder().encode(JSON.stringify(normalizeHamsterState(state)));
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+export function decodeCarryCode(code, now = Date.now()) {
+  try {
+    const binary = atob(code.replace(/-/g, "+").replace(/_/g, "/"));
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const value = JSON.parse(new TextDecoder().decode(bytes));
+    if (!value || typeof value !== "object" || !Number.isFinite(value.createdAt)) return null;
+    return normalizeHamsterState(value, now);
+  } catch {
+    return null;
+  }
+}

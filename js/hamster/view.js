@@ -16,6 +16,11 @@ const quietActivities = {
     "Listening for footsteps.", "Watching the lamp decide whether to stay lit.",
     "Reading the same page of a very small book.", "Warming both paws on the kettle.",
   ] },
+  done: { activity: "sorting", lines: [
+    "That is all I have for now. Come back after the kettle.",
+    "I have run out of things worth saying. A rare state.",
+    "No more for now. I am saving the rest for later.",
+  ] },
   night: { activity: "sleeping", lines: [
     "Asleep beneath a handkerchief.", "Asleep, one ear still on duty.",
     "Asleep with the map for a blanket.", "Snoring, politely.",
@@ -144,8 +149,8 @@ export function createHamsterView({ document, window }) {
     }, revealTransitionMs);
   }
 
-  function show(encounter, { sourceElement = null, keepsakes = {}, onRead = null, onRecall = null, choice = null, debug = false } = {}) {
-    const options = { sourceElement, keepsakes, onRead, onRecall, choice, debug };
+  function show(encounter, { sourceElement = null, keepsakes = {}, onRead = null, onRecall = null, onMore = null, choice = null, debug = false } = {}) {
+    const options = { sourceElement, keepsakes, onRead, onRecall, onMore, choice, debug };
     const isCameo = encounter.presentation === "cameo";
     if (isCameo && !debug && (document.hidden || isEditing() || panel || hasModal())) {
       queueCameo(encounter, options);
@@ -237,6 +242,14 @@ export function createHamsterView({ document, window }) {
         });
         copy.append(choices);
       }
+    }
+    if (onMore) {
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "hamster-reveal-recall";
+      more.textContent = "Go on";
+      more.addEventListener("click", onMore);
+      copy.append(more);
     }
     if (onRecall) {
       const recall = document.createElement("button");
