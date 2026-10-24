@@ -17,6 +17,24 @@
           "description": "Unsigned. Smells faintly of rain and somebody else's kitchen."
         }
       }
+    },
+    {
+      "date": "2026-10-24",
+      "text": "The moon is nearly round tonight. I should leave something by the door for whoever writes. A seed, or a reply?",
+      "choice": {
+        "options": [
+          {
+            "label": "A seed",
+            "reply": "A seed, then. Nobody has ever been annoyed by a seed. I will put it on the mat.",
+            "later": "The seed is gone from the mat. In its place, a small dry leaf. I take this as manners."
+          },
+          {
+            "label": "A reply",
+            "reply": "A reply. Yes. I shall keep it short, in case the moth reads over my shoulder.",
+            "later": "I wrote only 'Hello, who is it?' and slid it out. It has not come back. I keep checking the mat."
+          }
+        ]
+      }
     }
   ]
 }
