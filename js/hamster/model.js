@@ -80,17 +80,38 @@ function cooldownElapsed(lastAt, cooldownMs, now) {
   return !Number.isFinite(lastAt) || now - lastAt >= cooldownMs;
 }
 
-function chooseCandidate(candidates, state, random) {
+function candidateWeight(candidate) {
+  return Number.isFinite(candidate.weight) && candidate.weight > 0 ? candidate.weight : 1 + safeCount(candidate.priority);
+}
+
+function chooseCandidate(candidates, state, random, weighted) {
   // A line is a discovery, not a deck to cycle through. Old saved history counts.
-  const unseen = candidates.filter((candidate) => !state.seenEncounterIds[candidate.id]);
+  let unseen = candidates.filter((candidate) => !state.seenEncounterIds[candidate.id]);
   if (unseen.length === 0) return null;
+  // Dated lines (nightly ones) offer only the newest night, never an older backlog.
+  const newest = Math.max(...unseen.map((candidate) => (Number.isFinite(candidate.availableFrom) ? candidate.availableFrom : -Infinity)));
+  if (Number.isFinite(newest)) {
+    unseen = unseen.filter((candidate) => !Number.isFinite(candidate.availableFrom) || candidate.availableFrom === newest);
+  }
+  const roll = Math.min(0.999999, Math.max(0, random()));
+
+  if (weighted) {
+    // Deliberate visits are a weighted draw, heaviest first, so a low roll
+    // still means "the most likely line" and tests stay readable.
+    const pool = [...unseen].sort((a, b) => candidateWeight(b) - candidateWeight(a));
+    const total = pool.reduce((sum, candidate) => sum + candidateWeight(candidate), 0);
+    let target = roll * total;
+    for (const candidate of pool) {
+      target -= candidateWeight(candidate);
+      if (target < 0) return candidate;
+    }
+    return pool[pool.length - 1];
+  }
+
+  // Event reactions (quest endings, milestones) stay predictable.
   const highestPriority = Math.max(...unseen.map((candidate) => safeCount(candidate.priority)));
-  let pool = unseen.filter((candidate) => safeCount(candidate.priority) === highestPriority);
-  // Dated lines (nightly ones) prefer the newest night over an older backlog.
-  const newest = Math.max(...pool.map((candidate) => (Number.isFinite(candidate.availableFrom) ? candidate.availableFrom : -Infinity)));
-  if (Number.isFinite(newest)) pool = pool.filter((candidate) => candidate.availableFrom === newest);
-  const index = Math.min(pool.length - 1, Math.floor(Math.max(0, random()) * pool.length));
-  return pool[index] || null;
+  const pool = unseen.filter((candidate) => safeCount(candidate.priority) === highestPriority);
+  return pool[Math.floor(roll * pool.length)] || null;
 }
 
 export function recordHamsterEvent(stateValue, event, options) {
@@ -171,7 +192,7 @@ export function recordHamsterEvent(stateValue, event, options) {
     return { state, encounter: null };
   }
 
-  const encounter = chooseCandidate(candidates, state, random);
+  const encounter = chooseCandidate(candidates, state, random, policy.weightedChoice === true);
   if (!encounter) return { state, encounter: null };
   state.encounterCount += 1;
   state.lastEncounterId = encounter.id;

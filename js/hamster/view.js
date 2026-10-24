@@ -2,6 +2,26 @@ const revealTransitionMs = 260;
 const cameoDurationMs = 7200;
 const quietPauseMs = 1800;
 
+// What the hamster is doing between conversations. Picked at random per visit.
+const quietActivities = {
+  morning: { activity: "sorting", lines: [
+    "Sorting seeds.", "Arranging breakfast by size.", "Darning a sock with great seriousness.",
+    "Counting the crumbs. Twice.", "Folding the map the wrong way, again.",
+  ] },
+  day: { activity: "sorting", lines: [
+    "Sorting seeds.", "Polishing a sword that does not need it.", "Sweeping one corner very thoroughly.",
+    "Weighing two acorns against each other.", "Mending the strap of a very small pack.",
+  ] },
+  evening: { activity: "listening", lines: [
+    "Listening for footsteps.", "Watching the lamp decide whether to stay lit.",
+    "Reading the same page of a very small book.", "Warming both paws on the kettle.",
+  ] },
+  night: { activity: "sleeping", lines: [
+    "Asleep beneath a handkerchief.", "Asleep, one ear still on duty.",
+    "Asleep with the map for a blanket.", "Snoring, politely.",
+  ] },
+};
+
 export function createHamsterView({ document, window }) {
   let trigger = null;
   let panel = null;
@@ -62,7 +82,7 @@ export function createHamsterView({ document, window }) {
       if (header) element.style.top = `${Math.max(12, Math.min(header.getBoundingClientRect().bottom + 12, window.innerHeight - element.offsetHeight - 14))}px`;
       return;
     }
-    if (window.innerWidth > 640 || document.querySelector(".hamster-debug")) return;
+    if (window.innerWidth > 640) return;
     const viewport = window.visualViewport;
     const width = viewport?.width || window.innerWidth;
     const height = viewport?.height || window.innerHeight;
@@ -312,12 +332,10 @@ export function createHamsterView({ document, window }) {
   }
 
   function showQuiet(options = {}) {
-    const sleeping = options.timeBand === "night";
-    show({
-      id: "quiet-visit",
-      activity: sleeping ? "sleeping" : options.timeBand === "evening" ? "listening" : "sorting",
-      text: sleeping ? "Asleep beneath a handkerchief." : options.timeBand === "evening" ? "Listening for footsteps." : "Sorting seeds.",
-    }, options);
+    const band = quietActivities[options.timeBand] ? options.timeBand : "day";
+    const { activity, lines } = quietActivities[band];
+    const pick = Math.min(lines.length - 1, Math.floor(Math.max(0, (options.random || Math.random)()) * lines.length));
+    show({ id: "quiet-visit", activity, text: lines[pick] }, options);
   }
 
   function mountTrigger(parent, onReveal) {

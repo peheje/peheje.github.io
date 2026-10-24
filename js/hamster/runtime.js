@@ -81,6 +81,7 @@ export function createHamsterRuntime({
     view.showQuiet({
       ...context,
       timeBand: getTimeBand(new Date(now())),
+      random,
       keepsakes: result.state.keepsakes,
       onRecall: result.state.lastEncounterId ? () => recall(context) : null,
     });

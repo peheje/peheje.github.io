@@ -1,5 +1,4 @@
 import { startHamster } from "./hamster/runtime.js";
-import { mountHamsterDebug } from "./hamster/debug.js";
 
 // Local utility sites and configurations
 const sites = [
@@ -758,11 +757,10 @@ export function mountSiteShell() {
     header.append(nav, intro);
     menu.replaceChildren(header);
 
-    const hamsterRuntime = startHamster({
+    startHamster({
       page: site.url,
       triggerParent: titleRow,
     });
-    mountHamsterDebug({ runtime: hamsterRuntime, document, window });
   }
 
   applyTheme();

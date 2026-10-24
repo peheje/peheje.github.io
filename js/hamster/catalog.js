@@ -8,6 +8,7 @@ export const HAMSTER_EVENTS = Object.freeze({
 
 export const hamsterEventPolicies = Object.freeze({
   [HAMSTER_EVENTS.MANUAL_REVEAL]: {
+    weightedChoice: true,
     displayCooldownMs: 20 * 60 * 60 * 1000,
     relationshipCooldownMs: 20 * 60 * 60 * 1000,
   },
@@ -46,6 +47,23 @@ export const hamsterKeepsakes = Object.freeze({
     description: "Found where the floor leaned with the turning world.",
   },
 });
+
+// The very first meeting is one of these, so a fresh browser does not always
+// open with the same errand.
+const firstMeetings = [
+  ["supper", "Oh. A visitor. I was about to have supper, but I can have it slowly."],
+  ["boots", "Mind the boots by the door. They are mine, and they are tired."],
+  ["lantern", "You found the door. Most people walk straight past the small ones."],
+  ["sword", "The sword is mostly for opening jars. Do come in."],
+  ["kettle", "I heard you on the path. The kettle heard you first."],
+  ["map", "Sit anywhere. Not on the map. It is still drying."],
+].map(([id, text]) => ({
+  id: `first-meeting-${id}`,
+  event: HAMSTER_EVENTS.MANUAL_REVEAL,
+  stage: 0,
+  maxRelationshipCount: 0,
+  text,
+}));
 
 // Dialogue is data on purpose: adding or removing a line should not require
 // changing relationship, persistence, or rendering code.
@@ -176,6 +194,8 @@ export const hamsterEncounters = Object.freeze([
     event: HAMSTER_EVENTS.MANUAL_REVEAL,
     stage: 0,
     priority: 10,
+    weight: 8,
+    minRelationshipCount: 1,
     startsQuest: "wake-in-three",
     text: "The bell was meant to wake me. Three minutes ought to do.",
   },
@@ -221,6 +241,7 @@ export const hamsterEncounters = Object.freeze([
     event: HAMSTER_EVENTS.MANUAL_REVEAL,
     stage: 0,
     priority: 10,
+    weight: 8,
     startsQuest: "fetch-the-weather",
     requiresCompletedQuest: "wake-in-three",
     minTimeSinceCompletedQuestMs: 20 * 60 * 60 * 1000,
@@ -313,6 +334,7 @@ export const hamsterEncounters = Object.freeze([
     minTimeSinceCompletedQuestMs: 3 * 24 * 60 * 60 * 1000,
     text: "We asked the sky for permission once. The cloak and I have decided we can simply go.",
   },
+  ...firstMeetings,
   ...pageThoughts,
   ...familiarThoughts,
   ...clockThoughts,
