@@ -9,6 +9,9 @@ on:
   schedule:
     - cron: "23 2,3,4,6 * * *"
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Nightly hamster pushed"]
+    types: [completed]
 
 permissions:
   contents: write

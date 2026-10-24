@@ -1,0 +1,17 @@
+name: Nightly hamster pushed
+
+# Runs (with no permissions) when the nightly routine pushes claude/nightly.
+# Its only job is to wake "Merge nightly hamster" via workflow_run, which
+# GitHub always runs from the default branch's copy, so the pushed branch
+# can never change the merge rules.
+on:
+  push:
+    branches: [claude/nightly]
+
+permissions: {}
+
+jobs:
+  signal:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "claude/nightly updated"
