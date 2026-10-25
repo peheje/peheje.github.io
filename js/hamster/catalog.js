@@ -9,7 +9,7 @@ export const HAMSTER_EVENTS = Object.freeze({
 export const hamsterEventPolicies = Object.freeze({
   [HAMSTER_EVENTS.MANUAL_REVEAL]: {
     weightedChoice: true,
-    displayCooldownMs: 6 * 60 * 60 * 1000,
+    displayCooldownMs: 5 * 60 * 1000,
     relationshipCooldownMs: 20 * 60 * 60 * 1000,
   },
   [HAMSTER_EVENTS.MEMORY_CORRECT]: {
