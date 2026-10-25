@@ -10,6 +10,8 @@ export const NIGHTLY_MAX_NIGHTS = 60;
 const dayMs = 24 * 60 * 60 * 1000;
 const lineDays = 3;
 const laterDays = 14;
+const extraDays = 7;
+const maxExtras = 5;
 const questHours = 48;
 const timeBands = ["morning", "day", "evening", "night"];
 const questKinds = ["timer", "weather", "memory"];
@@ -114,7 +116,7 @@ export function validateNightly(doc) {
       errors.push(`${where}: must be an object`);
       return;
     }
-    checkKeys(night, ["date", "text", "note", "quest", "choice"], where, errors);
+    checkKeys(night, ["date", "text", "note", "quest", "choice", "extras"], where, errors);
     if (!parseDate(night.date)) errors.push(`${where}.date: expected a real YYYY-MM-DD date`);
     else if (seen.has(night.date)) errors.push(`${where}.date: duplicate ${night.date}`);
     seen.add(night.date);
@@ -126,6 +128,14 @@ export function validateNightly(doc) {
         checkKeys(night.note, ["text", "source"], `${where}.note`, errors);
         checkText(night.note.text, 8, 280, `${where}.note.text`, errors);
         checkText(night.note.source, 2, 80, `${where}.note.source`, errors);
+      }
+    }
+    if (night.extras !== undefined) {
+      if (!Array.isArray(night.extras) || night.extras.length < 1 || night.extras.length > maxExtras) {
+        errors.push(`${where}.extras: expected an array of 1-${maxExtras} lines`);
+      } else {
+        night.extras.forEach((extra, i) => checkText(extra, 8, 160, `${where}.extras[${i}]`, errors));
+        if (new Set([night.text, ...night.extras]).size !== night.extras.length + 1) errors.push(`${where}.extras: lines must differ from each other and from text`);
       }
     }
     if (night.quest !== undefined) validateQuest(night.quest, `${where}.quest`, errors);
@@ -146,65 +156,81 @@ export function nightlyEncounters(doc) {
   return doc.nights.flatMap((night) => {
     const id = `nightly-${night.date}`;
     const availableFrom = nightStart(night.date);
-    const line = {
-      id,
+    // Small extra lines stay around for a week, alongside newer nights.
+    const extras = (night.extras || []).map((text, index) => ({
+      id: `${id}-extra-${index}`,
       event: HAMSTER_EVENTS.MANUAL_REVEAL,
       stage: 0,
-      priority: 4,
-      weight: 30,
+      weight: 3,
       minRelationshipCount: 1,
       availableFrom,
-      availableUntil: availableFrom + lineDays * dayMs,
-      text: night.text,
-    };
-    if (night.choice) {
-      line.choice = { options: night.choice.options.map(({ label, reply }) => ({ label, reply })) };
-      // A follow-up, a day later, about whichever answer was picked.
-      const later = night.choice.options.flatMap((option, index) => option.later ? [{
-        id: `${id}-later-${index}`,
-        event: HAMSTER_EVENTS.MANUAL_REVEAL,
-        stage: 0,
-        priority: 5,
-        weight: 40,
-        requiresChoice: { id, option: index },
-        minTimeSinceChoiceMs: 20 * 60 * 60 * 1000,
-        availableUntil: availableFrom + laterDays * dayMs,
-        text: option.later,
-      }] : []);
-      return [line, ...later];
-    }
-    if (!night.quest) return [line];
-
-    const { quest } = night;
-    line.startsQuest = id;
-    line.questExpiresAfterMs = questHours * 60 * 60 * 1000;
-    const done = {
-      id: `${id}-done`,
-      stage: 0,
-      priority: 9,
-      requiresActiveQuest: id,
-      completesQuest: id,
-      presentation: "cameo",
-      text: quest.done,
-    };
-    if (quest.kind === "timer") {
-      done.event = HAMSTER_EVENTS.TIMER_COMPLETED;
-      done.minDurationMs = quest.minutes * 60 * 1000;
-    } else if (quest.kind === "weather") {
-      done.event = HAMSTER_EVENTS.WEATHER_CHECKED;
-    } else {
-      done.event = HAMSTER_EVENTS.MEMORY_CORRECT;
-    }
-    const detailEquals = {};
-    if (quest.timeBand) detailEquals.timeBand = quest.timeBand;
-    if (typeof quest.wet === "boolean") detailEquals.wet = quest.wet;
-    if (Object.keys(detailEquals).length) done.detailEquals = detailEquals;
-    if (quest.keepsake) {
-      done.awardsKeepsake = id;
-      done.keepsakeDetails = { ...quest.keepsake };
-    }
-    return [line, done];
+      availableUntil: availableFrom + extraDays * dayMs,
+      allowBacklog: true,
+      text,
+    }));
+    return [...nightLines(night, id, availableFrom), ...extras];
   });
+}
+
+function nightLines(night, id, availableFrom) {
+  const line = {
+    id,
+    event: HAMSTER_EVENTS.MANUAL_REVEAL,
+    stage: 0,
+    priority: 4,
+    weight: 30,
+    minRelationshipCount: 1,
+    availableFrom,
+    availableUntil: availableFrom + lineDays * dayMs,
+    text: night.text,
+  };
+  if (night.choice) {
+    line.choice = { options: night.choice.options.map(({ label, reply }) => ({ label, reply })) };
+    // A follow-up, a day later, about whichever answer was picked.
+    const later = night.choice.options.flatMap((option, index) => option.later ? [{
+      id: `${id}-later-${index}`,
+      event: HAMSTER_EVENTS.MANUAL_REVEAL,
+      stage: 0,
+      priority: 5,
+      weight: 40,
+      requiresChoice: { id, option: index },
+      minTimeSinceChoiceMs: 20 * 60 * 60 * 1000,
+      availableUntil: availableFrom + laterDays * dayMs,
+      text: option.later,
+    }] : []);
+    return [line, ...later];
+  }
+  if (!night.quest) return [line];
+
+  const { quest } = night;
+  line.startsQuest = id;
+  line.questExpiresAfterMs = questHours * 60 * 60 * 1000;
+  const done = {
+    id: `${id}-done`,
+    stage: 0,
+    priority: 9,
+    requiresActiveQuest: id,
+    completesQuest: id,
+    presentation: "cameo",
+    text: quest.done,
+  };
+  if (quest.kind === "timer") {
+    done.event = HAMSTER_EVENTS.TIMER_COMPLETED;
+    done.minDurationMs = quest.minutes * 60 * 1000;
+  } else if (quest.kind === "weather") {
+    done.event = HAMSTER_EVENTS.WEATHER_CHECKED;
+  } else {
+    done.event = HAMSTER_EVENTS.MEMORY_CORRECT;
+  }
+  const detailEquals = {};
+  if (quest.timeBand) detailEquals.timeBand = quest.timeBand;
+  if (typeof quest.wet === "boolean") detailEquals.wet = quest.wet;
+  if (Object.keys(detailEquals).length) done.detailEquals = detailEquals;
+  if (quest.keepsake) {
+    done.awardsKeepsake = id;
+    done.keepsakeDetails = { ...quest.keepsake };
+  }
+  return [line, done];
 }
 
 // Notes found under the burrow door, newest first, never from the future.

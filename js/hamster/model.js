@@ -89,9 +89,11 @@ function chooseCandidate(candidates, state, random, weighted) {
   let unseen = candidates.filter((candidate) => !state.seenEncounterIds[candidate.id]);
   if (unseen.length === 0) return null;
   // Dated lines (nightly ones) offer only the newest night, never an older backlog.
-  const newest = Math.max(...unseen.map((candidate) => (Number.isFinite(candidate.availableFrom) ? candidate.availableFrom : -Infinity)));
+  // Lines marked allowBacklog (nightly extras) stay in the pool either way.
+  const dated = (candidate) => Number.isFinite(candidate.availableFrom) && !candidate.allowBacklog;
+  const newest = Math.max(...unseen.map((candidate) => (dated(candidate) ? candidate.availableFrom : -Infinity)));
   if (Number.isFinite(newest)) {
-    unseen = unseen.filter((candidate) => !Number.isFinite(candidate.availableFrom) || candidate.availableFrom === newest);
+    unseen = unseen.filter((candidate) => !dated(candidate) || candidate.availableFrom === newest);
   }
   const roll = Math.min(0.999999, Math.max(0, random()));
 
