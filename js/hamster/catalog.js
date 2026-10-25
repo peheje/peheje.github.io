@@ -194,7 +194,9 @@ export const hamsterEncounters = Object.freeze([
     event: HAMSTER_EVENTS.MANUAL_REVEAL,
     stage: 0,
     priority: 10,
-    weight: 8,
+    // Heavy on purpose: this quest opens the burrow, so it should come up on
+    // the first visit it can, ahead of nightly lines and ambient chatter.
+    weight: 500,
     minRelationshipCount: 1,
     startsQuest: "wake-in-three",
     text: "The bell was meant to wake me. Three minutes ought to do.",
