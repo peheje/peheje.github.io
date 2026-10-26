@@ -17,7 +17,19 @@
         </section>
 
         <div id="burrow-home" hidden>
-            <section class="burrow-room" aria-label="The hamster's room">
+            <section id="burrow-room" class="burrow-room" aria-label="The hamster's room">
+                <div class="burrow-sky" aria-hidden="true">
+                    <span class="burrow-sky-dark"></span>
+                    <span class="burrow-sky-door"></span>
+                    <span class="burrow-sky-frost"></span>
+                    <span class="burrow-sky-wet"></span>
+                    <span class="burrow-sky-drip"></span><span class="burrow-sky-drip"></span><span class="burrow-sky-drip"></span>
+                    <span class="burrow-sky-flake"></span><span class="burrow-sky-flake"></span><span class="burrow-sky-flake"></span><span class="burrow-sky-flake"></span>
+                    <span class="burrow-sky-drift"></span>
+                    <span class="burrow-sky-fog"></span>
+                    <span class="burrow-sky-lights"></span>
+                    <span class="burrow-sky-flame"></span>
+                </div>
                 <div id="burrow-scene" class="burrow-scene">
                     <button id="burrow-cloak-object" class="burrow-room-cloak" type="button" aria-label="Examine the cloak" hidden></button>
                     <button id="burrow-motion-trigger" class="burrow-hamster" type="button" aria-label="The hamster at home" title="Disturb the stillness">
@@ -29,6 +41,10 @@
                 </div>
             </section>
             <p id="burrow-voice" class="burrow-voice" role="status">The hamster is sorting seeds.</p>
+            <section id="burrow-advent" class="burrow-ledger burrow-advent" aria-labelledby="burrow-advent-title" hidden>
+                <h2 id="burrow-advent-title">Jul</h2>
+                <div id="burrow-advent-doors" class="burrow-advent-doors"></div>
+            </section>
             <section id="burrow-notes" class="burrow-ledger" aria-labelledby="burrow-notes-title" hidden>
                 <h2 id="burrow-notes-title">Under the door</h2>
                 <ol id="burrow-notes-list"></ol>

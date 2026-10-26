@@ -1,3 +1,5 @@
+import { ADVENT_ORDER, adventKey, adventToday, openAdventDoor } from "../hamster/advent.js";
+import { burrowMood, loadBurrowSky } from "../hamster/burrow-weather.js";
 import { hamsterKeepsakes } from "../hamster/catalog.js";
 import { loadNightly, nightlyNotes } from "../hamster/nightly.js";
 import { createHamsterRepository, decodeCarryCode, encodeCarryCode } from "../hamster/storage.js";
@@ -5,14 +7,67 @@ import { mountSiteShell } from "../site.js";
 
 const motionSecretId = "shifted-floorboard";
 
-function createRepository() {
-  let storage = null;
+function browserStorage() {
   try {
-    storage = window.localStorage;
+    return window.localStorage;
   } catch {
     // The locked page can still render when browser storage is unavailable.
+    return null;
   }
-  return createHamsterRepository({ storage });
+}
+
+function createRepository() {
+  return createHamsterRepository({ storage: browserStorage() });
+}
+
+function applyMood(mood) {
+  const room = document.getElementById("burrow-room");
+  room.dataset.light = mood.light;
+  room.dataset.sky = mood.sky;
+  room.classList.toggle("is-frost", mood.frost);
+  room.classList.toggle("is-jul", mood.jul);
+}
+
+function renderSky(voice) {
+  applyMood(burrowMood(null));
+  loadBurrowSky({ storage: browserStorage() }).then(sky => {
+    if (!sky) return;
+    const mood = burrowMood(sky);
+    applyMood(mood);
+    // Only add to the idle line; never replace something the visitor asked for.
+    if (mood.note && voice.dataset.idle === "true") voice.textContent = `${voice.textContent} ${mood.note}`;
+  });
+}
+
+function renderAdvent(repository, state, voice) {
+  const today = adventToday();
+  const section = document.getElementById("burrow-advent");
+  if (!today) return;
+  section.hidden = false;
+  const doors = document.getElementById("burrow-advent-doors");
+  doors.replaceChildren(...ADVENT_ORDER.map(day => {
+    const door = document.createElement("button");
+    door.type = "button";
+    door.className = "burrow-advent-door";
+    door.textContent = String(day);
+    const refresh = () => {
+      const opened = Boolean(state.secrets[adventKey(today.year, day)]);
+      door.classList.toggle("is-open", opened);
+      door.disabled = day > today.openUpTo;
+      door.setAttribute("aria-label", door.disabled ? `Door ${day}, not yet` : opened ? `Door ${day}, opened` : `Door ${day}`);
+    };
+    refresh();
+    door.addEventListener("click", () => {
+      const line = openAdventDoor(state, day);
+      if (!line) return;
+      repository.save(state);
+      refresh();
+      voice.dataset.idle = "false";
+      voice.textContent = line;
+      if (day === 24) renderShelf(state);
+    });
+    return door;
+  }));
 }
 
 function activityForHour(hour) {
@@ -37,6 +92,7 @@ function renderRoom(state, voice) {
   const inspect = keepsakeId => {
     const keepsake = hamsterKeepsakes[keepsakeId];
     if (!keepsake) return;
+    voice.dataset.idle = "false";
     voice.textContent = `${keepsake.name}. ${keepsake.description}`;
   };
   button.addEventListener("click", () => inspect("brass-button"));
@@ -116,6 +172,7 @@ function setupMotionSecret(repository, initialState, voice) {
     if (state.secrets[motionSecretId]) return;
     armed = true;
     scene.classList.add("is-armed");
+    voice.dataset.idle = "false";
     voice.textContent = "What sleeps below will not wake while the room stands straight.";
   }
 
@@ -126,6 +183,7 @@ function setupMotionSecret(repository, initialState, voice) {
     repository.save(state);
     scene.classList.add("is-discovered");
     scene.classList.remove("is-armed");
+    voice.dataset.idle = "false";
     voice.textContent = "A loose board sighs. Beneath it, a seed black as old rain.";
     document.getElementById("burrow-seed-object").hidden = false;
     if (typeof navigator.vibrate === "function") navigator.vibrate(35);
@@ -213,6 +271,7 @@ function setupCarryLink(repository, voice) {
     try {
       if (navigator.share) await navigator.share({ title: "The hamster", url });
       else await navigator.clipboard.writeText(url);
+      voice.dataset.idle = "false";
       voice.textContent = "Open the link in your other browser. The hamster will follow.";
     } catch (error) {
       if (error?.name !== "AbortError") window.prompt("Copy this link to your other browser:", url);
@@ -232,7 +291,10 @@ function renderBurrow() {
 
   const voice = document.getElementById("burrow-voice");
   voice.textContent = activityForHour(new Date().getHours());
+  voice.dataset.idle = "true";
+  renderSky(voice);
   renderRoom(state, voice);
+  renderAdvent(repository, state, voice);
   renderRoad(state);
   renderShelf(state);
   setupCarryLink(repository, voice);
