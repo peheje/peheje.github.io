@@ -1,4 +1,4 @@
-import { HAMSTER_EVENTS } from "./catalog.js";
+import { HAMSTER_EVENTS, hamsterEncounters } from "./catalog.js";
 
 // Nightly entries are written by a scheduled Claude routine into
 // public/hamster/nightly.json. This module is the single gatekeeper for that
@@ -15,6 +15,7 @@ const maxExtras = 5;
 const questHours = 48;
 const timeBands = ["morning", "day", "evening", "night"];
 const questKinds = ["timer", "weather", "memory"];
+const builtInLines = new Set(hamsterEncounters.map((line) => line.text).filter(Boolean));
 
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -121,6 +122,9 @@ export function validateNightly(doc) {
     else if (seen.has(night.date)) errors.push(`${where}.date: duplicate ${night.date}`);
     seen.add(night.date);
     checkText(night.text, 8, 160, `${where}.text`, errors);
+    for (const [at, line] of [["text", night.text], ...(Array.isArray(night.extras) ? night.extras.map((extra, i) => [`extras[${i}]`, extra]) : [])]) {
+      if (builtInLines.has(line)) errors.push(`${where}.${at}: repeats a built-in line`);
+    }
     if (night.note !== undefined) {
       if (!isRecord(night.note)) {
         errors.push(`${where}.note: must be an object`);
