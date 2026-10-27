@@ -2248,6 +2248,289 @@ button.hamster-secret[aria-expanded="true"] {
 }
 .burrow-ledger small { color: var(--muted); }
 
+/* ---- The burrow's sky: the real weather, seen from inside ---- */
+/* Positions are percentages of the painting (1536x1024): door at 36.8% 34.3%,
+   threshold step near 37% 46%, candle wick at 92.2% 49%. */
+.burrow-sky,
+.burrow-sky span {
+    position: absolute;
+    pointer-events: none;
+}
+
+.burrow-sky {
+    z-index: 2;
+    inset: 0;
+    overflow: hidden;
+}
+
+.burrow-sky::before,
+.burrow-sky::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+}
+
+/* A cool cast over the room in wet or wintry weather. */
+.burrow-sky::before { background: rgba(48, 74, 102, 0.16); mix-blend-mode: multiply; }
+.burrow-room:is([data-sky="rain"], [data-sky="storm"], [data-sky="snow"], [data-sky="fog"]) .burrow-sky::before { opacity: 1; }
+
+/* Lightning, seen only as a flash around the door. */
+.burrow-sky::after { background: radial-gradient(ellipse 30% 40% at 36.8% 34.3%, rgba(225, 235, 255, 0.5), transparent 70%); }
+.burrow-room[data-sky="storm"] .burrow-sky::after { animation: burrow-lightning 13s infinite; }
+
+.burrow-sky span { opacity: 0; transition: opacity 1.2s ease; }
+
+/* Darkness everywhere except near the candle. */
+.burrow-sky-dark {
+    inset: 0;
+    background: radial-gradient(ellipse 34% 48% at 92% 48%, rgba(255, 170, 80, 0.08), rgba(3, 5, 9, 0.5) 100%);
+}
+.burrow-room[data-light="dusk"] .burrow-sky-dark { opacity: 0.5; }
+.burrow-room[data-light="night"] .burrow-sky-dark { opacity: 1; }
+
+/* Daylight leaking round the edge of the round door. */
+.burrow-sky-door {
+    left: 36.8%;
+    top: 34.3%;
+    width: 11.2%;
+    height: 17.6%;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 8px 1px rgba(255, 228, 172, 0.22), 0 0 24px 6px rgba(255, 224, 160, 0.1);
+}
+.burrow-sky-door::after {
+    content: "";
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    top: 98%;
+    height: 22%;
+    border-radius: 50%;
+    background: radial-gradient(ellipse closest-side, rgba(255, 228, 170, 0.26), transparent);
+}
+.burrow-room[data-light="day"] .burrow-sky-door { opacity: 1; }
+.burrow-room[data-light="dusk"] .burrow-sky-door { opacity: 0.45; }
+.burrow-room:is([data-sky="rain"], [data-sky="storm"], [data-sky="fog"], [data-sky="cloud"]) .burrow-sky-door { filter: saturate(0.25); }
+.burrow-room:is([data-sky="rain"], [data-sky="storm"], [data-sky="fog"], [data-sky="cloud"])[data-light="day"] .burrow-sky-door { opacity: 0.6; }
+
+/* Rime on the stone around the door when it is freezing. */
+.burrow-sky-frost {
+    left: 38%;
+    top: 31%;
+    width: 25%;
+    height: 37%;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(ellipse closest-side, transparent 66%, rgba(214, 232, 255, 0.12) 80%, rgba(232, 242, 255, 0.07) 92%, transparent 100%);
+    /* Patchy, and mostly on the upper stones where cold air settles. */
+    -webkit-mask-image: conic-gradient(from 0deg, #000 0 8%, rgba(0, 0, 0, 0.3) 14%, #000 22%, rgba(0, 0, 0, 0.2) 31%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.2) 69%, #000 78%, rgba(0, 0, 0, 0.4) 86%, #000 94%);
+    mask-image: conic-gradient(from 0deg, #000 0 8%, rgba(0, 0, 0, 0.3) 14%, #000 22%, rgba(0, 0, 0, 0.2) 31%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.2) 69%, #000 78%, rgba(0, 0, 0, 0.4) 86%, #000 94%);
+    filter: blur(2px);
+}
+.burrow-sky-frost::after {
+    content: "";
+    position: absolute;
+    inset: -60% -120%;
+    background:
+        radial-gradient(ellipse 30% 26% at 0% 0%, rgba(220, 236, 255, 0.22), transparent),
+        radial-gradient(ellipse 30% 26% at 100% 0%, rgba(220, 236, 255, 0.22), transparent);
+}
+.burrow-room.is-frost .burrow-sky-frost { opacity: 1; }
+
+/* A wet sheen on the step below the door. */
+.burrow-sky-wet {
+    left: 37%;
+    top: 51%;
+    width: 14%;
+    height: 12%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(ellipse closest-side, rgba(160, 186, 212, 0.15), transparent);
+    mix-blend-mode: screen;
+}
+.burrow-room:is([data-sky="rain"], [data-sky="storm"]) .burrow-sky-wet { opacity: 1; }
+
+/* Drops falling from the roots at the burrow's mouth. */
+.burrow-sky-drip {
+    top: 6%;
+    width: 0.32%;
+    height: 1.3%;
+    border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
+    background: rgba(196, 220, 240, 0.75);
+}
+.burrow-sky-drip:nth-of-type(5) { left: 46%; }
+.burrow-sky-drip:nth-of-type(6) { left: 59%; }
+.burrow-sky-drip:nth-of-type(7) { left: 72%; }
+.burrow-room:is([data-sky="rain"], [data-sky="storm"]) .burrow-sky-drip { animation: burrow-drip 3.4s ease-in infinite; }
+.burrow-room:is([data-sky="rain"], [data-sky="storm"]) .burrow-sky-drip:nth-of-type(6) { animation-delay: 1.3s; animation-duration: 4.1s; }
+.burrow-room:is([data-sky="rain"], [data-sky="storm"]) .burrow-sky-drip:nth-of-type(7) { animation-delay: 2.2s; animation-duration: 3.7s; }
+
+/* Snow drifting past the mouth of the burrow, and banked on the step. */
+.burrow-sky-flake {
+    top: -2%;
+    width: 0.55%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: rgba(240, 245, 252, 0.85);
+    filter: blur(0.4px);
+}
+.burrow-sky-flake:nth-of-type(8) { left: 4%; }
+.burrow-sky-flake:nth-of-type(9) { left: 11%; }
+.burrow-sky-flake:nth-of-type(10) { left: 88%; }
+.burrow-sky-flake:nth-of-type(11) { left: 95%; }
+.burrow-room[data-sky="snow"] .burrow-sky-flake { animation: burrow-flake 7s linear infinite; }
+.burrow-room[data-sky="snow"] .burrow-sky-flake:nth-of-type(9) { animation-delay: 2.5s; animation-duration: 8.5s; }
+.burrow-room[data-sky="snow"] .burrow-sky-flake:nth-of-type(10) { animation-delay: 4s; animation-duration: 7.6s; }
+.burrow-room[data-sky="snow"] .burrow-sky-flake:nth-of-type(11) { animation-delay: 1.2s; animation-duration: 9s; }
+
+.burrow-sky-drift {
+    left: 37%;
+    top: 44.6%;
+    width: 11%;
+    height: 2.6%;
+    border-radius: 50% 50% 30% 30%;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse closest-side, rgba(226, 234, 244, 0.38), rgba(226, 234, 244, 0.12) 70%, transparent);
+    filter: blur(0.8px);
+}
+.burrow-room[data-sky="snow"] .burrow-sky-drift { opacity: 1; }
+
+/* Fog settling low across the floor. */
+.burrow-sky-fog {
+    left: -10%;
+    right: -10%;
+    top: 42%;
+    bottom: 0;
+    background: linear-gradient(to bottom, transparent, rgba(196, 202, 208, 0.13) 35%, rgba(196, 202, 208, 0.2));
+}
+.burrow-room[data-sky="fog"] .burrow-sky-fog { opacity: 1; animation: burrow-fog 18s ease-in-out infinite alternate; }
+
+/* December: a string of tiny lights along the door's arch. */
+.burrow-sky-lights {
+    left: 38%;
+    top: 30%;
+    width: 24%;
+    height: 36%;
+    transform: translate(-50%, -50%);
+    background:
+        radial-gradient(ellipse 3% 3% at 4% 52%, #ffd27a, transparent),
+        radial-gradient(ellipse 3% 3% at 9% 30%, #ff8b6b, transparent),
+        radial-gradient(ellipse 3% 3% at 20% 12%, #ffd27a, transparent),
+        radial-gradient(ellipse 3% 3% at 34% 3%, #9fe0a8, transparent),
+        radial-gradient(ellipse 3% 3% at 50% 0%, #ffd27a, transparent),
+        radial-gradient(ellipse 3% 3% at 66% 3%, #ff8b6b, transparent),
+        radial-gradient(ellipse 3% 3% at 80% 12%, #ffd27a, transparent),
+        radial-gradient(ellipse 3% 3% at 91% 30%, #9fe0a8, transparent),
+        radial-gradient(ellipse 3% 3% at 96% 52%, #ffd27a, transparent);
+    filter: drop-shadow(0 0 3px rgba(255, 205, 120, 0.7));
+}
+.burrow-room.is-jul .burrow-sky-lights { opacity: 0.9; animation: burrow-twinkle 4.5s ease-in-out infinite; }
+
+/* The candle on the right, lit once the light goes. */
+.burrow-sky-flame {
+    left: 92.25%;
+    top: 49.4%;
+    width: 0.9%;
+    height: 2.8%;
+    border-radius: 50% 50% 50% 50% / 64% 64% 36% 36%;
+    transform: translate(-50%, -100%);
+    transform-origin: 50% 100%;
+    background: radial-gradient(ellipse at 50% 72%, #fff7d6 0 22%, #ffc65e 48%, rgba(255, 140, 40, 0) 78%);
+    box-shadow: 0 0 14px 5px rgba(255, 172, 72, 0.32);
+}
+.burrow-sky-flame::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 60%;
+    width: 1600%;
+    height: 520%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse closest-side, rgba(255, 180, 90, 0.2), transparent);
+}
+.burrow-room:is([data-light="dusk"], [data-light="night"]) .burrow-sky-flame { opacity: 1; animation: burrow-flicker 2.6s ease-in-out infinite; }
+
+@keyframes burrow-flicker {
+    0%, 100% { transform: translate(-50%, -100%) scale(1, 1) rotate(0deg); }
+    30% { transform: translate(-50%, -100%) scale(0.92, 1.08) rotate(-2deg); }
+    55% { transform: translate(-50%, -100%) scale(1.04, 0.95) rotate(1.5deg); }
+    80% { transform: translate(-50%, -100%) scale(0.97, 1.04) rotate(-1deg); }
+}
+
+@keyframes burrow-drip {
+    0% { top: 6%; opacity: 0; }
+    12% { opacity: 0.8; }
+    80% { opacity: 0.6; }
+    100% { top: 34%; opacity: 0; }
+}
+
+@keyframes burrow-flake {
+    0% { top: -2%; opacity: 0; transform: translateX(0); }
+    15% { opacity: 0.85; }
+    50% { transform: translateX(120%); }
+    85% { opacity: 0.6; }
+    100% { top: 42%; opacity: 0; transform: translateX(-60%); }
+}
+
+@keyframes burrow-fog {
+    from { transform: translateX(-3%); }
+    to { transform: translateX(3%); }
+}
+
+@keyframes burrow-twinkle {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.6; }
+}
+
+@keyframes burrow-lightning {
+    0%, 91%, 93.5%, 95.5%, 100% { opacity: 0; }
+    92% { opacity: 1; }
+    94.5% { opacity: 0.6; }
+}
+
+/* ---- Jul calendar ---- */
+.burrow-advent-doors {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.burrow-shell .burrow-advent-door {
+    min-width: 0;
+    min-height: 44px;
+    padding: 0;
+    border: 1px solid rgba(202, 168, 94, 0.38);
+    border-radius: 8px;
+    color: var(--burrow-gold);
+    background: rgba(202, 168, 94, 0.07);
+    box-shadow: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.burrow-shell .burrow-advent-door.is-open {
+    border-style: dashed;
+    color: var(--muted);
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.burrow-shell .burrow-advent-door:disabled {
+    opacity: 0.32;
+    cursor: default;
+}
+
+.burrow-shell .burrow-advent-door:disabled:hover,
+.burrow-shell .burrow-advent-door:disabled:active { transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .burrow-sky span,
+    .burrow-sky::after { animation: none !important; }
+    .burrow-sky-drip,
+    .burrow-sky-flake { display: none; }
+}
+
 @keyframes burrow-secret-arrival {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 0.78; transform: translateY(0); }
