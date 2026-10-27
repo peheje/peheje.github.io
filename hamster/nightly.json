@@ -53,6 +53,28 @@
         "The kettle has a new sound this week, a small cough before the whistle. I have decided it is polite.",
         "Cold nose this morning. Good news: the burrow is still exactly where I left it."
       ]
+    },
+    {
+      "date": "2026-10-27",
+      "text": "The letter-writer left a second note, but the ink ran in the damp. Remember something for me, and I will try to remember what it said.",
+      "extras": [
+        "The first proper frost is somewhere close. I can smell it, like a cold coin.",
+        "I swept the leaves off the step. They came back in a better arrangement.",
+        "The moth sat on the lampshade all evening, reading. I did not like to ask what.",
+        "Soup tonight. I tasted it three times, to be fair to it."
+      ],
+      "note": {
+        "text": "A small light kept burning is a kind of letter to whoever is still out walking.",
+        "source": "Found under the door"
+      },
+      "quest": {
+        "kind": "memory",
+        "done": "There. Held fast. The ink has dried, and the note says only: keep the lamp lit. I would have done that anyway.",
+        "keepsake": {
+          "name": "A smudged note",
+          "description": "Two words legible, a third lost to damp. It smells of moth wing and cold air."
+        }
+      }
     }
   ]
 }
