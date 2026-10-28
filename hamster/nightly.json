@@ -75,6 +75,16 @@
           "description": "Two words legible, a third lost to damp. It smells of moth wing and cold air."
         }
       }
+    },
+    {
+      "date": "2026-10-28",
+      "text": "I have kept the lamp lit, as the note said. The moth approves. I still do not know who was asking.",
+      "extras": [
+        "Acorns are dropping on the path tonight, like small, polite knocks.",
+        "The wool socks came out of the chest today. They remembered me fondly.",
+        "I counted my cloak buttons twice. The answer was the same both times, which is all I ask.",
+        "The wind tried the door at dusk, then thought better of it."
+      ]
     }
   ]
 }
