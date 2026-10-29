@@ -237,6 +237,20 @@ function nightLines(night, id, availableFrom) {
   return [line, done];
 }
 
+function localDayKey(timestamp) {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+// A visitor only finds notes that arrived on or after the day they first came.
+// The nightly file is shared, so without this a fresh browser inherits a backlog
+// addressed to someone else.
+export function notesArrivedSince(notes, since) {
+  if (!Number.isFinite(since)) return notes;
+  const firstDay = localDayKey(since);
+  return notes.filter((note) => note.date >= firstDay);
+}
+
 // Notes found under the burrow door, newest first, never from the future.
 export function nightlyNotes(doc, now = Date.now(), limit = 7) {
   if (validateNightly(doc).length) return [];
