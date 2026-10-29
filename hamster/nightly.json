@@ -85,6 +85,20 @@
         "I counted my cloak buttons twice. The answer was the same both times, which is all I ask.",
         "The wind tried the door at dusk, then thought better of it."
       ]
+    },
+    {
+      "date": "2026-10-29",
+      "text": "The mat was bare this morning, not even a leaf. I checked twice, then once more to be fair to the mat.",
+      "extras": [
+        "The moon is past its fullest and has begun to lean. I find it restful to watch something take its time.",
+        "A good dark evening for jam on bread. The dark did not ask for jam, but it seemed to approve.",
+        "I shook out the blue blanket and a whole summer afternoon fell out of it. Just a small one.",
+        "The chimney has started humming when the wind turns north. We are both getting used to it."
+      ],
+      "note": {
+        "text": "A thing of beauty is a joy for ever: its loveliness increases; it will never pass into nothingness.",
+        "source": "John Keats, Endymion (1818)"
+      }
     }
   ]
 }
