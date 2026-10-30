@@ -99,6 +99,30 @@
         "text": "A thing of beauty is a joy for ever: its loveliness increases; it will never pass into nothingness.",
         "source": "John Keats, Endymion (1818)"
       }
+    },
+    {
+      "date": "2026-10-30",
+      "text": "The moth is back on the lampshade, and it ought to have a name. I am poor at names. What shall we call it?",
+      "extras": [
+        "The last of the pears went soft on the sill. I gave them a respectful send-off, with a spoon.",
+        "It is dark before supper now. I have started eating by lamplight and calling it a feast.",
+        "There is mist on the path tonight. It is only borrowing the road, I think.",
+        "The stairs were chilly on my feet this morning. The wool socks were ready, which I took as friendship."
+      ],
+      "choice": {
+        "options": [
+          {
+            "label": "Wick",
+            "reply": "Wick. Short, warm, and it sits near the lamp anyway. I think it likes it. It did not leave.",
+            "later": "I called it Wick across the room today. A wing twitched. Either it knows, or it was a draught."
+          },
+          {
+            "label": "Mister Dusk",
+            "reply": "Mister Dusk. Very grand. I shall use the full name, and bow slightly. The moth bowed back, I think.",
+            "later": "Mister Dusk has taken the good corner of the lampshade. I did not offer it. It simply expected it."
+          }
+        ]
+      }
     }
   ]
 }
