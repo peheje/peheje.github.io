@@ -12,8 +12,15 @@
     <div id="menu"></div>
     <main class="app-shell burrow-shell">
         <section id="burrow-locked" class="burrow-door" hidden>
-                <div class="burrow-keyhole" aria-hidden="true"></div>
-                <h2>The latch is still drawn.</h2>
+                <button id="burrow-keyhole" class="burrow-keyhole" type="button" aria-label="Knock on the burrow door"></button>
+                <h2 id="burrow-lock-line">The latch is still drawn.</h2>
+                <form id="burrow-knock-form" class="burrow-knock" hidden>
+                    <label for="burrow-knock-answer">Who is it?</label>
+                    <div class="burrow-knock-row">
+                        <input id="burrow-knock-answer" name="answer" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="40" placeholder="a name">
+                        <button type="submit">Answer</button>
+                    </div>
+                </form>
         </section>
 
         <div id="burrow-home" hidden>

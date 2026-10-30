@@ -4,6 +4,7 @@ export const HAMSTER_EVENTS = Object.freeze({
   TIMER_COMPLETED: "timer.completed",
   MEMORY_CORRECT: "memory.correct",
   WEATHER_CHECKED: "weather.checked",
+  BURROW_OPENED: "burrow.opened",
 });
 
 export const hamsterEventPolicies = Object.freeze({
@@ -25,6 +26,10 @@ export const hamsterEventPolicies = Object.freeze({
   [HAMSTER_EVENTS.WEATHER_CHECKED]: {
     bypassCooldownWithActiveQuest: true,
     displayCooldownMs: 30 * 60 * 1000,
+    relationshipCooldownMs: 20 * 60 * 60 * 1000,
+  },
+  [HAMSTER_EVENTS.BURROW_OPENED]: {
+    displayCooldownMs: 0,
     relationshipCooldownMs: 20 * 60 * 60 * 1000,
   },
 });
@@ -64,6 +69,19 @@ const firstMeetings = [
   maxRelationshipCount: 0,
   text,
 }));
+
+// A one-time homecoming: forest is the hamster's favourite, and cycling the
+// site to it while already inside the burrow is the whole ritual.
+const burrowHomecoming = [
+  {
+    id: "burrow-green-door",
+    event: HAMSTER_EVENTS.BURROW_OPENED,
+    stage: 0,
+    detailEquals: { green: true },
+    presentation: "cameo",
+    text: "Green. My favourite. I have been waiting for someone to repaint the whole sky.",
+  },
+];
 
 // Dialogue is data on purpose: adding or removing a line should not require
 // changing relationship, persistence, or rendering code.
@@ -477,6 +495,7 @@ export const hamsterEncounters = Object.freeze([
     text: "We asked the sky for permission once. The cloak and I have decided we can simply go.",
   },
   ...firstMeetings,
+  ...burrowHomecoming,
   ...pageThoughts,
   ...familiarThoughts,
   ...clockThoughts,

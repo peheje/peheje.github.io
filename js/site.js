@@ -136,6 +136,8 @@ function hamsterBurrowUnlocked() {
     return false;
   }
 }
+export const THEME_CHANGED_EVENT = "peheje:theme-changed";
+
 const themes = [
   { key: "warm", className: "theme-warm", label: "W", title: "Warm theme" },
   { key: "blue", className: "theme-blue", label: "B", title: "Blue theme" },
@@ -297,6 +299,9 @@ function renderThemeToggle() {
     setSavedTheme(nextTheme.key);
     applyTheme();
     syncButton();
+    window.dispatchEvent(new CustomEvent(THEME_CHANGED_EVENT, {
+      detail: { theme: nextTheme.key, previous: activeTheme.key },
+    }));
   };
 }
 

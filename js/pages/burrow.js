@@ -1,11 +1,26 @@
 import { ADVENT_ORDER, adventKey, adventToday, openAdventDoor } from "../hamster/advent.js";
 import { burrowMood, loadBurrowSky } from "../hamster/burrow-weather.js";
 import { hamsterKeepsakes } from "../hamster/catalog.js";
-import { loadNightly, nightlyNotes } from "../hamster/nightly.js";
+import { loadNightly, nightlyNotes, notesArrivedSince } from "../hamster/nightly.js";
+import { HAMSTER_EVENTS, signalHamsterEvent } from "../hamster/runtime.js";
 import { createHamsterRepository, decodeCarryCode, encodeCarryCode } from "../hamster/storage.js";
-import { mountSiteShell } from "../site.js";
+import { mountSiteShell, THEME_CHANGED_EVENT } from "../site.js";
 
 const motionSecretId = "shifted-floorboard";
+
+// The door's shortcut is a name, not a timer: three knocks, then the sword's
+// name the hamster tells old friends. It opens the door without the errand's
+// keepsake, so the shortcut cannot erase what the bell earned.
+const doorSecret = "biscuit";
+const greenThemeKey = "forest";
+const greenHomecomingSecret = "green-door";
+const knocksToListen = 3;
+const knockWindowMs = 2600;
+const doorHints = [
+  "The latch does not move.",
+  "Somewhere behind the door, a chair scrapes.",
+  "A voice from very far away: “It earned it. Please do not laugh.”",
+];
 
 function browserStorage() {
   try {
@@ -104,6 +119,7 @@ function formatNightDate(date) {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString(undefined, { day: "numeric", month: "long" });
 }
+
 
 function renderNotes(notes) {
   const list = document.getElementById("burrow-notes-list");
@@ -279,19 +295,25 @@ function setupCarryLink(repository, voice) {
   });
 }
 
-function renderBurrow() {
-  mountSiteShell();
-  const repository = createRepository();
-  receiveCarriedHamster(repository);
-  const state = repository.load();
-  const unlocked = Boolean(state.completedQuestIds["wake-in-three"]);
-  document.getElementById("burrow-locked").hidden = unlocked;
-  document.getElementById("burrow-home").hidden = !unlocked;
-  if (!unlocked) return;
+function isBurrowUnlocked(state) {
+  return Boolean(state.completedQuestIds["wake-in-three"]);
+}
+
+function normalizeDoorAnswer(value) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z]/g, "");
+}
+
+function renderHome(repository, state, firstLine = null) {
+  document.getElementById("burrow-locked").hidden = true;
+  document.getElementById("burrow-home").hidden = false;
 
   const voice = document.getElementById("burrow-voice");
-  voice.textContent = activityForHour(new Date().getHours());
-  voice.dataset.idle = "true";
+  voice.textContent = firstLine || activityForHour(new Date().getHours());
+  voice.dataset.idle = firstLine ? "false" : "true";
   renderSky(voice);
   renderRoom(state, voice);
   renderAdvent(repository, state, voice);
@@ -299,9 +321,95 @@ function renderBurrow() {
   renderShelf(state);
   setupCarryLink(repository, voice);
   setupMotionSecret(repository, state, voice);
+  setupGreenHomecoming(repository);
   loadNightly().then(doc => {
-    if (doc) renderNotes(nightlyNotes(doc));
+    if (!doc) return;
+    renderNotes(notesArrivedSince(nightlyNotes(doc), state.createdAt));
   });
+}
+
+// Green is the hamster's favourite. Cycling the theme to forest while already
+// inside the burrow is the whole ritual; it only happens once per save.
+function setupGreenHomecoming(repository) {
+  window.addEventListener(THEME_CHANGED_EVENT, event => {
+    if (event.detail?.theme !== greenThemeKey) return;
+    const state = repository.load();
+    if (!isBurrowUnlocked(state) || state.secrets[greenHomecomingSecret]) return;
+    state.secrets[greenHomecomingSecret] = Date.now();
+    state.relationshipCount += 4;
+    repository.save(state);
+    signalHamsterEvent(HAMSTER_EVENTS.BURROW_OPENED, { green: true });
+  });
+}
+
+function setupDoorShortcut(repository) {
+  const keyhole = document.getElementById("burrow-keyhole");
+  const line = document.getElementById("burrow-lock-line");
+  const form = document.getElementById("burrow-knock-form");
+  const answer = document.getElementById("burrow-knock-answer");
+  let knocks = 0;
+  let knockTimer = 0;
+  let wrongAnswers = 0;
+
+  function resetKnocks() {
+    knocks = 0;
+    window.clearTimeout(knockTimer);
+  }
+
+  function listen() {
+    form.hidden = false;
+    line.textContent = "Someone is listening.";
+    answer.focus();
+  }
+
+  keyhole.addEventListener("click", () => {
+    if (!form.hidden) {
+      answer.focus();
+      return;
+    }
+    knocks += 1;
+    keyhole.classList.remove("is-knocked");
+    void keyhole.offsetWidth; // restart the knock animation
+    keyhole.classList.add("is-knocked");
+    if (knocks >= knocksToListen) {
+      resetKnocks();
+      listen();
+      return;
+    }
+    window.clearTimeout(knockTimer);
+    knockTimer = window.setTimeout(resetKnocks, knockWindowMs);
+  });
+
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    if (normalizeDoorAnswer(answer.value) === doorSecret) {
+      const state = repository.load();
+      state.completedQuestIds["wake-in-three"] = Date.now();
+      repository.save(state);
+      form.hidden = true;
+      answer.value = "";
+      answer.blur();
+      renderHome(repository, state, "The latch lifts before you finish the second syllable.");
+      return;
+    }
+    wrongAnswers += 1;
+    line.textContent = doorHints[Math.min(wrongAnswers, doorHints.length) - 1];
+    answer.value = "";
+    answer.focus();
+  });
+}
+
+function renderBurrow() {
+  mountSiteShell();
+  const repository = createRepository();
+  receiveCarriedHamster(repository);
+  const state = repository.load();
+  if (!isBurrowUnlocked(state)) {
+    document.getElementById("burrow-locked").hidden = false;
+    setupDoorShortcut(repository);
+    return;
+  }
+  renderHome(repository, state);
 }
 
 renderBurrow();
