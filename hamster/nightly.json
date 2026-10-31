@@ -123,6 +123,31 @@
           }
         ]
       }
+    },
+    {
+      "date": "2026-10-31",
+      "text": "It is the sort of evening that wants sitting through. Seven minutes of quiet, if you can spare them. The moth and I will keep still beside you.",
+      "extras": [
+        "Someone down the lane has carved a turnip into a grumpy face. I saluted it on my way past.",
+        "The hedge smells of woodsmoke tonight. I take it as a sign the neighbours are well.",
+        "I hung the wet cloak by the fire and it steamed gently, like a small, thoughtful cloud.",
+        "The moon is thinning to a half now. It looks like a pared apple, and I will not say what that does to my appetite.",
+        "A single late bee came to the window, looked about, and left. I thought it very sensible of it."
+      ],
+      "note": {
+        "text": "Dark comes early now. That is only the day going to bed. You are welcome to sit with it a while.",
+        "source": "Found under the door"
+      },
+      "quest": {
+        "kind": "timer",
+        "minutes": 7,
+        "timeBand": "evening",
+        "done": "Seven minutes, kept whole. Even the lamp seemed to listen. I found this on the mat afterward, and I think it is yours.",
+        "keepsake": {
+          "name": "A pocket of quiet",
+          "description": "A walnut shell stuffed with wool and sealed with wax. Hold it to your ear and nothing happens, gently."
+        }
+      }
     }
   ]
 }
