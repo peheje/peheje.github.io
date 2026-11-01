@@ -148,6 +148,16 @@
           "description": "A walnut shell stuffed with wool and sealed with wax. Hold it to your ear and nothing happens, gently."
         }
       }
+    },
+    {
+      "date": "2026-11-01",
+      "text": "Something new under the door this morning: a drawing of a small lamp, with no words. Whoever it is draws better than they write.",
+      "extras": [
+        "November has arrived without knocking. I put the kettle on to show it where things are.",
+        "The hedgehog next door has gone quiet for the winter. I left a thimble of seeds by his hedge, in case of dreams.",
+        "I tried the old mittens on. They fit, which is either good luck or a lot of porridge.",
+        "The path is all wet leaves now, and each step says its own small word."
+      ]
     }
   ]
 }
