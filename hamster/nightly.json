@@ -158,6 +158,35 @@
         "I tried the old mittens on. They fit, which is either good luck or a lot of porridge.",
         "The path is all wet leaves now, and each step says its own small word."
       ]
+    },
+    {
+      "date": "2026-11-02",
+      "text": "I have the lamp drawing, and nowhere to put it. Shall it go on the wall, or into the big book? I would like a second opinion.",
+      "extras": [
+        "The kettle and I woke at the same moment. Neither of us would admit who was first.",
+        "A fine drizzle of leaves came down the chimney. I treated them as post.",
+        "I found a button behind the bread bin. It matches nothing, which makes it very interesting.",
+        "The wool socks have started to feel like old colleagues. We nod at each other in the mornings.",
+        "The moon is a thin slice tonight. Someone has been at the cheese, and I am not looking at the moth."
+      ],
+      "note": {
+        "text": "Heaven is under our feet as well as over our heads.",
+        "source": "Henry David Thoreau, Walden (1854)"
+      },
+      "choice": {
+        "options": [
+          {
+            "label": "On the wall",
+            "reply": "On the wall, then. Beside the window, where the lamp can look at itself. I used a very small tack.",
+            "later": "The drawing has been on the wall all day. The moth sat beneath it for an hour, looking up."
+          },
+          {
+            "label": "In the big book",
+            "reply": "In the big book, next to the red leaf. They will have a lot to talk about. I pressed the page flat.",
+            "later": "I opened the big book to check on the drawing. It was still there, and the leaf had not objected."
+          }
+        ]
+      }
     }
   ]
 }
