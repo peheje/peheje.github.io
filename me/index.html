@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Me | peheje</title>
+    <script src="/js/theme-init.js"></script>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        .me-shell {
+            max-width: 32rem;
+            margin: 0 auto;
+            padding: 2.5rem 16px 3rem;
+        }
+
+        .me-shell h1 {
+            font-family: var(--font-display);
+            letter-spacing: var(--title-spacing);
+            margin: 0 0 1.5rem;
+        }
+
+        .me-links {
+            display: grid;
+            gap: 0.75rem;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .me-link {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.1rem;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .me-link:hover,
+        .me-link:focus-visible {
+            border-color: var(--accent);
+        }
+
+        .me-icon {
+            font-size: 2rem;
+            line-height: 1;
+        }
+
+        .me-name {
+            display: block;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .me-note {
+            display: block;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .me-back {
+            display: inline-block;
+            margin-top: 2rem;
+            color: var(--muted);
+        }
+    </style>
+</head>
+<body>
+    <main class="me-shell">
+        <h1>Me</h1>
+        <ul class="me-links">
+            <li>
+                <a class="me-link" href="https://peheje.github.io/hike-map/">
+                    <span class="me-icon" aria-hidden="true">🥾</span>
+                    <span><span class="me-name">Hike map</span><span class="me-note">peheje.github.io/hike</span></span>
+                </a>
+            </li>
+            <li>
+                <a class="me-link" href="https://claude.ai/artifact/Lr2sUJch5q5xCSqMFy2nAr">
+                    <span class="me-icon" aria-hidden="true">🧸</span>
+                    <span><span class="me-name">Legekassen</span><span class="me-note">peheje.github.io/leg</span></span>
+                </a>
+            </li>
+        </ul>
+        <a class="me-back" href="/compare.html">← Tools</a>
+    </main>
+    <script>
+        // theme-init.js sets the theme on <html> and hides the page until reveal;
+        // site.js normally finishes that, but this page doesn't load it.
+        const root = document.documentElement;
+        root.classList.forEach((name) => {
+            if (name.startsWith("theme-")) document.body.classList.add(name);
+        });
+        root.classList.remove("page-loading");
+        document.body.classList.add("page-loaded");
+    </script>
+</body>
+</html>

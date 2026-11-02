@@ -762,6 +762,14 @@ export function mountSiteShell() {
     header.append(nav, intro);
     menu.replaceChildren(header);
 
+    // Quiet link to the unlisted personal launcher.
+    const meDot = document.createElement("a");
+    meDot.className = "me-dot";
+    meDot.href = "/me/";
+    meDot.textContent = "·";
+    meDot.setAttribute("aria-label", "Personal links");
+    document.body.append(meDot);
+
     startHamster({
       page: site.url,
       triggerParent: titleRow,

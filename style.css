@@ -3209,3 +3209,21 @@ body.tool-picker-active {
         animation: none;
     }
 }
+
+/* Quiet link to /me/ at the bottom of every tool page. */
+.me-dot {
+    display: block;
+    width: fit-content;
+    margin: 2rem auto 1rem;
+    padding: 0.25rem 0.75rem;
+    color: var(--muted);
+    opacity: 0.35;
+    text-decoration: none;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.me-dot:hover,
+.me-dot:focus-visible {
+    opacity: 0.8;
+}
