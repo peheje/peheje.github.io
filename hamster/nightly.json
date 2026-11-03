@@ -187,6 +187,24 @@
           }
         ]
       }
+    },
+    {
+      "date": "2026-11-03",
+      "text": "The window has fogged over and I am too comfortable to wipe it. Would you tell me what the sky is doing?",
+      "extras": [
+        "The drawing of the lamp has not moved, but I keep feeling it has been looking at something.",
+        "I found a walnut in the coat pocket from last year. We regarded each other with mutual surprise.",
+        "The porridge pot and I have settled into a quiet winter routine. It involves a lot of stirring and very little talking.",
+        "There is a new draught under the pantry door. I have named it the Visitor and given it no tea."
+      ],
+      "quest": {
+        "kind": "weather",
+        "done": "Ah, so that is what it has been up to. Thank you. I wiped a small circle in the glass to see for myself, and it was a good circle.",
+        "keepsake": {
+          "name": "A fogged button",
+          "description": "A horn button that still seems faintly breathed on. Hold it up, and the room goes soft."
+        }
+      }
     }
   ]
 }
