@@ -205,6 +205,20 @@
           "description": "A horn button that still seems faintly breathed on. Hold it up, and the room goes soft."
         }
       }
+    },
+    {
+      "date": "2026-11-04",
+      "text": "Another drawing under the door this morning: a kettle, with steam. Whoever it is has been looking at my kettle. I am flattered and slightly watched.",
+      "extras": [
+        "The moon rises late and thin now. I waited up for it, and it was worth about half a candle.",
+        "I swept the leaves off the step. By the time I turned round, they had returned, as if invited.",
+        "The bread went hard on the shelf. I have decided it is now a doorstop, and a good one.",
+        "A cold nose of wind came in with the post. I asked it to wipe its feet."
+      ],
+      "note": {
+        "text": "Rather than love, than money, than fame, give me truth.",
+        "source": "Henry David Thoreau, Walden (1854)"
+      }
     }
   ]
 }
