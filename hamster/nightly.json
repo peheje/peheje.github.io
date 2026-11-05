@@ -219,6 +219,30 @@
         "text": "Rather than love, than money, than fame, give me truth.",
         "source": "Henry David Thoreau, Walden (1854)"
       }
+    },
+    {
+      "date": "2026-11-05",
+      "text": "Whoever draws under my door has left no name. Shall I set something out on the mat for them? A cup of tea, or a biscuit?",
+      "extras": [
+        "The frost came in the night and drew ferns on the glass. Very neat work. I did not breathe on it.",
+        "The moon is a fine thread before dawn now. I could almost hang a small coat from it.",
+        "I found where the draught goes in the afternoons. It sits on the stairs and thinks.",
+        "The woollen hat has been promoted from thinking hat to going-out hat. It takes the extra work calmly."
+      ],
+      "choice": {
+        "options": [
+          {
+            "label": "A cup of tea",
+            "reply": "Tea, then. In the blue cup, with the chip turned away. I set it on the mat and tried not to hover.",
+            "later": "The cup was still on the mat this morning, empty and rinsed. I did not rinse it. I am choosing not to think about that."
+          },
+          {
+            "label": "A biscuit",
+            "reply": "A biscuit. The good kind, with the corner already off. I set it on the mat and tiptoed away from my own door.",
+            "later": "The biscuit is gone, and there is a small neat pile of crumbs where it was. It seems the sort who tidies, mostly."
+          }
+        ]
+      }
     }
   ]
 }
