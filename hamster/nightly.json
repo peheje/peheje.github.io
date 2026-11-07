@@ -258,6 +258,24 @@
         "text": "Tuck the cold in with a warm lamp and call it a night.",
         "source": "Found under the door"
       }
+    },
+    {
+      "date": "2026-11-07",
+      "text": "I keep muddling the drawings: lamp, kettle, window. Would you remember something for me? It might straighten my thoughts.",
+      "extras": [
+        "The hedge has gone bare enough to see the lane through. I feel a little more watched, and a little more neighbourly.",
+        "A dry leaf has been rolling past the door all morning, like a courier with no letters.",
+        "I oiled the door hinge. It now opens in silence, which feels slightly like cheating.",
+        "The porridge came out lumpy today. I called the lumps dumplings and we all felt better."
+      ],
+      "quest": {
+        "kind": "memory",
+        "done": "Lamp, kettle, window. There, in order, and no muddle left. I felt the whole row settle.",
+        "keepsake": {
+          "name": "An acorn-cap bookmark",
+          "description": "A tiny acorn cap with a loop of thread, for keeping your place in a long day."
+        }
+      }
     }
   ]
 }
