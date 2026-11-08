@@ -276,6 +276,21 @@
           "description": "A tiny acorn cap with a loop of thread, for keeping your place in a long day."
         }
       }
+    },
+    {
+      "date": "2026-11-08",
+      "text": "No moon tonight, only a dark where it was. Under the door: a drawing of a small hat. Mine, I think. It is a very good hat.",
+      "extras": [
+        "The moon has gone out altogether. I am told it is only resting, which I respect.",
+        "The stars look brighter without the moon about. They seem to have been waiting for the room.",
+        "There is woodsmoke on the air from down the lane. Someone is thinking about winter, and so am I.",
+        "I trimmed the lamp wick with great ceremony. It burns exactly as before, but I feel better.",
+        "Sunday has a quiet shape. I have been walking round it in my slippers."
+      ],
+      "note": {
+        "text": "A small light kept in is better than a large one left out.",
+        "source": "Found under the door"
+      }
     }
   ]
 }
