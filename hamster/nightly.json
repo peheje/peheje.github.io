@@ -291,6 +291,31 @@
         "text": "A small light kept in is better than a large one left out.",
         "source": "Found under the door"
       }
+    },
+    {
+      "date": "2026-11-09",
+      "text": "The moth has settled on the lamp shade and will not be moved. It wants a name, and mine are all used up. Would you choose one?",
+      "extras": [
+        "Wet leaves on the step make a sound like slow applause. I bowed, in case.",
+        "I turned the sock drawer out looking for the other sock. The drawer is now tidier than the sock deserves.",
+        "There is a cold edge to the air that smells of tin and chimney. I like it, in small doses.",
+        "The kettle took a little longer today. I think it was thinking about something.",
+        "I put a second blanket on the chair. The chair did not say anything, but it looked grateful."
+      ],
+      "choice": {
+        "options": [
+          {
+            "label": "Wick",
+            "reply": "Wick. It suits a creature that sits by a flame and says nothing. I told the moth. It twitched one wing.",
+            "later": "I have been calling it Wick all day. It comes when called, or when the lamp is lit. I cannot yet tell which."
+          },
+          {
+            "label": "Sorrel",
+            "reply": "Sorrel. A good green name, for a grey little visitor. I said it aloud and the moth turned round once.",
+            "later": "Sorrel has taken the left side of the lamp shade. I have taken the right. We are neighbours now, formally."
+          }
+        ]
+      }
     }
   ]
 }
