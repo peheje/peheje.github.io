@@ -316,6 +316,20 @@
           }
         ]
       }
+    },
+    {
+      "date": "2026-11-10",
+      "text": "Somewhere down the lane someone is roasting a duck. I have been standing at the door, being polite about it with my nose.",
+      "extras": [
+        "A thin new moon showed up over the hedge, no wider than a fingernail clipping. I gave it a small wave.",
+        "The step was damp this morning and the boots took it personally. They are drying by the stove, sulking.",
+        "I found a button in the flour bin. Nobody will own up, so it lives on the shelf now.",
+        "A wind came round the corner and tried every window in turn. The lamp has opinions about it."
+      ],
+      "note": {
+        "text": "The longest evenings are for the smallest comforts.",
+        "source": "Found under the door"
+      }
     }
   ]
 }
