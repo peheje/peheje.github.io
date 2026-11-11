@@ -330,6 +330,27 @@
         "text": "The longest evenings are for the smallest comforts.",
         "source": "Found under the door"
       }
+    },
+    {
+      "date": "2026-11-11",
+      "text": "The moth keeps tapping the lamp shade, and I cannot hear myself think. Might we have six minutes of quiet, to let it settle?",
+      "extras": [
+        "There is a fine mist on the lane this morning. The hedge looks like it is being thought about.",
+        "I have found out that a scarf can be a tablecloth, if the dinner is small enough.",
+        "The jam jar on the shelf has a new lid. I do not remember buying it, so I am calling it a gift.",
+        "Somebody has hung a lantern at the end of the lane. It makes the dark feel a little less empty.",
+        "The stove ticks as it cools, like a clock that has given up on the hour and kept the company."
+      ],
+      "quest": {
+        "kind": "timer",
+        "minutes": 6,
+        "timeBand": "evening",
+        "done": "Six minutes, and the moth has folded its wings on the shade. It looks like a small grey button. Thank you.",
+        "keepsake": {
+          "name": "A moth-wing button",
+          "description": "A dusty grey button, light as breath, that someone left beside the lamp."
+        }
+      }
     }
   ]
 }
