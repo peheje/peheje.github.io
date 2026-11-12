@@ -351,6 +351,34 @@
           "description": "A dusty grey button, light as breath, that someone left beside the lamp."
         }
       }
+    },
+    {
+      "date": "2026-11-12",
+      "text": "An envelope under the door this morning, sealed with a dab of jam. Shall I open it now, or leave it by the lamp until evening?",
+      "extras": [
+        "The lane is quiet today. Even the puddles are keeping still, out of courtesy.",
+        "I found a good use for the small pan: it catches the drip from the third stair. It sings a bit.",
+        "A crow sat on the fence and looked at my chimney like a landlord. I put the kettle on to seem prosperous.",
+        "The bread has gone a little hard. I am calling it hardy and eating it with soup."
+      ],
+      "note": {
+        "text": "Even a short day can hold a whole supper.",
+        "source": "Unsigned"
+      },
+      "choice": {
+        "options": [
+          {
+            "label": "Open it now",
+            "reply": "Now, then. I slid a butter knife under the flap and held my breath. The jam was raspberry. That is all I will say yet.",
+            "later": "I read the letter twice by the window. It is short and kindly, and it smells faintly of jam. I have put it on the shelf."
+          },
+          {
+            "label": "Wait for evening",
+            "reply": "Evening it is. I have propped it against the lamp, and I will try not to look at it more than twice an hour.",
+            "later": "I opened it by lamplight, as planned. It was worth the waiting, I think. The jam had set properly by then."
+          }
+        ]
+      }
     }
   ]
 }
