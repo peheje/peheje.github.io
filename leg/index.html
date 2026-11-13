@@ -1,14 +1,132 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="noindex">
-    <title>Legekassen | peheje</title>
-    <script>window.location.replace("https://claude.ai/artifact/Lr2sUJch5q5xCSqMFy2nAr");</script>
-    <noscript><meta http-equiv="refresh" content="0; url=https://claude.ai/artifact/Lr2sUJch5q5xCSqMFy2nAr"></noscript>
-</head>
-<body>
-    <p>Going to <a href="https://claude.ai/artifact/Lr2sUJch5q5xCSqMFy2nAr">Legekassen</a>…</p>
-</body>
-</html>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Legekassen</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grandstander:wght@600;800&display=swap">
+<style>
+/* Layout: one fixed screen. Menu = big picture tiles (no reading needed); each game fills the screen with a small home button in the corner. Single bright meadow look on purpose. */
+:root{
+  --meadow:#d9f0d3; --meadow-deep:#b8e2ae; --ink:#1f3a5f; --sun:#ffc93c;
+  --card:#fffdf7; --coral:#ff6b6b; --sky:#7cc6f2; --shadow:#9ccf90;
+  --display:"Grandstander","Chalkboard SE","Comic Sans MS",system-ui,sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{background:var(--meadow);color:var(--ink);font-family:var(--display);
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+button{font-family:inherit;color:inherit;border:0;cursor:pointer}
+button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
+
+/* Menu: der er mange fliser (19+). Derfor op til 7 pr. række i landskab og lidt mindre luft,
+   så alle fliser kan være på skærmen. På helt små telefoner ruller menuen lodret i stedet for at klippe. */
+.menu{height:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:clamp(6px,2.4vh,20px);
+  padding-block:2vh;overflow-y:auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:radial-gradient(120% 60% at 50% 110%,var(--meadow-deep) 0 45%,transparent 46%),var(--meadow)}
+.menu h1{margin:0;font-weight:800;font-size:clamp(28px,6vh,74px);text-align:center}
+/* auto-marginer midterstiller indholdet, men lader det starte foroven hvis det ikke kan være der */
+.menu>:first-child{margin-top:auto}
+.menu>:last-child{margin-bottom:auto}
+.tiles{display:flex;flex-wrap:wrap;gap:clamp(14px,3vw,40px);justify-content:center;max-width:calc(3 * clamp(120px,24vmin,230px) + 2 * clamp(14px,3vw,40px) + 2px)}
+@media (min-aspect-ratio:1/1){.tiles{gap:clamp(14px,2.2vw,40px);max-width:calc(7 * clamp(100px,min(22vmin,11.6vw),230px) + 6 * clamp(14px,2.2vw,40px) + 2px)}.tiles .tile{width:clamp(100px,min(22vmin,11.6vw),230px)}.tiles .tile .ic{font-size:clamp(48px,min(12vmin,6.4vw),120px)}.tiles .tile .nm{font-size:clamp(13px,min(3.6vmin,1.35vw),34px)}}
+@media (max-width:520px){.menu{gap:clamp(6px,1.8vh,16px)}.menu h1{font-size:clamp(26px,5.4vh,60px)}}
+
+.tile{width:clamp(120px,24vmin,230px);aspect-ratio:1;border-radius:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1vh;
+  box-shadow:0 10px 0 rgba(31,58,95,.25);transition:transform .15s}
+.tile:active{transform:translateY(6px);box-shadow:0 4px 0 rgba(31,58,95,.25)}
+.tile .ic{font-size:clamp(56px,12vmin,120px);line-height:1}
+.tile .nm{font-weight:800;font-size:clamp(15px,3.6vmin,34px)}
+
+.stage{position:fixed;inset:0}
+.home{position:fixed;z-index:20;top:calc(2vh + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));
+  width:clamp(52px,8vh,76px);aspect-ratio:1;border-radius:50%;background:var(--card);box-shadow:0 5px 0 rgba(31,58,95,.25);font-size:clamp(24px,4vh,36px)}
+.home:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(31,58,95,.25)}
+
+/* Delt af flere spil */
+.balloon{position:absolute;bottom:-25vh;width:clamp(80px,14vh,140px);aspect-ratio:3/4;border-radius:50% 50% 48% 48%;
+  animation:rise linear forwards;display:block;z-index:1}
+.balloon::after{content:"";position:absolute;left:50%;top:100%;width:2px;height:8vh;background:#ffffffaa}
+.balloon.pop{animation:pop .25s forwards!important}
+@keyframes rise{to{transform:translateY(-140vh)}}
+@keyframes pop{to{transform:scale(1.6);opacity:0}}
+.confetti{position:fixed;pointer-events:none;font-size:34px;animation:fly 1s ease-out forwards;z-index:30}
+@keyframes fly{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+@media (prefers-reduced-motion:reduce){.confetti{animation:none}.balloon{animation-duration:30s!important}}
+</style>
+
+<div class="menu" id="menu">
+  <h1>Hvad vil du spille?</h1>
+  <div class="tiles" id="tiles"></div>
+</div>
+<div class="stage" id="stage" hidden></div>
+<button class="home" id="home" hidden aria-label="Tilbage til menuen">🏠</button>
+
+<script src="shared.js"></script>
+<script src="spil/find-dyret.js"></script>
+<script src="spil/ballon-pop.js"></script>
+<script src="spil/raketten.js"></script>
+<script src="spil/dino-aeg.js"></script>
+<script src="spil/brandbilen.js"></script>
+<script src="spil/byg-monster.js"></script>
+<script src="spil/dyre-orkester.js"></script>
+<script src="spil/badekarret.js"></script>
+<script src="spil/bageriet.js"></script>
+<script src="spil/vendespil.js"></script>
+<script src="spil/larven.js"></script>
+<script src="spil/mal.js"></script>
+<script src="spil/puttekassen.js"></script>
+<script src="spil/rullebanen-baner.js"></script>
+<script src="spil/rullebanen.js"></script>
+<script src="spil/bilvasken.js"></script>
+<script src="spil/toget.js"></script>
+<script src="spil/skraldebilen.js"></script>
+<script src="spil/vippetaarn.js"></script>
+<script src="spil/akvariet.js"></script>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  let running=null;
+
+  $("tiles").innerHTML="";
+  Spil.games.forEach(g=>{
+    const b=document.createElement("button");b.className="tile";b.style.background=g.farve;
+    b.innerHTML=`<span class="ic">${g.ikon}</span><span class="nm">${g.navn}</span>`;
+    b.onclick=()=>open(g);$("tiles").appendChild(b);
+  });
+
+  function open(g){
+    Spil.sfx.click();
+    $("menu").hidden=true;$("stage").hidden=false;$("home").hidden=false;
+    running=g;g.start($("stage"));
+    try{history.replaceState(null,"","#"+g.id)}catch(e){}
+  }
+  function home(){
+    if(running){running.stop();running=null}
+    Spil.dyb="";
+    Spil.stopTalking();
+    $("stage").innerHTML="";$("stage").hidden=true;$("home").hidden=true;$("menu").hidden=false;
+    try{history.replaceState(null,"",location.pathname)}catch(e){}
+    Spil.say("Hvad vil du spille?",null,"hvad-vil-du");
+  }
+  $("home").onclick=home;
+  // Ingen højrekliksmenu (eller lang-tryk-menu): børn kommer nemt til at trykke på den
+  document.addEventListener("contextmenu",e=>e.preventDefault());
+
+  // Færdige lydfiler (lyd/*.mp3) bruges altid; browserens stemme kun hvis en fil mangler (vælges automatisk).
+  Spil.preload(["hvad-vil-du"]);
+
+  // Dybt link (til test af en bestemt rettelse): #spil eller #spil/tilstand, fx #dino-aeg/sandkasse,
+  // eller ?spil=dino-aeg&dyb=sandkasse. Spillet kan læse Spil.dyb i start() og springe direkte til tilstanden.
+  Spil.dyb = "";
+  try{
+    const qs = new URLSearchParams(location.search), h = location.hash.slice(1).split("/");
+    const id = qs.get("spil") || h[0], g = Spil.games.find(x => x.id === id);
+    if (g){ Spil.dyb = qs.get("dyb") || h.slice(1).join("/") || ""; open(g); }
+  }catch(e){}
+})();
+</script>
+<!-- Statistik for voksne: hold fingeren på overskriften i menuen -->
+<script src="statistik.js"></script>
+
+</body></html>
