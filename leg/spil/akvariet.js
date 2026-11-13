@@ -322,6 +322,7 @@
   let fish, flakes, bubbles, golds, bigs, parts, ripples, decos, kiste, koral, sorteret, aegs = [];
   let gem, demo, hoert, night, nightF, dimLocal, dimF, dimT, scene, bogOpen, pointer, sidstRort, hintN, nextGold, sidstGuld, paaVej;
   let maetSagt = false, alleSoverT = -99, udeUr = 0, hjaelpUr = 24;
+  let grave = [], rev = null, gravUr = 0; // muslinger under sandet, koralrevet (se nedenfor)
   let tidsFaktor = 1, skrift = "sans-serif", haandVist, vokseHint, perleHint, kisteHint, nextSelv, frameStat, bobleUr, hazeGrad, sandTop, stjerner, natUr;
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
   // Sig noget, når den igangværende replik er talt færdig (så fx "Saml fem perler ..." ikke klippes over af et fiskenavn)
@@ -1122,15 +1123,21 @@
     LYD.guldPop(); gnistRing(b.x, b.y, RM.matches ? 6 : 12, S * 1.1, S * .2);
     for (let i = 0; i < 6; i++) nyBoble(b.x + rnd(-1, 1) * b.r, b.y + rnd(-1, 1) * b.r, rnd(.02, .05), .9);
     perleHint = 9;
+    flyvPerle(b.x, b.y);
+    nextGold = T + rnd(5, 9);
+  }
+
+  // En perle flyver fra (x, y) hen til næste plads i perlerækken
+  function flyvPerle(x, y) {
     if (gem.perler + paaVej >= PERLER) return;
     const nr = gem.perler + paaVej; paaVej++;
     const slot = root.querySelectorAll(".ak-perle")[nr], el = document.createElement("div");
     el.className = "ak-flyv"; root.appendChild(el);
     const rr = root.getBoundingClientRect(), sr = slot.getBoundingClientRect();
     const tx = sr.left + sr.width / 2 - rr.left, ty = sr.top + sr.height / 2 - rr.top;
-    const mx = (b.x + tx) / 2 + rnd(-1, 1) * S * .5, my = Math.min(b.y, ty) - S * .3;
+    const mx = (x + tx) / 2 + rnd(-1, 1) * S * .5, my = Math.min(y, ty) - S * .3;
     const anim = el.animate([
-      { transform: `translate(${b.x}px,${b.y}px) scale(1.3)` },
+      { transform: `translate(${x}px,${y}px) scale(1.3)` },
       { transform: `translate(${mx}px,${my}px) scale(1.5)`, offset: .45 },
       { transform: `translate(${tx}px,${ty}px) scale(1)` }], { duration: RM.matches ? 300 : 750, easing: "cubic-bezier(.4,0,.3,1)", fill: "forwards" });
     anim.onfinish = () => {
@@ -1142,7 +1149,6 @@
       else if (gem.perler === 1 && !gem.perleSagt) { gem.perleSagt = 1; gemNu(); Spil.say("Én! En perle! Saml fem perler, så åbner skattekisten!", null, ["tal-1", "akva-perle"]); }
       else Spil.say(String(gem.perler), null, "tal-" + gem.perler);
     };
-    nextGold = T + rnd(5, 9);
   }
 
   function tegnPerler(hop) {
@@ -1430,16 +1436,30 @@
     if (y < madZone()) { dryss(x, true); pointer = { mode: "mad", x, y, lx: x, lt: T }; return; }
     const f = ramtFisk(x, y); if (f) { trykFisk(f); return; }
     const sf = ramtSil(x, y); if (sf) { kald(sf); return; }
+    // sandet: en muslinge man graver i, og et koral-stykke man flytter, har forrang over pynten på bunden
+    const gm = grave.find(k => k.st === 0 && Math.abs(x - k.x) < k.w * .6 && Math.abs(y - k.y) < S * .25);
+    if (gm) { pointer = { mode: "grav", x, y, lx: x, ly: y }; grav(x, y, S * .2); return; }
+    const pb = rev && y > floorY - S * .1 && rev.brikker.find(k => Math.hypot(x - k.x, y - k.y) < S * .3);
+    if (pb) {
+      pb.drag = true; pointer = { mode: "koral", b: pb, x, y };
+      if (!gem.revSagt && !Spil.isTalking()) { gem.revSagt = 1; gemNu(); Spil.say("Træk et koral hen til revet!", null, "akva-rev-hint"); }
+      return;
+    }
     const d = ramtPynt(x, y); if (d) { trykPynt(d); return; }
+    // på sandet: fingeren graver efter muslinger (også når en pynt ligger oven på)
+    if (y > floorY - S * .1) { pointer = { mode: "grav", x, y, lx: x, ly: y }; grav(x, y, S * .2); return; }
     pointer = { mode: "vand", x, y, x0: x, y0: y, t0: T, ring: T };
   }
   function flyt(e) {
     if (!pointer) return;
     const [x, y] = pos(e); pointer.x = x; pointer.y = y;
     if (pointer.mode === "mad" && (Math.abs(x - pointer.lx) > S * .3 || T - pointer.lt > .18)) { dryss(x, false); pointer.lx = x; pointer.lt = T; }
+    if (pointer.mode === "koral") { pointer.b.x = x; pointer.b.y = y; }
+    if (pointer.mode === "grav") { const d = Math.hypot(x - pointer.lx, y - pointer.ly); if (d > 2) { grav(x, y, d); pointer.lx = x; pointer.ly = y; } }
   }
   function op() {
     const p = pointer; pointer = null;
+    if (p && p.mode === "koral") { slipKoral(p.b); return; }
     if (p && p.mode === "vand" && T - p.t0 < .28 && Math.hypot(p.x - p.x0, p.y - p.y0) < 24) skraem(p.x, p.y);
   }
   function popStor(b) {
@@ -1447,6 +1467,132 @@
     gnistRing(b.x, b.y, RM.matches ? 6 : 14, S * 1.2, S * .2);
     parts.push({ t: "ring", x: b.x, y: b.y, liv: 0, max: .5, s: b.r * 2.4 });
     for (let i = 0; i < 10; i++) nyBoble(b.x + rnd(-1, 1) * b.r, b.y + rnd(-1, 1) * b.r, rnd(.02, .05), b.z);
+  }
+
+  /* ---------- Sandet: grav efter muslinger ---------- */
+  // Under sandet ligger muslinger, og i hver er der en perle. Træk fingeren hen over sandet lige ved en skal, så graver man,
+  // og når der er gravet nok, åbner muslingen sig, og perlen flyver til perlerækken.
+  /* ---------- Koralrevet ---------- */
+  // Nederst på sandet ligger koral-stykker. Træk dem hen til de tomme pladser i revet. Når revet er fuldt, glimter det,
+  // der kommer en perle, og et nyt rev begynder. Ingen fejl: en forkert plads bare sætter stykket tilbage.
+  const REV_N = 4;
+
+  // Et sted på sandet, så langt fra muslinger, revet og koral som muligt
+  function ledigSted(z0, z1) {
+    let bedst = null, bd = -1;
+    for (let k = 0; k < 40; k++) {
+      const z = rnd(z0, z1), x = W * rnd(.08, .92), y = sandY(z);
+      if (portrait && x > W * .45 && y > H * .86) continue; // måneknappen sidder nederst til højre på telefon
+      let d = 1e9;
+      const se = (px, py) => { d = Math.min(d, Math.hypot(x - px, y - py)); };
+      grave.forEach(m => se(m.x, m.y));
+      if (rev) { rev.slots.forEach(s => se(s.x, s.y)); rev.brikker.forEach(b => se(b.x, b.y)); }
+      if (d > bd) { bd = d; bedst = { x, y }; }
+    }
+    return bedst;
+  }
+
+  function nyGrav() {
+    const p = ledigSted(.05, .9);
+    grave.push({ x: p.x, y: p.y, w: S * .5, p: 0, n: 4, st: 0, t: 0, wig: 0 });
+  }
+
+  function grav(x, y, d) {
+    const m = grave.find(k => k.st === 0 && Math.abs(x - k.x) < k.w * .6 && Math.abs(y - k.y) < S * .25);
+    if (!m) return;
+    if (!gem.gravSagt && !Spil.isTalking()) { gem.gravSagt = 1; gemNu(); Spil.say("Træk fingeren hen over sandet, så graver du efter muslinger!", null, "akva-grav"); }
+    const foer = Math.floor(m.p);
+    m.p += d / (S * .4); m.wig = 1;
+    gnist(x, y, S * .08, "#f0d89a");
+    if (Math.floor(m.p) > foer) LYD.drys();
+    if (m.p >= m.n) {
+      m.st = 1; m.t = 0; LYD.glimt();
+      flyvPerle(m.x, m.y - S * .1);
+      naarStille(() => { if (!scene && !bogOpen) Spil.say("Der var en perle i muslingen!", null, "akva-muslinge"); });
+    }
+  }
+
+  function opdaterSand(dt) {
+    for (const m of grave) { if (m.st === 1) m.t += dt; m.wig = Math.max(0, m.wig - dt * 2); }
+    grave = grave.filter(m => !(m.st === 1 && m.t > 2.2));
+    gravUr -= dt;
+    if (gravUr <= 0) { gravUr = 3.5; if (grave.filter(m => m.st === 0).length < 2) nyGrav(); }
+  }
+
+  /* ---------- Koralrevet ---------- */
+  // Revet står til venstre for skattekisten, så de to ikke ligger oven på hinanden
+  const revX = () => W * .33;
+
+  function nyRev() {
+    const c = revX(), sp = Math.max(S * .6, W * .11), y = sandY(.4);
+    rev = { slots: [], brikker: [], klar: 0 };
+    for (let i = 0; i < REV_N; i++) rev.slots.push({ x: c + (i - (REV_N - 1) / 2) * sp, y, fyldt: false, k: i % 2 ? "koral-roed" : "sten-koral" });
+    for (let i = 0; i < REV_N; i++) {
+      const p = ledigSted(.92, 1);
+      rev.brikker.push({ x: p.x, y: p.y, hx: p.x, hy: p.y, k: i % 2 ? "sten-koral" : "koral-roed", drag: false });
+    }
+  }
+
+  function slipKoral(b) {
+    b.drag = false;
+    if (!rev) return;
+    const s = rev.slots.find(v => !v.fyldt && Math.hypot(b.x - v.x, b.y - v.y) < S * .4);
+    if (!s) { b.x = b.hx; b.y = b.hy; LYD.blop(); return; } // ved siden af: stykket ligger tilbage, hvor det var
+    s.fyldt = true; rev.brikker.splice(rev.brikker.indexOf(b), 1);
+    LYD.plop(); gnistRing(s.x, s.y, RM.matches ? 5 : 10, S * .6, S * .14);
+    for (let i = 0; i < 4; i++) nyBoble(s.x + rnd(-1, 1) * S * .2, s.y, rnd(.02, .05), .8);
+    if (rev.slots.every(v => v.fyldt)) revFaerdig();
+  }
+
+  function revFaerdig() {
+    rev.klar = T;
+    const x = revX(), y = sandY(.4);
+    LYD.guldKom(); gnistRing(x, y, RM.matches ? 8 : 18, S * 1.2, S * .2);
+    flyvPerle(x, y - S * .5);
+    naarStille(() => { if (!scene && !bogOpen) Spil.say("Et koralrev! Hvor er det flot!", null, "akva-rev-faerdig"); });
+    later(nyRev, 3200);
+  }
+
+  // Tegnes bagved fiskene: muslinger og rev ligger på bunden
+  function drawImg(img, x, y, w, a) {
+    if (!klar(img) || a <= 0) return;
+    const h = w * img.naturalHeight / img.naturalWidth;
+    cx.globalAlpha = a; cx.drawImage(img, x - w / 2, y - h / 2, w, h); cx.globalAlpha = 1;
+  }
+
+  function tegnSand() {
+    for (const m of grave) {
+      const sc = 1 + .12 * m.wig;
+      if (m.st === 0) {
+        const h = S * .12 * (1 - .4 * m.p / m.n) * sc;
+        cx.fillStyle = "#e6c283"; cx.beginPath(); cx.ellipse(m.x, m.y, m.w * .5, h, 0, 0, TAU); cx.fill();
+        cx.strokeStyle = "rgba(160,110,50,.55)"; cx.lineWidth = 2; cx.stroke();
+        if (!RM.matches) { cx.fillStyle = `rgba(255,255,240,${.35 + .4 * Math.sin(T * 3 + m.x)})`; cx.beginPath(); cx.arc(m.x + m.w * .18, m.y - h * .6, S * .03, 0, TAU); cx.fill(); }
+      } else {
+        const u = clamp(m.t / .4, 0, 1), a = m.t > 1.6 ? clamp((2.2 - m.t) / .6, 0, 1) : 1;
+        drawImg(billede("muslinge"), m.x, m.y - S * .05, m.w * (.6 + .4 * u), a);
+      }
+    }
+    if (!rev) return;
+    for (const s of rev.slots) drawImg(billede(s.k), s.x, s.y, S * .42, s.fyldt ? 1 : .3);
+    for (const b of rev.brikker) drawImg(billede(b.k), b.x, b.y, S * .42, 1);
+  }
+
+  /* ---------- Forældre-genvej ---------- */
+  // Skriver en voksen "voksen" på tastaturet, låses alle dyr op. Ingen knap på skærmen, så barnet ikke ser den.
+  let tastBuf = "";
+  function tast(e) {
+    if (!e.key || e.key.length !== 1) return;
+    tastBuf = (tastBuf + e.key.toLowerCase()).slice(-12);
+    if (tastBuf.endsWith("voksen")) { tastBuf = ""; laasAlleOp(); }
+  }
+  function laasAlleOp() {
+    if (!gem || scene) return;
+    const mangler = ARTER.filter(a => !gem.fundet.includes(a.k));
+    if (!mangler.length) return;
+    gem.fundet = ARTER.map(a => a.k);
+    for (const a of mangler) fish.push(nyFisk(a.k));
+    gemNu(); Spil.sfx.fanfare();
   }
 
   /* ---------- Hovedløkken ---------- */
@@ -1470,6 +1616,7 @@
 
   function opdater(dt) {
     nightF += ((night ? 1 : 0) - nightF) * Math.min(1, dt * .6);
+    opdaterSand(dt);
     if (scene) opdaterScene(dt);
     else dimT = 0;
     dimF += (dimT - dimF) * Math.min(1, dt * 2.5);
@@ -2128,6 +2275,7 @@
       if ((f.scene && !flytter) || f.spot > .3) helt.push(f); else if (f.over) over.push(f); else sorteret.push(f);
     }
     sorteret.sort((a, b) => a.z - b.z);
+    tegnSand();
     let lag = 0;
     const dis = a => { if (av.dis) return; cx.globalAlpha = a; cx.fillStyle = hazeGrad; cx.fillRect(0, surfY, W, H - surfY); cx.globalAlpha = 1; };
     for (const o of sorteret) {
@@ -2156,7 +2304,7 @@
     start(r) {
       const keys = ["akva-hej", "akva-maet", "akva-alle-maette", "akva-mad", "akva-bobler", "akva-perle", "akva-kiste", "akva-kiste-hint", "akva-alle", "akva-nat", "akva-dag",
         "akva-bog", "akva-mangler", "akva-vokser", "akva-tryk-fisk", "tal-1", "tal-2", "tal-3", "tal-4", "tal-5", "ros-4",
-        "akva-aeg", "akva-boble-unge", "akva-lille", "akva-nu-stor",
+        "akva-aeg", "akva-boble-unge", "akva-lille", "akva-nu-stor", "akva-grav", "akva-muslinge", "akva-rev-hint", "akva-rev-faerdig",
         ...ARTER.flatMap(a => ["akva-navn-" + a.k, "akva-ny-" + a.k, "akva-stor-" + a.k, "akva-unge-" + a.k])];
       Spil.preload(keys);
       alleBilleder().forEach(billede);
@@ -2213,8 +2361,11 @@
       for (const k of gem.aeg) { const m = foraelder(k); if (m) nytAeg(k, m); }
       startUde();
       tegnPerler();
+      grave = []; rev = null; gravUr = 1.5;
+      nyRev(); nyGrav(); nyGrav();
 
       cv.addEventListener("pointerdown", ned);
+      addEventListener("keydown", tast); tastBuf = "";
       cv.addEventListener("pointermove", flyt);
       addEventListener("pointerup", op); addEventListener("pointercancel", op);
       addEventListener("resize", maal);
@@ -2244,9 +2395,10 @@
     },
     stop() {
       alive = false; timers.forEach(clearTimeout); cancelAnimationFrame(raf); raf = 0;
-      removeEventListener("pointerup", op); removeEventListener("pointercancel", op); removeEventListener("resize", maal);
+      removeEventListener("pointerup", op); removeEventListener("pointercancel", op); removeEventListener("resize", maal); removeEventListener("keydown", tast);
       if (master) { try { master.gain.value = 0; master.disconnect(); } catch (e) {} master = null; }
       fish = []; flakes = []; bubbles = []; golds = []; bigs = []; parts = []; aegs = []; scene = null; pointer = null;
+      grave = []; rev = null;
     }
   });
 
@@ -2257,7 +2409,9 @@
     aeg: aegs.map(e => ({ k: e.k, x: e.x, y: e.y, r: e.r, boble: e.boble })), unger: gem.unger.slice(), gemtAeg: gem.aeg.slice(), lyst: { ...gem.lyst },
     sil: fish.filter(f => vaek(f) && f.ude.sil).map(f => ({ k: f.k, x: f.ude.sil.x, y: f.ude.sil.y, a: f.ude.sil.a })),
     golds: golds.map(b => ({ x: b.x, y: b.y, r: b.r })), bigs: bigs.map(b => ({ x: b.x, y: b.y, r: b.r, fri: b.fri })),
-    kiste: kiste && { x: kiste.x, y: kiste.by - kiste.h / 2 }, flakes: flakes.length, kval, ms: frameStat && { js: frameStat.sidstJs, dt: frameStat.sidstDt },
+    kiste: kiste && { x: kiste.x, y: kiste.by - kiste.h / 2 }, flakes: flakes.length,
+    grave: grave.map(m => ({ x: m.x, y: m.y, w: m.w, p: m.p, n: m.n, st: m.st })),
+    rev: rev && { klar: !!rev.klar, slots: rev.slots.map(s => ({ x: s.x, y: s.y, fyldt: s.fyldt })), brikker: rev.brikker.map(b => ({ x: b.x, y: b.y, hx: b.hx, hy: b.hy })) }, kval, ms: frameStat && { js: frameStat.sidstJs, dt: frameStat.sidstDt },
   }) : null;
   Spil.akvarieTest.fastKval = () => { if (frameStat) frameStat.test = true; };
   Spil.akvarieTest.tid = f => { tidsFaktor = f; };
