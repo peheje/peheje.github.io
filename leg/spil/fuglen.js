@@ -87,7 +87,7 @@
 
   let root, cv, g, hud, alive, raf, timers, W, H, S, dpr, last, time;
   let cam, speed, dayT, bird, holding, pointerId, targetY, history, seeds, plants, falling, animals, parts,
-    clouds, friends, combo, lastCollect, roundCount, totalSeeds, nextSpawn, nextAnimal, queue, countTalk,
+    clouds, friends, combo, lastCollect, roundCount, totalSeeds, nextSpawn, nextAnimal, queue, lastAnimal,
     phase, said, lastTouch, hints, rainbow, rainFx, curSeg, stars, motes, nextCloud, audio;
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
 
@@ -145,14 +145,18 @@
   }
 
   /* ---------- Stemme: en lille kø, så replikker ikke afbryder hinanden ---------- */
-  function line(key, text) { if (!queue.some(q => q[0] === key)) queue.push([key, text]); }
+  // Fuglen skal mest være stille: højst én replik ca. hvert 25. sekund, og en replik der har ventet
+  // for længe (fx "Se, en regnsky!" efter skyen er fløjet forbi) droppes. Hvert emne siges kun én gang.
+  const RO = 25, FORAELDET = 10;
+  let lastLine = -99;
+  function line(key, text) { if (!queue.some(q => q[0] === key)) queue.push([key, text, time]); }
   function once(key, text) { if (!said[key]) { said[key] = 1; line(key, text); } }
   function pumpVoice() {
-    if (queue.length && !Spil.isTalking()) { const [k, t] = queue.shift(); countTalk = false; Spil.say(t, null, k); }
-  }
-  function count(n) {
-    if (Spil.isTalking() && !countTalk) return; // en vigtig replik taler: klokken er nok
-    countTalk = true; Spil.say(String(n), () => { countTalk = false; }, "tal-" + n);
+    queue = queue.filter(q => time - q[2] < FORAELDET || q[0] === "fugl-hej" || q[0] === "fugl-froe");
+    if (queue.length && !Spil.isTalking() && time - lastLine > RO) {
+      const [k, t] = queue.shift(); lastLine = time; Spil.say(t, null, k);
+      if (k === "fugl-hej") lastLine = time - RO + 1; // "Saml de lysende frø!" kommer lige efter hej
+    }
   }
 
   /* ---------- Opsætning ---------- */
@@ -203,19 +207,19 @@
     if (roundCount >= RUNDE) {
       roundCount = 0;
       later(() => renderHud(roundCount), 1500);
-      count(RUNDE);
       later(() => {
         if (friends.length < VENNER.length) {
           friends.push({ c: VENNER[friends.length], join: 0, off: (friends.length % 2 ? 1 : -1) * (0.05 + 0.02 * friends.length), ph: Math.random() * TAU });
           Spil.sfx.fanfare();
+          lastLine = -99; // en ny ven er vigtig: den må gerne siges med det samme
           line(friends.length === VENNER.length ? "fugl-alle" : "fugl-ven",
             friends.length === VENNER.length ? "Nu er vi fem fugle! Hvor er vi mange!" : "En ny ven! Nu flyver vi sammen!");
         } else { // alle venner er med: så kommer der en regnbue i stedet
-          rainbow = Math.max(rainbow, 18); Spil.sfx.fanfare(); line("fugl-regnbue", "Se, en regnbue!");
+          rainbow = Math.max(rainbow, 18); Spil.sfx.fanfare();
           plants.forEach(p => { p.big = Math.min(1.6, p.big + .25); });
         }
       }, 700);
-    } else count(roundCount);
+    }
   }
 
   function plant(x, water) {
@@ -287,7 +291,7 @@
       if (Math.abs(a.x - bx) < 0.22 && bird.y > gy - 0.27) {
         a.heard = true; a.hop = 1;
         for (let i = 0; i < 3; i++) parts.push({ k: "hjerte", x: a.x + (i - 1) * .04, y: gy - .1, vx: speed * .6, vy: -.12 - i * .03, life: 0, max: 1.4, r: .03 });
-        if (!Spil.isTalking() || countTalk) { countTalk = false; Spil.say("Det er " + a.navn + ".", null, a.lyd ? ["er-" + a.k, "dyr-" + a.k] : ["er-" + a.k]); }
+        if (a.lyd && !Spil.isTalking() && time - lastAnimal > 12) { lastAnimal = time; Spil.say(a.navn, null, "dyr-" + a.k); }
       }
     });
     animals = animals.filter(a => a.x > cam - 1);
@@ -295,11 +299,10 @@
     // regnskyen
     clouds.forEach(c => {
       const dx = (c.x - bx) * S, dy = (c.y - bird.y) * H;
-      if (!c.seen && c.x < cam + vw * .95) { c.seen = true; line("fugl-sky", "Se, en regnsky! Flyv ind i skyen!"); }
+      if (!c.seen && c.x < cam + vw * .95) { c.seen = true; once("fugl-sky", "Se, en regnsky! Flyv ind i skyen!"); }
       if (!c.hit && Math.abs(dx) < .32 * S && Math.abs(dy) < .14 * S) {
         c.hit = true; c.rain = 7; rainbow = Math.max(rainbow, 26); bell(TONER[0], .12, 2); bell(TONER[4], .1, 2.4);
-        line("fugl-regn", "Det regner! Nu vokser blomsterne!");
-        later(() => line("fugl-regnbue", "Se, en regnbue!"), 3500);
+        once("fugl-regn", "Det regner! Nu vokser blomsterne!");
       }
       if (c.rain > 0) {
         c.rain -= dt;
@@ -328,18 +331,15 @@
     // døgnet og stedet: stemmen fortæller, når noget skifter
     const ph = dayT < 0.06 ? "morgen" : dayT < 0.56 ? "dag" : dayT < 0.68 ? "aften" : dayT < 0.95 ? "nat" : "morgen";
     if (ph !== phase) {
-      if (ph === "aften") line("fugl-aften", "Nu går solen ned. Hvor er det smukt!");
-      if (ph === "nat") line("fugl-nat", "Godnat, sol. Se alle stjernerne!");
-      if (ph === "morgen") line("fugl-morgen", "Godmorgen! Solen står op igen.");
+      if (ph === "aften") once("fugl-aften", "Nu går solen ned. Hvor er det smukt!");
+      if (ph === "nat") once("fugl-nat", "Godnat, sol. Se alle stjernerne!");
       phase = ph;
     }
     const seg = segType(bx);
     if (seg !== curSeg) {
-      if (seg === "skov") once("fugl-skov", "Nu flyver vi over skoven.");
-      if (seg === "soe") once("fugl-vand", "Se, vi flyver over vandet!");
       curSeg = seg;
     }
-    if (time - lastTouch > 22 && hints < 2 && !Spil.isTalking()) { hints++; lastTouch = time; line("fugl-hint", "Sæt fingeren på skærmen, så flyver fuglen derhen!"); }
+    if (time - lastTouch > 22 && hints < 1 && !Spil.isTalking()) { hints++; lastTouch = time; line("fugl-hint", "Sæt fingeren på skærmen, så flyver fuglen derhen!"); }
     pumpVoice();
 
     if (audio) {
@@ -809,8 +809,7 @@
   Spil.register({
     id: "fuglen", navn: "Fuglen", ikon: "🐦", farve: "#bfe3ff",
     start(r) {
-      Spil.preload(["fugl-hej", "fugl-froe", "fugl-gror", "fugl-ven", "fugl-sky", "fugl-regn", "fugl-regnbue",
-        "tal-1", "tal-2", "tal-3", "tal-4", "tal-5", "tal-6", "tal-7", "tal-8", "tal-9", "tal-10"]);
+      Spil.preload(["fugl-hej", "fugl-froe", "fugl-gror", "fugl-ven", "fugl-sky", "fugl-regn", "fugl-regnbue"]);
       alive = true; timers = [];
       r.innerHTML = `<div class="fu"><canvas aria-label="En lille fugl flyver over landskabet"></canvas><div class="fu-hud">${"<i></i>".repeat(RUNDE)}</div></div>`;
       root = r.querySelector(".fu"); cv = root.querySelector("canvas"); hud = root.querySelector(".fu-hud");
@@ -823,7 +822,7 @@
       bird = { y: .4, vy: 0, ang: 0, flap: 0, wing: 0, blink: 0 };
       holding = false; pointerId = null; targetY = .4; history = [];
       seeds = []; plants = []; falling = []; animals = []; parts = []; clouds = []; friends = [];
-      combo = 0; lastCollect = -9; roundCount = 0; totalSeeds = 0; queue = []; countTalk = false; said = {};
+      combo = 0; lastCollect = -9; roundCount = 0; totalSeeds = 0; queue = []; lastAnimal = -99; lastLine = -99; said = {};
       nextSpawn = 1.1; nextAnimal = 1.6; nextCloud = 24; phase = "dag"; curSeg = "eng"; lastTouch = 0; hints = 0;
       rainbow = 0; rainFx = 0;
       stars = Array.from({ length: 140 }, () => ({ x: Math.random(), y: Math.random() * .55, r: .5 + Math.random() * 1.3, a: .4 + Math.random() * .6, ph: Math.random() * TAU, sp: 1 + Math.random() * 2 }));
