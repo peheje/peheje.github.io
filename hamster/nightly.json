@@ -390,6 +390,29 @@
         "The wooden spoon has a new dent. I have given it a small medal.",
         "Somewhere a gate is swinging on one hinge. It sounds like a very slow conversation."
       ]
+    },
+    {
+      "date": "2026-11-14",
+      "text": "The moth has left me a gap and I keep looking at it. Tell me what the sky is doing, and I shall stop.",
+      "extras": [
+        "The crescent moon is fatter again, a thumbnail now. I think it is catching up on its dinners.",
+        "Saturday smells of toast three doors down. I am enjoying it at a respectful distance.",
+        "I swept the leaves off the step. By the time I turned round, the step had changed its mind.",
+        "The scarf is on the hook and the hook is holding up well. I told it so.",
+        "A drip on the third stair has found its rhythm. I have started tapping along with a spoon."
+      ],
+      "note": {
+        "text": "A good road is mostly the part you walk home on.",
+        "source": "Unsigned"
+      },
+      "quest": {
+        "kind": "weather",
+        "done": "So that is the sky tonight. Thank you. I shall tell the door, which likes to know.",
+        "keepsake": {
+          "name": "A thimble of sky-water",
+          "description": "A thimble with a lid of waxed paper. It holds a little of the weather, set aside for later."
+        }
+      }
     }
   ]
 }
