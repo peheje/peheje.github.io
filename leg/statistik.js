@@ -66,6 +66,14 @@
     .st-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#5cc46b,#4d96ff)}
     .st-mere{grid-column:2;font:500 13px system-ui,sans-serif;opacity:.7}
     .st-raek.ingen{opacity:.55}
+    .st-flyt p{margin:0 0 12px;font:500 15px/1.45 system-ui,-apple-system,sans-serif;opacity:.8}
+    .st-knapper{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+    .st-knapper button,.st-knapper label{padding:12px 16px;border-radius:14px;background:#fff;box-shadow:0 3px 0 rgba(31,58,95,.18);
+      font:700 16px system-ui,sans-serif;color:var(--ink);cursor:pointer;min-height:48px;box-sizing:border-box;display:inline-flex;align-items:center}
+    .st-knapper input[type=file]{display:none}
+    .st-flyt textarea{width:100%;box-sizing:border-box;height:110px;border-radius:12px;border:2px solid rgba(31,58,95,.2);padding:10px;
+      font:13px ui-monospace,Menlo,Consolas,monospace;background:#fff;color:var(--ink)}
+    .st-besked{min-height:1.2em;margin:8px 0 0;font:700 15px system-ui,sans-serif}
     .st-nul{margin-top:8px;padding:12px 18px;border-radius:14px;background:#fff;box-shadow:0 3px 0 rgba(31,58,95,.18);font:600 15px system-ui,sans-serif;color:#b33}
   `);
 
@@ -112,16 +120,66 @@
       <p class="st-note">Kun for voksne (åbnes ved at holde på overskriften eller skrive "stat"). Gemt på denne enhed. Tid tælles kun, mens der bliver trykket (pause efter 2 min uden tryk). I alt: ${tid(total)}.</p>
       <div class="st-kort"><h3>Sidste 7 dage</h3><div class="st-uge">${uge}</div></div>
       <div class="st-kort"><h3>Spillene</h3>${raekker}</div>
+      <div class="st-kort st-flyt"><h3>Flyt fremskridt til en anden side eller enhed</h3>
+        <p>Alt hvad der er låst op (dinoer, akvariet, monstre, tegninger, larven osv.) gemmes kun på denne side i denne browser.
+          Gem det her, og hent det på den nye side (fx peheje.github.io/leg).</p>
+        <div class="st-knapper"><button class="st-gem">📦 Gem som fil</button><button class="st-kopi">📋 Kopiér som tekst</button></div>
+        <div class="st-knapper"><label>📥 Hent fra fil<input type="file" class="st-fil" accept=".json,.txt,application/json,text/plain"></label>
+          <button class="st-indsaet">📥 Hent fra indsat tekst</button></div>
+        <textarea class="st-tekst" placeholder="Indsæt teksten her (eller den kopierede tekst vises her)" spellcheck="false"></textarea>
+        <p class="st-besked" role="status"></p></div>
       <button class="st-nul">Nulstil statistik</button></div>`;
     document.body.appendChild(el);
     const luk = () => { el.remove(); removeEventListener("keydown", tast); };
     const tast = e => { if (e.key === "Escape") luk(); };
     addEventListener("keydown", tast);
     el.querySelector(".st-luk").onclick = luk;
+    flyt(el);
     el.querySelector(".st-nul").onclick = () => {
       if (!confirm("Slet al statistik på denne enhed?")) return;
       data = { spil: {}, dage: {} }; gem(); luk(); vis();
     };
+  }
+
+  /* ---------- Flyt fremskridt (alle lk-* nøgler) mellem sider/enheder ---------- */
+  function pakUd() {
+    const d = {};
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^lk-/.test(k)) d[k] = localStorage.getItem(k); } } catch (e) {}
+    return JSON.stringify({ legekassen: 1, gemt: new Date().toISOString(), data: d });
+  }
+  function pakInd(tekst) {
+    let o; try { o = JSON.parse(tekst.trim()); } catch (e) { throw new Error("Teksten kunne ikke læses."); }
+    const d = o && o.legekassen && o.data;
+    if (!d || typeof d !== "object") throw new Error("Det ligner ikke en Legekassen-fil.");
+    const keys = Object.keys(d).filter(k => /^lk-/.test(k) && typeof d[k] === "string");
+    if (!keys.length) throw new Error("Der er intet fremskridt i filen.");
+    if (!confirm(`Hent ${keys.length} gemte ting? Det overskriver det samme fremskridt på denne side.`)) return false;
+    keys.forEach(k => localStorage.setItem(k, d[k]));
+    return keys.length;
+  }
+  function flyt(el) {
+    const q = s => el.querySelector(s), tekst = q(".st-tekst"), besked = q(".st-besked");
+    const sig = (m, ok) => { besked.textContent = m; besked.style.color = ok ? "#2a7a3a" : "#b33"; };
+    const antal = () => Object.keys(JSON.parse(pakUd()).data).length;
+    q(".st-gem").onclick = () => {
+      try {
+        const url = URL.createObjectURL(new Blob([pakUd()], { type: "application/json" }));
+        const a = document.createElement("a"); a.href = url; a.download = "legekassen-fremskridt.json";
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+        sig(`Gemt (${antal()} ting). Kom filen ikke? Brug "Kopiér som tekst" i stedet.`, true);
+      } catch (e) { sig("Kunne ikke gemme som fil her. Brug \"Kopiér som tekst\".", false); }
+    };
+    q(".st-kopi").onclick = async () => {
+      const t = pakUd(); tekst.value = t;
+      try { await navigator.clipboard.writeText(t); sig(`Kopieret (${antal()} ting). Indsæt teksten på den nye side.`, true); }
+      catch (e) { tekst.focus(); tekst.select(); sig("Teksten står i feltet herunder: markér alt og kopiér den.", true); }
+    };
+    const hent = t => {
+      try { const n = pakInd(t); if (n) { sig(`Hentet ${n} ting! Siden genindlæses …`, true); setTimeout(() => location.reload(), 900); } }
+      catch (e) { sig(e.message, false); }
+    };
+    q(".st-indsaet").onclick = () => hent(tekst.value);
+    q(".st-fil").onchange = e => { const f = e.target.files[0]; if (f) f.text().then(hent, () => sig("Filen kunne ikke læses.", false)); };
   }
 
   // Hold fingeren på overskriften i menuen i 1,5 sekund
