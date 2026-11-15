@@ -319,6 +319,8 @@
       c.beginPath(); p.forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.stroke();
       c.strokeStyle = th.kant2; c.lineWidth = 1;
       c.beginPath(); p.forEach((q, i) => i ? c.lineTo(q[0], q[1] - (e.fyld === "ned" ? .7 : -.7)) : c.moveTo(q[0], q[1] - (e.fyld === "ned" ? .7 : -.7))); c.stroke();
+    } else if (p.length === 2 && p[0][0] === p[1][0] && (p[0][0] <= 0 || p[0][0] >= VB)) {
+      tegnKantpael(c, v, e, p);
     } else {
       const tyk = e.tyk ?? 1;
       // afstand fra punktet q til et linjestykke
@@ -356,6 +358,29 @@
         c.stroke();
       }
     }
+  }
+
+  // Lodret væg ved banens kant: en tyk træpæl, så man kan se, hvad pindsvinet hopper tilbage fra.
+  // Pælens inderside ligger præcis hvor væggen er i fysikken; resten af tykkelsen vokser udad, væk fra banen.
+  function tegnKantpael(c, v, e, p) {
+    const tyk = e.tyk ?? 1, x0 = p[0][0], ud = x0 <= 0 ? -1 : 1;
+    const ind = x0 - ud * tyk, B = 4.6, venstre = ud > 0 ? ind : ind - B;
+    const top = Math.min(p[0][1], p[1][1]), bund = Math.max(p[0][1], p[1][1]);
+    const under = v.tema === "under";
+    const g = c.createLinearGradient(venstre, 0, venstre + B, 0);
+    if (under) { g.addColorStop(0, "#9a7650"); g.addColorStop(.5, "#c89a68"); g.addColorStop(1, "#80603f"); }
+    else { g.addColorStop(0, "#7a4f2a"); g.addColorStop(.45, "#b07a48"); g.addColorStop(1, "#5e3b1e"); }
+    c.fillStyle = g; c.beginPath(); c.roundRect(venstre, top - 1.2, B, bund - top + 2.4, 1.2); c.fill();
+    c.strokeStyle = under ? "rgba(255,225,170,.35)" : "rgba(60,35,15,.5)"; c.lineWidth = .35; c.lineCap = "round";
+    for (let y = top + 4, k = 0; y < bund - 3; y += 9, k++) {   // barkstreger
+      const xx = venstre + B * (.25 + .5 * hash(k + 11)), l = 3 + 4 * hash(k + 5);
+      c.beginPath(); c.moveTo(xx, y); c.lineTo(xx + .15, Math.min(bund - 1, y + l)); c.stroke();
+    }
+    // årringe på toppen
+    const mx = venstre + B / 2;
+    c.fillStyle = "#e6c08a"; c.beginPath(); c.ellipse(mx, top - 1.2, B / 2, .9, 0, 0, 7); c.fill();
+    c.strokeStyle = "#b88a52"; c.lineWidth = .3;
+    [.6, .3].forEach(f => { c.beginPath(); c.ellipse(mx, top - 1.2, B / 2 * f, .9 * f, 0, 0, 7); c.stroke(); });
   }
 
   // Under jorden: rødder der hænger ned fra hulens loft (fyld "op"), hele vejen ud til skærmens kanter
@@ -830,11 +855,11 @@
     el.innerHTML = `${af ? `<div class="rb-aebler">${Array.from({ length: af }, (_, k) => k < fik ? "🍎" : "<i>🍎</i>").join("")}</div>` : ""}
       <div class="rb-row"><button class="rb-knap rb-videre" aria-label="Næste bane">▶</button></div>`;
     el.hidden = false;
-    el.querySelector(".rb-videre").onclick = () => { Spil.sfx.click(); videreNaarStille(); };
+    el.querySelector(".rb-videre").onclick = () => { Spil.sfx.click(); naesteBane(); };
     later(() => { if (w && w.status === "hjemme" && !q(".rb-hjemme").hidden) videreNaarStille(); }, 9000);
   }
-  // Videre til næste bane, men først når stemmen har sagt "Hjemme! Godt klaret!" færdig
-  // (ellers afbryder den næste banes replik rosen). Højst 6 s ventetid.
+  // Auto-videre: først når stemmen har sagt "Hjemme! Godt klaret!" færdig
+  // (ellers afbryder den næste banes replik rosen). Højst 6 s ventetid. ▶ går videre med det samme.
   function videreNaarStille(fra = performance.now()) {
     if (!w || w.status !== "hjemme") return;
     if (Spil.isTalking() && performance.now() - fra < 6000) { later(() => videreNaarStille(fra), 120); return; }

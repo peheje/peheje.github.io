@@ -14,7 +14,7 @@
 //   {type:"jord", punkter:[[x,y],...], fyld:"ned"|"op"|"ingen", tyk:1, skjult:false}
 //       en brudt linje pindsvinet kan rulle på. "ned" = jord under linjen, "op" = loft over linjen,
 //       "ingen" = en tyk væg/rod. Rører linjen x<=0 eller x>=100, fortsætter jorden ud til skærmens kant.
-//       skjult:true = usynlig væg (bruges til banens kanter, så pindsvinet ikke ryger ud).
+//       skjult:true = usynlig væg. Lodrette vægge ved x=0/x=100 tegnes som en tyk træpæl ude ved kanten.
 //   {type:"planke", fra:[x,y], til:[x,y]}             en træplanke
 //   {type:"trampolin", fra:[x,y], til:[x,y], hop:175}  hopper pindsvinet op (vinkelret på planken); hop = mindste fart
 //   {type:"snor", anker:[x,y], slap:1}                snor fra anker til pindsvinet; stryg over den for at klippe
@@ -31,7 +31,7 @@ window.RULLEBANER = [
     start: [26, 58],
     elementer: [
       { type: "jord", fyld: "ned", punkter: [[0, 104], [22, 110], [60, 126], [100, 134]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 134], [100, 90]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 134], [100, 90]] },
       { type: "snor", anker: [26, 16] },
       { type: "aeble", x: 26, y: 86 },
       { type: "aeble", x: 50, y: 114 },
@@ -45,7 +45,7 @@ window.RULLEBANER = [
     start: [16, 100],
     elementer: [
       { type: "jord", fyld: "ned", punkter: [[0, 112], [26, 112], [34, 150], [60, 150], [66, 110], [100, 110]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 110], [100, 60]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 110], [100, 60]] },
       { type: "slynge", x: 16, y: 106 },
       { type: "aeble", x: 50, y: 74 },
       { type: "hule", x: 86, y: 101, r: 8 },
@@ -58,8 +58,8 @@ window.RULLEBANER = [
     start: [50, 56],
     elementer: [
       { type: "jord", fyld: "ned", punkter: [[0, 96], [38, 134], [44, 140], [56, 140], [62, 134], [100, 96]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[0, 96], [0, 6]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 96], [100, 6]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[0, 96], [0, 6]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 96], [100, 6]] },
       { type: "snor", anker: [26, 18] },
       { type: "snor", anker: [74, 18] },
       { type: "aeble", x: 74, y: 116 },
@@ -75,7 +75,7 @@ window.RULLEBANER = [
     start: [30, 52],
     elementer: [
       { type: "jord", fyld: "ned", punkter: [[0, 150], [100, 150]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 150], [100, 100]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 150], [100, 100]] },
       { type: "planke", fra: [14, 100], til: [62, 118] },
       { type: "snor", anker: [30, 12] },
       { type: "aeble", x: 30, y: 82 },
@@ -91,8 +91,8 @@ window.RULLEBANER = [
     start: [20, 32],
     elementer: [
       { type: "jord", fyld: "ned", punkter: [[0, 150], [100, 150]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[0, 150], [0, 20]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 150], [100, 20]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[0, 150], [0, 20]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 150], [100, 20]] },
       { type: "planke", fra: [8, 48], til: [74, 72] },
       { type: "planke", fra: [94, 84], til: [28, 108] },
       { type: "planke", fra: [6, 118], til: [62, 136] },
@@ -117,20 +117,6 @@ window.RULLEBANER = [
     ],
     pynt: [{ type: "sol", x: 82, y: 22 }, { type: "blomst", x: 6, y: 134 }, { type: "trae", x: 64, y: 112 }, { type: "blomst", x: 96, y: 112, farve: "#ffd84a" }],
     hjaelp: [{ type: "kast", traek: [-15, 21] }],
-  },
-  {
-    id: "klip-3", tema: "over",
-    start: [24, 60],
-    elementer: [
-      { type: "jord", fyld: "ned", punkter: [[58, 170], [60, 118], [100, 118]] },
-      { type: "snor", anker: [8, 12] },
-      { type: "snor", anker: [62, 12] },
-      { type: "aeble", x: 64, y: 88 },
-      { type: "hule", x: 86, y: 108, r: 10 },
-    ],
-    pynt: [{ type: "sol", x: 84, y: 24 }, { type: "blomst", x: 72, y: 118 }, { type: "trae", x: 98, y: 118 }],
-    // Klip venstre snor, lad pindsvinet svinge, og klip den højre, når det er på vej op mod højre
-    hjaelp: [{ type: "klip", fra: [1, 15], til: [15, 15], t: 0.3 }, { type: "klip", fra: [55, 15], til: [69, 15], t: 0.8 }],
   },
   // Klip snoren, og lad trampolinen kaste pindsvinet op på bakken
   {
@@ -166,7 +152,7 @@ window.RULLEBANER = [
     start: [14, 124],
     elementer: [
       { type: "jord", fyld: "ned", punkter: [[0, 128], [24, 128], [38, 106], [52, 128], [100, 128]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 128], [100, 70]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 128], [100, 70]] },
       { type: "slynge", x: 14, y: 124 },
       { type: "aeble", x: 40, y: 92 },
       { type: "hule", x: 70, y: 119, r: 10 },
@@ -180,7 +166,7 @@ window.RULLEBANER = [
     start: [14, 120],
     elementer: [
       { type: "jord", fyld: "ned", punkter: [[0, 130], [100, 130]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 130], [100, 60]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 130], [100, 60]] },
       { type: "trampolin", fra: [30, 127], til: [54, 127] },
       { type: "jord", fyld: "ingen", tyk: 3, punkter: [[64, 130], [64, 96]] },
       { type: "slynge", x: 14, y: 126 },
@@ -196,8 +182,8 @@ window.RULLEBANER = [
     start: [16, 40],
     elementer: [
       { type: "jord", fyld: "ned", punkter: [[0, 150], [100, 150]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 150], [100, 40]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[0, 150], [0, 40]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 150], [100, 40]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[0, 150], [0, 40]] },
       { type: "trampolin", fra: [4, 106], til: [30, 114], hop: 150 },
       { type: "planke", fra: [98, 96], til: [58, 114] },
       { type: "snor", anker: [18, 16] },
@@ -208,6 +194,21 @@ window.RULLEBANER = [
     pynt: [{ type: "sol", x: 82, y: 20 }, { type: "blomst", x: 20, y: 150 }, { type: "blomst", x: 72, y: 150, farve: "#b48cf0" }, { type: "trae", x: 60, y: 150 }],
     hjaelp: [{ type: "klip", fra: [7, 26], til: [27, 26] }],
   },
+  // Svær: det andet klip skal times (ca. 1/3 s vindue), derfor sidst blandt solskinsbanerne
+  {
+    id: "klip-3", tema: "over",
+    start: [24, 60],
+    elementer: [
+      { type: "jord", fyld: "ned", punkter: [[58, 170], [60, 118], [100, 118]] },
+      { type: "snor", anker: [8, 12] },
+      { type: "snor", anker: [62, 12] },
+      { type: "aeble", x: 64, y: 88 },
+      { type: "hule", x: 86, y: 108, r: 10 },
+    ],
+    pynt: [{ type: "sol", x: 84, y: 24 }, { type: "blomst", x: 72, y: 118 }, { type: "trae", x: 98, y: 118 }],
+    // Klip venstre snor, lad pindsvinet svinge, og klip den højre, når det er på vej op mod højre
+    hjaelp: [{ type: "klip", fra: [1, 15], til: [15, 15], t: 0.3 }, { type: "klip", fra: [55, 15], til: [69, 15], t: 0.8 }],
+  },
   {
     id: "under-1", tema: "under",
     start: [20, 42],
@@ -216,7 +217,7 @@ window.RULLEBANER = [
       { type: "jord", fyld: "ned", punkter: [[0, 142], [55, 142]] },
       { type: "jord", fyld: "ingen", tyk: 2, punkter: [[55, 142], [55, 106]] },
       { type: "jord", fyld: "ned", punkter: [[55, 106], [100, 106]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 106], [100, 10]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 106], [100, 10]] },
       { type: "trampolin", fra: [8, 128], til: [32, 136] },
       { type: "snor", anker: [20, 10] },
       { type: "aeble", x: 20, y: 100 },
@@ -237,7 +238,7 @@ window.RULLEBANER = [
       { type: "slynge", x: 16, y: 136 },
       { type: "aeble", x: 48, y: 98 },
       { type: "hule", x: 84, y: 131, r: 8 },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 140], [100, 60]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 140], [100, 60]] },
     ],
     pynt: [{ type: "svamp", x: 30, y: 140 }, { type: "svamp", x: 66, y: 140, s: 1.2 }, { type: "krystal", x: 92, y: 140, farve: "#ff9fd0" }],
     hjaelp: [{ type: "kast", traek: [-15, 21] }],
@@ -249,7 +250,7 @@ window.RULLEBANER = [
     elementer: [
       { type: "jord", fyld: "op", punkter: [[0, 22], [100, 22]] },
       { type: "jord", fyld: "ned", punkter: [[0, 144], [100, 144]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 144], [100, 60]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 144], [100, 60]] },
       { type: "planke", fra: [92, 96], til: [34, 122] },
       { type: "snor", anker: [60, 22] },
       { type: "aeble", x: 46, y: 108 },
@@ -266,8 +267,8 @@ window.RULLEBANER = [
     elementer: [
       { type: "jord", fyld: "op", punkter: [[0, 12], [100, 12]] },
       { type: "jord", fyld: "ned", punkter: [[0, 148], [100, 148]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[0, 148], [0, 12]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 148], [100, 12]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[0, 148], [0, 12]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 148], [100, 12]] },
       { type: "planke", fra: [94, 58], til: [30, 76] },
       { type: "planke", fra: [6, 92], til: [72, 110] },
       { type: "aeble", x: 44, y: 64 },
@@ -332,7 +333,7 @@ window.RULLEBANER = [
       { type: "jord", fyld: "op", punkter: [[0, 96], [100, 96]] },
       { type: "jord", fyld: "ned", punkter: [[0, 140], [30, 140], [32, 170]] },
       { type: "jord", fyld: "ned", punkter: [[58, 170], [60, 140], [100, 140]] },
-      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 140], [100, 96]] },
+      { type: "jord", fyld: "ingen", tyk: 1.2, punkter: [[100, 140], [100, 96]] },
       { type: "slynge", x: 14, y: 136 },
       { type: "aeble", x: 45, y: 118 },
       { type: "hule", x: 84, y: 131, r: 10 },
