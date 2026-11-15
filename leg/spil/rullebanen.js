@@ -245,9 +245,37 @@
 
   /* =====================================================================
      Tegning
+     Én fælles stil for alt: lyset kommer fra oven til venstre, flader har en blød farveovergang,
+     en mørk, varm streg rundt om (STREG) og et lille lyst glimt. Nye ting bør bruge hjælperne herunder,
+     så alt på banen har samme detaljegrad.
      ===================================================================== */
   // Lille fast tilfældighed, så sten/rødder ser ens ud hver gang
   const hash = n => { const x = Math.sin(n * 127.1) * 43758.5453; return x - Math.floor(x); };
+
+  const STREG = .45, BLYANT = "#4a2f1a", BLOED = "rgba(60,34,14,.6)";
+  // Fyld og omrids af den sti, der lige er lagt
+  const fyldOgStreg = (c, fyld, streg = BLYANT, bred = STREG) => {
+    c.fillStyle = fyld; c.fill();
+    if (streg) { c.lineJoin = "round"; c.strokeStyle = streg; c.lineWidth = bred; c.stroke(); }
+  };
+  const lodret = (c, y0, y1, ...farver) => { const g = c.createLinearGradient(0, y0, 0, y1); farver.forEach((f, i) => g.addColorStop(i / (farver.length - 1), f)); return g; };
+  // Farveovergang til noget rundt: lyst oppe til venstre, mørkt i kanten
+  const kugle = (c, x, y, r, lys, mork) => { const g = c.createRadialGradient(x - r * .35, y - r * .4, r * .08, x, y, r * 1.05); g.addColorStop(0, lys); g.addColorStop(1, mork); return g; };
+  const glimt = (c, x, y, rx, ry, rot = -.6, a = .6) => { c.fillStyle = `rgba(255,255,255,${a})`; c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, 7); c.fill(); };
+  const gloed = (c, x, y, r, rgb, a) => {
+    const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+  };
+  // Går langs en brudt linje i faste skridt og kalder fn(x, y, nr) for hvert sted
+  function langs(p, skridt, fn) {
+    let k = 0, rest = skridt / 2;
+    for (let i = 0; i < p.length - 1; i++) {
+      const [ax, ay] = p[i], [bx, by] = p[i + 1], l = Math.hypot(bx - ax, by - ay);
+      if (l < .01) continue;
+      for (; rest <= l; rest += skridt) fn(ax + (bx - ax) * rest / l, ay + (by - ay) * rest / l, k++, i);
+      rest -= l;
+    }
+  }
 
   // Højden af den nærmeste jord/planke lige under (x, y). Bruges til at sætte ting ned på jorden,
   // så hule, svampe, blade og trampoliner står på bakken, også når den er skrå.
@@ -268,61 +296,161 @@
   const paaJord = (w, x, y, maks = 40) => { const g = jordUnder(w, x, y); return g != null && g - y < maks ? g : y + 6; };
 
   const TEMA = {
-    over: { himmel: ["#8fd3f7", "#d6f0ff"], jord: ["#b07a45", "#7a4f2a"], kant: "#5fae47", kant2: "#8fd16f", planke: "#c98a4c" },
-    under: { himmel: ["#4a3426", "#21170f"], jord: ["#5b3d28", "#3a2618"], kant: "#7a5236", kant2: "#9a6b46", planke: "#a8733f" },
+    over: { himmel: ["#5db9ee", "#a9defa", "#e9f7ff"], jord: ["#bd8756", "#8f5e37", "#6c4426"], kant: "#5cb043", kant2: "#9ade74", kantM: "#3d8a31" },
+    under: { himmel: ["#3b2a21", "#2a1c14", "#170f0a"], jord: ["#6d4c35", "#4b3220", "#2f1e12"], kant: "#8d6546", kant2: "#b98d66", kantM: "#3d2717" },
   };
+  const TRAE = { lys: "#c99a66", mellem: "#a47143", mork: "#73492a", ende: "#efd09c", ring: "#b98a52" };
 
+  /* ---------- Baggrund (i skærmens pixels) ---------- */
+  function tegnSky(c, x, y, r) {
+    const boller = [[0, 0, 1], [1.05, -.42, 1.25], [2.2, -.1, 1.05], [3.1, .15, .72], [-.85, .22, .68]];
+    const sti = dy => { c.beginPath(); boller.forEach(([bx, by, br]) => { c.moveTo(x + (bx + br) * r, y + by * r + dy); c.arc(x + bx * r, y + by * r + dy, br * r, 0, 7); }); };
+    c.save(); c.beginPath(); c.rect(x - 2.2 * r, y - 2.4 * r, 7 * r, 3.05 * r); c.clip(); // flad bund
+    c.fillStyle = "#cfe4f3"; sti(0); c.fill();
+    c.fillStyle = "#ffffff"; sti(-.2 * r); c.fill();
+    c.restore();
+  }
+  // En række bløde bakker langt væk, der toner ud i disen forneden (så de ikke ligner jord, man kan lande på)
+  function tegnBakker(c, cw, ch, y0, amp, top, bund, fase, traeer) {
+    const yv = x => y0 - amp * (.5 + .5 * Math.sin(x / (ch * .34) + fase)) - amp * .3 * Math.sin(x / (ch * .13) + fase * 2.3);
+    c.beginPath(); c.moveTo(-20, ch);
+    for (let x = -20; x <= cw + 20; x += 16) c.lineTo(x, yv(x));
+    c.lineTo(cw + 20, ch); c.closePath();
+    c.fillStyle = lodret(c, y0 - amp * 1.3, y0 + ch * .22, top, bund); c.fill();
+    if (traeer) {
+      // små træer på bakkekammen
+      c.fillStyle = top;
+      for (let x = 30 + hash(fase) * 60, k = 0; x < cw; x += 70 + hash(k + fase) * 150, k++) {
+        const y = yv(x), h = ch * (.022 + hash(k + 9) * .02);
+        [[0, -1.1, .8], [-.6, -.5, .6], [.6, -.5, .6]].forEach(([dx, dy, r]) => { c.beginPath(); c.arc(x + dx * h, y + dy * h, r * h, 0, 7); c.fill(); });
+      }
+    }
+  }
   function tegnBaggrund(c, v, cw, ch, t) {
-    const th = TEMA[v.tema];
-    const g = c.createLinearGradient(0, 0, 0, ch);
-    g.addColorStop(0, th.himmel[0]); g.addColorStop(1, th.himmel[1]);
-    c.fillStyle = g; c.fillRect(0, 0, cw, ch);
+    const th = TEMA[v.tema], ro = RM.matches;
+    c.fillStyle = lodret(c, 0, ch, ...th.himmel); c.fillRect(0, 0, cw, ch);
     if (v.tema === "over") {
-      // skyer der driver hen over hele skærmen
-      c.fillStyle = "rgba(255,255,255,.92)";
-      [[.12, .1, 1], [.55, .2, .7], [.85, .07, .85]].forEach(([x, y, s], i) => {
-        const fx = ((x * cw + (RM.matches ? 0 : t * (8 + i * 4))) % (cw + 200)) - 100, fy = y * ch, r = 26 * s * Math.max(1, cw / 900);
-        c.beginPath(); c.arc(fx, fy, r, 0, 7); c.arc(fx + r * 1.1, fy - r * .4, r * 1.2, 0, 7); c.arc(fx + r * 2.2, fy, r * .9, 0, 7); c.fill();
+      tegnBakker(c, cw, ch, ch * .6, ch * .085, "#8fc9ea", "#e3f4fd", 1.3, false);
+      // skyer der driver hen over hele skærmen (bag de nære bakker)
+      c.globalAlpha = .95;
+      [[.1, .1, 1], [.5, .22, .7], [.82, .06, .85], [.3, .36, .55]].forEach(([x, y, k], i) => {
+        const r = 24 * k * Math.max(1, cw / 900);
+        tegnSky(c, ((x * cw + (ro ? 0 : t * (7 + i * 3.5))) % (cw + 260)) - 130, y * ch, r);
       });
+      c.globalAlpha = 1;
+      tegnBakker(c, cw, ch, ch * .7, ch * .06, "#9fd9b6", "#e6f6ee", 4.1, true);
+      // fnug i luften
+      c.fillStyle = "rgba(255,255,255,.75)";
+      for (let i = 0; i < 9; i++) {
+        const x = (hash(i + 3) * cw + (ro ? 0 : t * (9 + hash(i) * 8))) % cw, y = ch * (.15 + .6 * hash(i + 40)) + (ro ? 0 : Math.sin(t * .7 + i * 2) * 14);
+        c.beginPath(); c.arc(x, y, 1.2 + hash(i + 70) * 1.3, 0, 7); c.fill();
+      }
     } else {
-      // en svag varm glød fra midten (rødderne hænger fra loftet, se tegnRoedder)
+      // klippevæggen bagest: store, bløde klumper i lidt lysere og mørkere jord
+      for (let i = 0; i < 12; i++) {
+        c.fillStyle = i % 2 ? "rgba(255,214,170,.035)" : "rgba(0,0,0,.16)";
+        c.beginPath(); c.ellipse(hash(i + 2) * cw, hash(i + 31) * ch, (.08 + hash(i + 5) * .14) * ch + 30, (.05 + hash(i + 8) * .08) * ch + 20, hash(i) - .5, 0, 7); c.fill();
+      }
+      // drypsten langt inde i hulen
+      c.fillStyle = "rgba(0,0,0,.2)";
+      for (let x = hash(7) * 60, k = 0; x < cw; x += 50 + hash(k + 12) * 110, k++) {
+        const b = 14 + hash(k + 3) * 22, h = ch * (.06 + hash(k + 21) * .16), op = k % 3 === 1;
+        c.beginPath();
+        if (op) { c.moveTo(x - b, ch); c.quadraticCurveTo(x - b * .2, ch - h * .5, x, ch - h); c.quadraticCurveTo(x + b * .2, ch - h * .5, x + b, ch); }
+        else { c.moveTo(x - b, 0); c.quadraticCurveTo(x - b * .2, h * .5, x, h); c.quadraticCurveTo(x + b * .2, h * .5, x + b, 0); }
+        c.fill();
+      }
+      // en svag varm glød fra midten
       const gl = c.createRadialGradient(cw / 2, ch * .45, 10, cw / 2, ch * .45, Math.max(cw, ch) * .7);
-      gl.addColorStop(0, "rgba(255,190,120,.10)"); gl.addColorStop(1, "rgba(0,0,0,0)");
+      gl.addColorStop(0, "rgba(255,190,120,.13)"); gl.addColorStop(1, "rgba(0,0,0,0)");
       c.fillStyle = gl; c.fillRect(0, 0, cw, ch);
     }
   }
 
-  // Jord med græskant (over) eller jordkant (under). Rører linjen verdens kant, fortsætter den ud til skærmens kant.
+  /* ---------- Jord, vægge og planker (står stille; tegnes én gang pr. bane til et lag) ---------- */
+  // En træstamme i egne koordinater: fra x=0 til x=l, halv tykkelse h. frie = [venstre ende fri, højre ende fri]
+  function tegnStamme(c, l, h, frie, lys) {
+    const pal = lys ? ["#dcb283", "#bd8d5d", "#8d6540"] : [TRAE.lys, TRAE.mellem, TRAE.mork];
+    c.beginPath(); c.roundRect(-h * .3, -h, l + h * .6, h * 2, h * .35);
+    fyldOgStreg(c, lodret(c, -h, h, ...pal));
+    c.strokeStyle = "rgba(58,32,14,.5)"; c.lineWidth = .32; c.lineCap = "round";
+    for (let x = 2 + h, k = 0; x < l - 2; x += 5 + hash(k + 2) * 4, k++) {  // bark
+      const y = (hash(k + 11) - .5) * h * 1.3, ll = 1.6 + hash(k + 5) * 3;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(Math.min(l - 1, x + ll), y + .12); c.stroke();
+    }
+    c.strokeStyle = "rgba(255,236,200,.35)"; c.lineWidth = .4;
+    c.beginPath(); c.moveTo(h * .4, -h * .62); c.lineTo(l - h * .4, -h * .62); c.stroke();
+    frie.forEach((er, k) => {
+      if (!er) return;
+      const x = k ? l + h * .3 : -h * .3;
+      c.beginPath(); c.ellipse(x, 0, h * .42, h * .98, 0, 0, 7); fyldOgStreg(c, TRAE.ende, BLYANT, .35);
+      c.strokeStyle = TRAE.ring; c.lineWidth = .28;
+      [.62, .3].forEach(f => { c.beginPath(); c.ellipse(x, 0, h * .42 * f, h * .98 * f, 0, 0, 7); c.stroke(); });
+    });
+  }
+
+  // Jord med græskant (over) eller klippekant (under). Rører linjen verdens kant, fortsætter den ud til skærmens kant.
   function tegnJord(c, v, e, ud) {
-    if (e.skjult) return; // usynlig kant, fx så pindsvinet ikke ryger ud af skærmen
-    const th = TEMA[v.tema], p = e.punkter.slice();
+    if (e.skjult) return; // usynlig væg
+    const th = TEMA[v.tema], over = v.tema === "over", p = e.punkter.slice(), tyk = e.tyk ?? 1;
     if (e.fyld !== "ingen") {
       if (p[0][0] <= 0) p.unshift([ud.l - 5, p[0][1]]);
       if (p[p.length - 1][0] >= VB) p.push([ud.r + 5, p[p.length - 1][1]]);
     }
     c.lineJoin = c.lineCap = "round";
+    const sti = (dy = 0) => { c.beginPath(); p.forEach((q, i) => i ? c.lineTo(q[0], q[1] + dy) : c.moveTo(q[0], q[1] + dy)); };
+    const stejl = i => Math.abs(p[i + 1][0] - p[i][0]) < Math.abs(p[i + 1][1] - p[i][1]) * .8;
     if (e.fyld === "ned" || e.fyld === "op") {
-      const kant = e.fyld === "ned" ? ud.b + 5 : ud.t - 5;
-      const g = c.createLinearGradient(0, e.fyld === "ned" ? Math.min(...p.map(q => q[1])) : kant, 0, e.fyld === "ned" ? kant : Math.max(...p.map(q => q[1])));
-      g.addColorStop(0, th.jord[0]); g.addColorStop(1, th.jord[1]);
-      c.fillStyle = g;
+      const ned = e.fyld === "ned", r = ned ? 1 : -1, kant = ned ? ud.b + 5 : ud.t - 5;
+      const ys = p.map(q => q[1]), y0 = ned ? Math.min(...ys) : Math.max(...ys);
       c.beginPath(); c.moveTo(p[0][0], kant);
       p.forEach(q => c.lineTo(q[0], q[1]));
-      c.lineTo(p[p.length - 1][0], kant); c.closePath(); c.fill();
-      // små sten i jorden
-      c.fillStyle = v.tema === "over" ? "rgba(90,55,25,.35)" : "rgba(20,10,5,.35)";
-      for (let i = 0; i < p.length - 1; i++) for (let k = 0; k < 3; k++) {
-        const t = hash(i * 7 + k), x = p[i][0] + (p[i + 1][0] - p[i][0]) * t, y = p[i][1] + (p[i + 1][1] - p[i][1]) * t;
-        c.beginPath(); c.ellipse(x, y + (e.fyld === "ned" ? 1 : -1) * (5 + hash(i + k * 3) * 10), 1.4, .9, 0, 0, 7); c.fill();
+      c.lineTo(p[p.length - 1][0], kant); c.closePath();
+      c.fillStyle = lodret(c, y0, y0 + r * 75, ...th.jord); c.fill();
+      c.save(); c.clip();
+      // et mørkere muldlag lige under overfladen, og et par svage lag længere nede
+      c.strokeStyle = over ? "rgba(84,48,20,.3)" : "rgba(0,0,0,.28)"; c.lineWidth = 8; sti(r * 4.5); c.stroke();
+      c.strokeStyle = over ? "rgba(70,38,14,.13)" : "rgba(0,0,0,.16)"; c.lineWidth = .9;
+      sti(r * 19); c.stroke(); sti(r * 36); c.stroke();
+      // sten i jorden
+      langs(p, 6.5, (x, y, k) => {
+        if (x < ud.l - 3 || x > ud.r + 3 || hash(k * 3 + 1) < .25) return;
+        const d = 9 + hash(k * 5 + 2) * 30, rx = .9 + hash(k + 17) * 1.5, ry = rx * (.55 + hash(k + 4) * .25), sx = x + (hash(k + 9) - .5) * 5, sy = y + r * d;
+        c.fillStyle = over ? "rgba(92,56,28,.6)" : "rgba(22,12,6,.55)";
+        c.beginPath(); c.ellipse(sx, sy, rx, ry, hash(k) - .5, 0, 7); c.fill();
+        c.fillStyle = over ? "rgba(255,226,180,.3)" : "rgba(255,214,170,.14)";
+        c.beginPath(); c.ellipse(sx - rx * .25, sy - ry * .35, rx * .5, ry * .35, -.3, 0, 7); c.fill();
+      });
+      c.restore();
+      // kanten: mørk underside, farven, og en lys stribe øverst
+      const b = tyk * 2 + 1.2;
+      c.strokeStyle = th.kantM; c.lineWidth = b; sti(); c.stroke();
+      c.strokeStyle = th.kant; c.lineWidth = b - .8; sti(-r * .28); c.stroke();
+      c.strokeStyle = th.kant2; c.lineWidth = .8; sti(-r * tyk * .95); c.stroke();
+      if (over && ned) {
+        // græstotter
+        const farver = [th.kantM, th.kant, th.kant2];
+        c.lineWidth = .55;
+        langs(p, 3.1, (x, y, k, i) => {
+          if (x < ud.l - 2 || x > ud.r + 2 || hash(k + 3) < .22 || stejl(i)) return;
+          for (let j = 0; j < 3; j++) {
+            const h = 1.1 + hash(k * 3 + j) * 1.9, lean = (hash(k * 7 + j) - .5) * 1.6, bx = x + (j - 1) * .55;
+            c.strokeStyle = farver[(k + j) % 3];
+            c.beginPath(); c.moveTo(bx, y - tyk * .5); c.quadraticCurveTo(bx + lean * .2, y - tyk - h * .5, bx + (j - 1) * .5 + lean, y - tyk - .5 - h); c.stroke();
+          }
+        });
+      } else if (!over && ned) {
+        // småsten på hulens gulv
+        langs(p, 8.3, (x, y, k, i) => {
+          if (x < ud.l - 2 || x > ud.r + 2 || hash(k + 13) < .45 || stejl(i)) return;
+          const rx = .8 + hash(k + 2) * .9;
+          c.beginPath(); c.ellipse(x + (hash(k) - .5) * 3, y - tyk - .25, rx, rx * .62, 0, 0, 7);
+          fyldOgStreg(c, hash(k + 8) < .5 ? "#9a8068" : "#7f6852", BLOED, .28);
+        });
       }
-      c.strokeStyle = th.kant; c.lineWidth = (e.tyk ?? 1) * 2 + 1.2;
-      c.beginPath(); p.forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.stroke();
-      c.strokeStyle = th.kant2; c.lineWidth = 1;
-      c.beginPath(); p.forEach((q, i) => i ? c.lineTo(q[0], q[1] - (e.fyld === "ned" ? .7 : -.7)) : c.moveTo(q[0], q[1] - (e.fyld === "ned" ? .7 : -.7))); c.stroke();
     } else if (p.length === 2 && p[0][0] === p[1][0] && (p[0][0] <= 0 || p[0][0] >= VB)) {
       tegnKantpael(c, v, e, p);
     } else {
-      const tyk = e.tyk ?? 1;
       // afstand fra punktet q til et linjestykke
       const afstand = (q, st) => {
         const ex = st.bx - st.ax, ey = st.by - st.ay, l2 = ex * ex + ey * ey || 1e-9;
@@ -332,30 +460,16 @@
       // en ende er fri, hvis den ikke rører anden jord
       const fri = p.length === 2 ? p.map(q => !v.statics.some(st => !(st.ax === p[0][0] && st.ay === p[0][1] && st.bx === p[1][0] && st.by === p[1][1]) && afstand(q, st) < tyk + st.t + .8)) : [false, false];
       if (fri[0] || fri[1]) {
-        // en fritstående pæl: en træstamme med bark og årringe i den frie ende (før: en tynd pind med en grøn stribe)
-        const [[ax, ay], [bx, by]] = p, l = Math.hypot(bx - ax, by - ay);
+        // en fritstående pæl: en træstamme med bark og årringe i den frie ende
+        const [[ax, ay], [bx, by]] = p;
         c.save(); c.translate(ax, ay); c.rotate(Math.atan2(by - ay, bx - ax));
-        const g = c.createLinearGradient(0, -tyk, 0, tyk);
-        g.addColorStop(0, "#7a4f2a"); g.addColorStop(.45, "#a87445"); g.addColorStop(1, "#5e3b1e");
-        c.fillStyle = g; c.beginPath(); c.roundRect(-tyk * .3, -tyk, l + tyk * .6, tyk * 2, tyk * .3); c.fill();
-        c.strokeStyle = "rgba(60,35,15,.55)"; c.lineWidth = .35; c.lineCap = "round";
-        [[-.55, .1, .7], [.05, .3, .95], [.5, .05, .55], [-.15, .55, .9]].forEach(([y, f0, f1]) => {
-          c.beginPath(); c.moveTo(l * f0, y * tyk); c.lineTo(l * f1, y * tyk + .15); c.stroke();
-        });
-        fri.forEach((er, k) => {
-          if (!er) return;
-          const x = k ? l + tyk * .3 : -tyk * .3;
-          c.fillStyle = "#e6c08a"; c.beginPath(); c.ellipse(x, 0, tyk * .42, tyk * .98, 0, 0, 7); c.fill();
-          c.strokeStyle = "#b88a52"; c.lineWidth = .3;
-          [.62, .3].forEach(f => { c.beginPath(); c.ellipse(x, 0, tyk * .42 * f, tyk * .98 * f, 0, 0, 7); c.stroke(); });
-        });
+        tegnStamme(c, Math.hypot(bx - ax, by - ay), tyk, fri, !over);
         c.restore();
       } else {
-        // en kant mellem to stykker jord
-        c.strokeStyle = th.jord[1]; c.lineWidth = tyk * 2;
-        c.beginPath(); p.forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.stroke();
-        c.strokeStyle = th.kant; c.lineWidth = Math.max(.8, tyk * .5);
-        c.stroke();
+        // en rod/væg mellem to stykker jord
+        c.strokeStyle = BLYANT; c.lineWidth = tyk * 2; sti(); c.stroke();
+        c.strokeStyle = over ? TRAE.mellem : "#8d6540"; c.lineWidth = Math.max(.6, tyk * 2 - .9); c.stroke();
+        c.strokeStyle = "rgba(255,236,200,.3)"; c.lineWidth = Math.max(.3, tyk * .4); c.stroke();
       }
     }
   }
@@ -364,23 +478,11 @@
   // Pælens inderside ligger præcis hvor væggen er i fysikken; resten af tykkelsen vokser udad, væk fra banen.
   function tegnKantpael(c, v, e, p) {
     const tyk = e.tyk ?? 1, x0 = p[0][0], ud = x0 <= 0 ? -1 : 1;
-    const ind = x0 - ud * tyk, B = 4.6, venstre = ud > 0 ? ind : ind - B;
+    const ind = x0 - ud * tyk, B = 4.6, midt = ind + ud * B / 2;
     const top = Math.min(p[0][1], p[1][1]), bund = Math.max(p[0][1], p[1][1]);
-    const under = v.tema === "under";
-    const g = c.createLinearGradient(venstre, 0, venstre + B, 0);
-    if (under) { g.addColorStop(0, "#9a7650"); g.addColorStop(.5, "#c89a68"); g.addColorStop(1, "#80603f"); }
-    else { g.addColorStop(0, "#7a4f2a"); g.addColorStop(.45, "#b07a48"); g.addColorStop(1, "#5e3b1e"); }
-    c.fillStyle = g; c.beginPath(); c.roundRect(venstre, top - 1.2, B, bund - top + 2.4, 1.2); c.fill();
-    c.strokeStyle = under ? "rgba(255,225,170,.35)" : "rgba(60,35,15,.5)"; c.lineWidth = .35; c.lineCap = "round";
-    for (let y = top + 4, k = 0; y < bund - 3; y += 9, k++) {   // barkstreger
-      const xx = venstre + B * (.25 + .5 * hash(k + 11)), l = 3 + 4 * hash(k + 5);
-      c.beginPath(); c.moveTo(xx, y); c.lineTo(xx + .15, Math.min(bund - 1, y + l)); c.stroke();
-    }
-    // årringe på toppen
-    const mx = venstre + B / 2;
-    c.fillStyle = "#e6c08a"; c.beginPath(); c.ellipse(mx, top - 1.2, B / 2, .9, 0, 0, 7); c.fill();
-    c.strokeStyle = "#b88a52"; c.lineWidth = .3;
-    [.6, .3].forEach(f => { c.beginPath(); c.ellipse(mx, top - 1.2, B / 2 * f, .9 * f, 0, 0, 7); c.stroke(); });
+    c.save(); c.translate(midt, bund + 1); c.rotate(-Math.PI / 2);
+    tegnStamme(c, bund - top + 1, B / 2, [false, true], v.tema === "under");
+    c.restore();
   }
 
   // Under jorden: rødder der hænger ned fra hulens loft (fyld "op"), hele vejen ud til skærmens kanter
@@ -397,115 +499,180 @@
         const h = hash(k + 31), x = k * 7 + (h - .5) * 3;
         if (x < fra || x > til || h < .18) continue;                // nogle steder er der ingen rod
         const y = ay + (by - ay) * (x - ax) / (bx - ax) + .6;
-        const l = 5 + hash(k + 57) * 12, b = (hash(k + 83) - .5) * 5, tyk = .7 + hash(k + 11) * .9;
-        c.strokeStyle = "#6e4a2c"; c.lineWidth = tyk;
-        c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + b, y + l * .55, x + b * .3, y + l); c.stroke();
-        // en lille sidegren på de lange rødder
-        if (l > 10) {
-          const sy = y + l * .45, sx = x + b * .45;
-          c.lineWidth = tyk * .6;
-          c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(sx + 2.2, sy + 1, sx + 2.6, sy + 3.4); c.stroke();
-        }
+        const l = 5 + hash(k + 57) * 12, b = (hash(k + 83) - .5) * 5, tyk = .8 + hash(k + 11) * .9;
+        const rod = () => { c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + b, y + l * .55, x + b * .3, y + l); };
+        const gren = l > 10 ? () => { const sy = y + l * .45, sx = x + b * .45; c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(sx + 2.2, sy + 1, sx + 2.6, sy + 3.4); } : null;
+        c.strokeStyle = "#2c1a0e"; c.lineWidth = tyk + .5; rod(); c.stroke();
+        if (gren) { c.lineWidth = tyk * .6 + .45; gren(); c.stroke(); }
+        c.strokeStyle = "#7d5534"; c.lineWidth = tyk; rod(); c.stroke();
+        if (gren) { c.lineWidth = tyk * .6; gren(); c.stroke(); }
+        c.strokeStyle = "rgba(255,226,180,.22)"; c.lineWidth = tyk * .3; rod(); c.stroke();
       }
     }
   }
 
   function tegnPlanke(c, v, e) {
-    c.lineCap = "round";
-    c.strokeStyle = "#6b4423"; c.lineWidth = 3.6;
-    c.beginPath(); c.moveTo(...e.fra); c.lineTo(...e.til); c.stroke();
-    c.strokeStyle = TEMA[v.tema].planke; c.lineWidth = 2.4; c.stroke();
-  }
-
-  function tegnTrampolin(c, v, e, t) {
-    const [ax, ay] = e.fra, [bx, by] = e.til, mx = (ax + bx) / 2, my = (ay + by) / 2;
-    const ang = Math.atan2(by - ay, bx - ax), l = Math.hypot(bx - ax, by - ay);
-    // ben (over) eller stilk (under) ned til jorden
-    if (v.tema === "over") {
-      c.fillStyle = "#6b4423";
-      [[ax + (bx - ax) * .12, ay + (by - ay) * .12], [ax + (bx - ax) * .88, ay + (by - ay) * .88]].forEach(([x, y]) => c.fillRect(x - .6, y, 1.2, paaJord(v, x, y) + 2 - y));
-    } else {
-      c.fillStyle = "#e9d7c0"; c.beginPath(); c.roundRect(mx - 1.6, my, 3.2, paaJord(v, mx, my) + 2 - my, 1.2); c.fill();
+    const [ax, ay] = e.fra, [bx, by] = e.til, l = Math.hypot(bx - ax, by - ay), h = 1.8, lys = v.tema === "under";
+    c.save(); c.translate(ax, ay); c.rotate(Math.atan2(by - ay, bx - ax)); c.lineCap = "round";
+    c.beginPath(); c.roundRect(-1, -h, l + 2, h * 2, .8);
+    fyldOgStreg(c, lodret(c, -h, h, lys ? "#e0b88a" : "#d9a871", lys ? "#bd8d5d" : "#b27c49", lys ? "#94683f" : "#8a5c33"));
+    // årer i træet, et lyst skær øverst og et søm i hver ende
+    c.strokeStyle = "rgba(74,44,20,.38)"; c.lineWidth = .28;
+    for (let x = 1.5, k = 0; x < l - 3; x += 6 + hash(k + 4) * 5, k++) {
+      const y = (hash(k + 21) - .5) * 1.9, ll = Math.min(l - x - .5, 3 + hash(k + 7) * 5);
+      c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + ll / 2, y + .35, x + ll, y); c.stroke();
     }
-    c.save(); c.translate(mx, my); c.rotate(ang);
-    const bump = e._puls ? Math.max(0, 1 - (t - e._puls) * 4) : 0;
-    if (v.tema === "over") {
-      c.fillStyle = "#ff6b6b"; c.beginPath(); c.roundRect(-l / 2, -1.4 + bump, l, 2.8, 1.4); c.fill();
-      c.fillStyle = "#fff"; for (let i = 0; i < 4; i++) c.fillRect(-l / 2 + (i * 2 + .5) * l / 8, -1.4 + bump, l / 8, 2.8);
-    } else {
-      // stor lysende svampehat
-      const g = c.createLinearGradient(0, -5, 0, 2); g.addColorStop(0, "#d58cff"); g.addColorStop(1, "#8f4fd1");
-      c.fillStyle = g; c.beginPath(); c.ellipse(0, 1 + bump, l / 2 + 1, 5 - bump, 0, Math.PI, 0); c.closePath(); c.fill();
-      c.fillStyle = "rgba(255,255,255,.7)";
-      [[-.25, -2.5], [.1, -3.5], [.32, -1.8]].forEach(([x, y]) => { c.beginPath(); c.arc(x * l, y + bump, .9, 0, 7); c.fill(); });
-    }
+    c.strokeStyle = "rgba(255,240,210,.5)"; c.lineWidth = .45;
+    c.beginPath(); c.moveTo(-.2, -h + .75); c.lineTo(l + .2, -h + .75); c.stroke();
+    [.6, l - .6].forEach(x => {
+      c.fillStyle = "#5a4636"; c.beginPath(); c.arc(x, 0, .55, 0, 7); c.fill();
+      c.fillStyle = "rgba(255,255,255,.55)"; c.beginPath(); c.arc(x - .15, -.15, .2, 0, 7); c.fill();
+    });
     c.restore();
   }
 
-  function tegnHule(c, v, h, t) {
+  /* ---------- Ting på banen ---------- */
+  function tegnTrampolin(c, v, e, t) {
+    const [ax, ay] = e.fra, [bx, by] = e.til, mx = (ax + bx) / 2, my = (ay + by) / 2;
+    const ang = Math.atan2(by - ay, bx - ax), l = Math.hypot(bx - ax, by - ay);
+    const bump = e._puls ? Math.max(0, 1 - (t - e._puls) * 4) : 0;
+    c.lineCap = c.lineJoin = "round";
     if (v.tema === "over") {
-      // en lille jordhøj med en mørk indgang og en græstot
+      // to træben ned til jorden
+      [[ax + (bx - ax) * .14, ay + (by - ay) * .14], [ax + (bx - ax) * .86, ay + (by - ay) * .86]].forEach(([x, y]) => {
+        c.beginPath(); c.roundRect(x - .9, y, 1.8, paaJord(v, x, y) + 2 - y, .4); fyldOgStreg(c, lodret(c, y, y + 14, TRAE.mellem, TRAE.mork));
+      });
+      c.save(); c.translate(mx, my); c.rotate(ang);
+      // fjedre under dugen
+      c.strokeStyle = "#8d8f96"; c.lineWidth = .4;
+      [-.3, 0, .3].forEach(f => { c.beginPath(); for (let k = 0; k <= 6; k++) c.lineTo(f * l + (k % 2 ? .7 : -.7), 1.2 + bump + k * .35); c.stroke(); });
+      // rød dug med hvide striber
+      const pude = () => { c.beginPath(); c.roundRect(-l / 2 - .6, -1.6 + bump, l + 1.2, 3.2, 1.6); };
+      pude(); c.fillStyle = lodret(c, -1.6 + bump, 1.6 + bump, "#ff8a7a", "#f2545b", "#cf3a48"); c.fill();
+      c.save(); pude(); c.clip();
+      c.fillStyle = "rgba(255,255,255,.92)";
+      for (let i = 0; i < 4; i++) { const x = -l / 2 + (i * 2 + .55) * l / 8; c.beginPath(); c.moveTo(x, -2 + bump); c.lineTo(x + l / 8, -2 + bump); c.lineTo(x + l / 8 - .9, 2 + bump); c.lineTo(x - .9, 2 + bump); c.fill(); }
+      c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(-l / 2, -1.6 + bump, l, .8);
+      c.restore();
+      pude(); c.strokeStyle = "#8f2433"; c.lineWidth = STREG; c.stroke();
+      c.restore();
+    } else {
+      // stor lysende svampehat på en stilk
+      gloed(c, mx, my - 1, l * .75, "200,130,255", .28);
+      c.beginPath(); c.roundRect(mx - 1.7, my, 3.4, paaJord(v, mx, my) + 2 - my, 1.2);
+      fyldOgStreg(c, lodret(c, my, my + 12, "#f6ead8", "#cdb89c"), "#6e5a44");
+      c.save(); c.translate(mx, my); c.rotate(ang);
+      c.beginPath(); c.ellipse(0, 1 + bump, l / 2 + 1, 5 - bump, 0, Math.PI, 0); c.closePath();
+      fyldOgStreg(c, lodret(c, -4, 1.5, "#e3a6ff", "#a561e0", "#7a3fba"), "#4a2378");
+      c.strokeStyle = "rgba(255,255,255,.35)"; c.lineWidth = .5;
+      c.beginPath(); c.ellipse(0, 1 + bump, l / 2 - .4, 4.2 - bump, 0, Math.PI * 1.12, Math.PI * 1.45); c.stroke();
+      [[-.27, -2.3, 1], [.08, -3.3, 1.15], [.32, -1.7, .8], [-.08, -1.2, .6]].forEach(([x, y, r]) => { c.fillStyle = "rgba(255,255,255,.8)"; c.beginPath(); c.ellipse(x * l, y + bump, r, r * .75, 0, 0, 7); c.fill(); });
+      c.restore();
+    }
+  }
+
+  function tegnHule(c, v, h, t) {
+    const hjemme = v.status === "hjemme";
+    c.lineCap = c.lineJoin = "round";
+    if (v.tema === "over") {
+      // en jordhøj med græs på toppen og en indgang med dørkarm af træ.
       // Højen og indgangen fortsætter ned til jorden; jorden tegnes bagefter og dækker resten
-      const bund = Math.max(paaJord(v, h.x - h.r - 6, h.y), paaJord(v, h.x, h.y), paaJord(v, h.x + h.r + 6, h.y)) + 4;
-      c.fillStyle = "#8a5a32"; c.beginPath(); c.ellipse(h.x, h.y + 4, h.r + 6, h.r + 3, 0, Math.PI, 0);
-      c.lineTo(h.x + h.r + 6, bund); c.lineTo(h.x - h.r - 6, bund); c.closePath(); c.fill();
-      c.fillStyle = "#2b1a0e"; c.beginPath(); c.ellipse(h.x, h.y + 4, h.r - 1, h.r - 2, 0, Math.PI, 0);
-      c.lineTo(h.x + h.r - 1, bund); c.lineTo(h.x - h.r + 1, bund); c.closePath(); c.fill();
-      c.strokeStyle = "#5fae47"; c.lineWidth = 1.3; c.lineCap = "round";
-      for (let i = -3; i <= 3; i++) { c.beginPath(); c.moveTo(h.x + i * 2.2, h.y - h.r + 1.2); c.lineTo(h.x + i * 2.6, h.y - h.r - 1.6 - Math.abs(i % 2)); c.stroke(); }
+      const th = TEMA.over, cx = h.x, cy = h.y + 4, rx = h.r + 6, ry = h.r + 3, ix = h.r - 1, iy = h.r - 2;
+      const bund = Math.max(paaJord(v, cx - rx, h.y), paaJord(v, cx, h.y), paaJord(v, cx + rx, h.y)) + 4;
+      c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, Math.PI, 0); c.lineTo(cx + rx, bund); c.lineTo(cx - rx, bund); c.closePath();
+      fyldOgStreg(c, kugle(c, cx, cy - ry * .2, rx * 1.25, "#c8925f", "#7d4f2c"));
+      // græs hen over toppen
+      const bue = (d, a0 = 1.14, a1 = 1.86) => { c.beginPath(); c.ellipse(cx, cy, rx - d, ry - d, 0, Math.PI * a0, Math.PI * a1); };
+      c.strokeStyle = th.kantM; c.lineWidth = 2.6; bue(.3); c.stroke();
+      c.strokeStyle = th.kant; c.lineWidth = 1.8; bue(.1); c.stroke();
+      c.strokeStyle = th.kant2; c.lineWidth = .6; bue(-.45, 1.2, 1.8); c.stroke();
+      c.lineWidth = .55;
+      for (let i = -5; i <= 5; i++) {
+        const a = -Math.PI / 2 + i * .2, x = cx + Math.cos(a) * rx, y = cy + Math.sin(a) * ry, hh = 1.6 + hash(i + 20) * 1.8;
+        c.strokeStyle = [th.kantM, th.kant, th.kant2][(i + 6) % 3];
+        c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + i * .08, y - hh * .6, x + i * .22, y - hh); c.stroke();
+      }
+      // indgangen: mørk, eller varmt oplyst når pindsvinet er hjemme
+      const inde = c.createRadialGradient(cx, cy + 1, .5, cx, cy, ix * 1.3);
+      if (hjemme) { inde.addColorStop(0, "#fff6da"); inde.addColorStop(1, "#f0b25c"); } else { inde.addColorStop(0, "#150b05"); inde.addColorStop(1, "#3d2515"); }
+      c.beginPath(); c.ellipse(cx, cy, ix, iy, 0, Math.PI, 0); c.lineTo(cx + ix, bund); c.lineTo(cx - ix, bund); c.closePath();
+      c.fillStyle = inde; c.fill();
+      const karm = () => { c.beginPath(); c.moveTo(cx - ix, bund); c.lineTo(cx - ix, cy); c.ellipse(cx, cy, ix, iy, 0, Math.PI, 0); c.lineTo(cx + ix, bund); };
+      karm(); c.strokeStyle = BLYANT; c.lineWidth = 1.9; c.stroke();
+      karm(); c.strokeStyle = TRAE.lys; c.lineWidth = 1.05; c.stroke();
+      karm(); c.strokeStyle = "rgba(255,240,210,.45)"; c.lineWidth = .3; c.stroke();
+      if (hjemme) gloed(c, cx, cy, rx * 1.3, "255,214,130", .3);
     } else {
       // rund hobbit-dør af træplanker i en ring af sten, med et lille oplyst vindue og et dørhåndtag.
       // Når pindsvinet er hjemme, står døren åben, og der er lys derinde.
-      const glo = .75 + (RM.matches ? 0 : Math.sin(t * 2) * .1), r = h.r, aaben = v.status === "hjemme";
-      const g = c.createRadialGradient(h.x, h.y, 2, h.x, h.y, r + 14);
-      g.addColorStop(0, `rgba(255,200,120,${.35 * glo})`); g.addColorStop(1, "rgba(255,200,120,0)");
-      c.fillStyle = g; c.beginPath(); c.arc(h.x, h.y, r + 14, 0, 7); c.fill();
+      const glo = .75 + (RM.matches ? 0 : Math.sin(t * 2) * .1), r = h.r;
+      gloed(c, h.x, h.y, r + 15, "255,200,120", .38 * glo);
       // dørkarmen fortsætter ned til jorden
       const bund = paaJord(v, h.x, h.y) + 3;
-      c.fillStyle = "#4a3020"; c.fillRect(h.x - r - 1.5, h.y, 2 * r + 3, bund - h.y);
+      c.fillStyle = "#3d2717"; c.fillRect(h.x - r - 1.5, h.y, 2 * r + 3, bund - h.y);
       // stenene i ringen
-      c.fillStyle = "#5a4a40"; c.beginPath(); c.arc(h.x, h.y, r + 2.4, 0, 7); c.fill();
+      c.beginPath(); c.arc(h.x, h.y, r + 2.5, 0, 7); fyldOgStreg(c, "#4a3b32", "#1e120a");
       for (let i = 0; i < 14; i++) {
         const a0 = i / 14 * Math.PI * 2 + .03, a1 = a0 + Math.PI * 2 / 14 - .07;
-        c.fillStyle = i % 2 ? "#8a7a6c" : "#9c8b7b";
-        c.beginPath(); c.arc(h.x, h.y, r + 2.1, a0, a1); c.arc(h.x, h.y, r + .4, a1, a0, true); c.closePath(); c.fill();
+        c.fillStyle = ["#a59383", "#8c7b6c", "#b3a292"][i % 3];
+        c.beginPath(); c.arc(h.x, h.y, r + 2.15, a0, a1); c.arc(h.x, h.y, r + .4, a1, a0, true); c.closePath(); c.fill();
+        c.fillStyle = "rgba(255,255,255,.16)";
+        c.beginPath(); c.arc(h.x, h.y, r + 2.1, a0 + .05, a1 - .12); c.arc(h.x, h.y, r + 1.5, a1 - .12, a0 + .05, true); c.closePath(); c.fill();
       }
-      if (aaben) {
+      if (hjemme) {
         // varmt lys inde i hulen, og døren svinget op mod venstre
         const ind = c.createRadialGradient(h.x, h.y + 1, 1, h.x, h.y, r);
-        ind.addColorStop(0, "#fff4d8"); ind.addColorStop(1, "#efb768");
+        ind.addColorStop(0, "#fff6da"); ind.addColorStop(1, "#f0b25c");
         c.fillStyle = ind; c.beginPath(); c.arc(h.x, h.y, r, 0, 7); c.fill();
-        c.fillStyle = "#a8642f"; c.beginPath(); c.ellipse(h.x - r * .92, h.y, r * .28, r * .98, 0, 0, 7); c.fill();
-        c.strokeStyle = "#6e3f1c"; c.lineWidth = .35; c.stroke();
+        c.beginPath(); c.ellipse(h.x - r * .92, h.y, r * .28, r * .98, 0, 0, 7); fyldOgStreg(c, lodret(c, h.y - r, h.y + r, "#c98a50", "#8f5428"), BLYANT, .4);
       } else {
         c.save(); c.beginPath(); c.arc(h.x, h.y, r, 0, 7); c.clip();
-        const tr = c.createLinearGradient(h.x, h.y - r, h.x, h.y + r);
-        tr.addColorStop(0, "#c17f45"); tr.addColorStop(1, "#8f5428");
-        c.fillStyle = tr; c.fillRect(h.x - r, h.y - r, 2 * r, 2 * r);
+        c.fillStyle = lodret(c, h.y - r, h.y + r, "#d39558", "#b0733c", "#86501f"); c.fillRect(h.x - r, h.y - r, 2 * r, 2 * r);
         // planker
-        c.strokeStyle = "rgba(90,50,20,.75)"; c.lineWidth = .35;
+        c.strokeStyle = "rgba(74,40,14,.7)"; c.lineWidth = .35;
         for (let k = -2; k <= 2; k++) { const x = h.x + k * r * .38; c.beginPath(); c.moveTo(x, h.y - r); c.lineTo(x, h.y + r); c.stroke(); }
+        // jernbeslag
+        c.strokeStyle = "#4b3a30"; c.lineWidth = .7;
+        [-.55, .55].forEach(f => { c.beginPath(); c.moveTo(h.x - r, h.y + r * f); c.lineTo(h.x - r * .1, h.y + r * f); c.stroke(); });
         c.restore();
+        c.beginPath(); c.arc(h.x, h.y, r, 0, 7); c.strokeStyle = BLYANT; c.lineWidth = .4; c.stroke();
         // vindue med krydspost og varmt lys
         const vy = h.y - r * .42, vr = r * .27;
-        c.fillStyle = "#5a3418"; c.beginPath(); c.arc(h.x, vy, vr + .5, 0, 7); c.fill();
-        c.fillStyle = `rgba(255,214,140,${glo})`; c.beginPath(); c.arc(h.x, vy, vr, 0, 7); c.fill();
-        c.strokeStyle = "#5a3418"; c.lineWidth = .4;
+        c.beginPath(); c.arc(h.x, vy, vr, 0, 7); fyldOgStreg(c, `rgba(255,220,150,${glo})`, "#4a2a12", .6);
+        c.strokeStyle = "#4a2a12"; c.lineWidth = .4;
         c.beginPath(); c.moveTo(h.x - vr, vy); c.lineTo(h.x + vr, vy); c.moveTo(h.x, vy - vr); c.lineTo(h.x, vy + vr); c.stroke();
         // dørhåndtag
-        c.fillStyle = "#ffd84a"; c.beginPath(); c.arc(h.x + r * .58, h.y + r * .12, r * .1 + .3, 0, 7); c.fill();
-        c.fillStyle = "rgba(255,255,255,.6)"; c.beginPath(); c.arc(h.x + r * .55, h.y + r * .08, .25, 0, 7); c.fill();
+        c.beginPath(); c.arc(h.x + r * .58, h.y + r * .12, r * .1 + .35, 0, 7); fyldOgStreg(c, kugle(c, h.x + r * .58, h.y + r * .12, r * .1 + .35, "#fff0a0", "#e0a520"), "#7a5510", .3);
       }
     }
   }
 
+  // Æblets omrids omkring (0, 0); r er cirka den halve bredde
+  function aebleSti(c, r) {
+    c.beginPath(); c.moveTo(0, -r * .62);
+    c.bezierCurveTo(r * .75, -r * 1.3, r * 1.75, -r * .35, r * 1.08, r * .7);
+    c.bezierCurveTo(r * .7, r * 1.3, r * .25, r * 1.08, 0, r * .92);
+    c.bezierCurveTo(-r * .25, r * 1.08, -r * .7, r * 1.3, -r * 1.08, r * .7);
+    c.bezierCurveTo(-r * 1.75, -r * .35, -r * .75, -r * 1.3, 0, -r * .62);
+    c.closePath();
+  }
   function tegnAeble(c, a, t, i) {
     if (a.taget) return;
-    const y = a.y + (RM.matches ? 0 : Math.sin(t * 2.4 + i) * .8);
-    c.fillStyle = "#e8413b"; c.beginPath(); c.arc(a.x - 1, y, 2.6, 0, 7); c.arc(a.x + 1, y, 2.6, 0, 7); c.fill();
-    c.fillStyle = "rgba(255,255,255,.55)"; c.beginPath(); c.arc(a.x - 1.6, y - 1, .8, 0, 7); c.fill();
-    c.strokeStyle = "#6b4423"; c.lineWidth = .6; c.beginPath(); c.moveTo(a.x, y - 2.4); c.lineTo(a.x + .4, y - 4); c.stroke();
-    c.fillStyle = "#5fae47"; c.beginPath(); c.ellipse(a.x + 1.4, y - 3.6, 1.4, .7, -.5, 0, 7); c.fill();
+    const y = a.y + (RM.matches ? 0 : Math.sin(t * 2.4 + i) * .8), r = 2.75;
+    c.save(); c.translate(a.x, y + .3); c.lineCap = c.lineJoin = "round";
+    if (!a.ikon) gloed(c, 0, 0, 7.5, "255,244,200", .32);
+    aebleSti(c, r); fyldOgStreg(c, kugle(c, 0, 0, r * 1.5, "#ff8a6e", "#cf2a30"), "#7d1620");
+    c.fillStyle = "rgba(120,10,25,.25)"; c.beginPath(); c.ellipse(0, -r * .62, r * .42, r * .16, 0, 0, 7); c.fill(); // fordybningen ved stilken
+    glimt(c, -r * .55, -r * .3, r * .26, r * .45, .5, .7);
+    c.strokeStyle = "#5a3418"; c.lineWidth = .65; c.beginPath(); c.moveTo(0, -r * .6); c.quadraticCurveTo(.1, -r * 1.1, .7, -r * 1.42); c.stroke();
+    c.beginPath(); c.moveTo(.3, -r * 1.05); c.quadraticCurveTo(1.4, -r * 1.9, 3.3, -r * 1.35); c.quadraticCurveTo(1.9, -r * .85, .3, -r * 1.05);
+    fyldOgStreg(c, lodret(c, -r * 1.8, -r * .9, "#9ade74", "#4f9e3c"), "#2f6b2c", .35);
+    // et lille blink en gang imellem
+    if (!RM.matches) {
+      const b = Math.max(0, Math.sin(t * 1.7 + i * 2.1) - .86) / .14;
+      if (b > 0) { c.fillStyle = `rgba(255,255,255,${b})`; c.beginPath(); for (let k = 0; k < 4; k++) { const an = k * Math.PI / 2; c.lineTo(2.3 + Math.cos(an) * 1.5 * b, -2.2 + Math.sin(an) * 1.5 * b); c.lineTo(2.3 + Math.cos(an + .785) * .35, -2.2 + Math.sin(an + .785) * .35); } c.fill(); }
+    }
+    c.restore();
   }
 
   // Hænger snoren fra loftet (en knage), eller fra en ballon på himlen?
@@ -520,7 +687,7 @@
     }
     return r.ballon;
   }
-  const BALLONFARVER = [["#ff5e6c", "#c9304a"], ["#ffc93c", "#d9951a"], ["#5eb8ff", "#2f7fcf"]];
+  const BALLONFARVER = [["#ff8a94", "#e8384f", "#8f1830"], ["#ffe07a", "#f2a81e", "#96600a"], ["#96d4ff", "#3b8fe0", "#1c4f8f"]];
   // Er snoren klippet, flyver ballonen op og væk og tager det stykke snor med, der stadig hænger i den
   function ballonerFlyver(v, dt, t) {
     v.ropes.forEach(r => {
@@ -532,16 +699,18 @@
     });
   }
   function tegnBallon(c, v, r, i, t) {
-    const a = r.anker, [lys, mork] = BALLONFARVER[i % BALLONFARVER.length];
+    const a = r.anker, [lys, farve, mork] = BALLONFARVER[i % BALLONFARVER.length];
     const sving = RM.matches ? 0 : Math.sin(t * 1.4 + i * 2) * .07;
     c.save(); c.translate(a.x, a.y); c.rotate(sving);
-    c.strokeStyle = "rgba(90,60,40,.8)"; c.lineWidth = .35;
+    c.strokeStyle = "rgba(90,60,40,.85)"; c.lineWidth = .35;
     c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(.8, -1, 0, -2.2); c.stroke();
-    const g = c.createRadialGradient(-1.4, -8.6, .5, 0, -6.8, 5.4);
-    g.addColorStop(0, lys); g.addColorStop(1, mork);
-    c.fillStyle = g; c.beginPath(); c.ellipse(0, -6.8, 4, 4.6, 0, 0, 7); c.fill();
-    c.fillStyle = mork; c.beginPath(); c.moveTo(0, -2.4); c.lineTo(.9, -1.5); c.lineTo(-.9, -1.5); c.closePath(); c.fill();
-    c.fillStyle = "rgba(255,255,255,.6)"; c.beginPath(); c.ellipse(-1.5, -8.4, .9, 1.5, -.5, 0, 7); c.fill();
+    c.beginPath(); c.moveTo(0, -2.5); c.lineTo(1, -1.4); c.lineTo(-1, -1.4); c.closePath(); fyldOgStreg(c, farve, mork, .35);
+    // let dråbeformet ballon
+    c.beginPath(); c.moveTo(0, -2.3);
+    c.bezierCurveTo(-5.6, -5.2, -4.9, -12, 0, -12); c.bezierCurveTo(4.9, -12, 5.6, -5.2, 0, -2.3); c.closePath();
+    fyldOgStreg(c, kugle(c, 0, -7.4, 5.4, lys, farve), mork);
+    glimt(c, -1.7, -9.2, .9, 1.7, .45, .75);
+    c.strokeStyle = "rgba(255,255,255,.35)"; c.lineWidth = .4; c.beginPath(); c.arc(0, -7.2, 3.6, .25, 1.1); c.stroke();
     c.restore();
   }
 
@@ -549,98 +718,185 @@
     c.lineCap = c.lineJoin = "round";
     if (snorBallon(v, r)) tegnBallon(c, v, r, i, t);
     else {
-      // knagen i loftet
-      c.fillStyle = "#6b4423"; c.beginPath(); c.arc(r.anker.x, r.anker.y, 1.8, 0, 7); c.fill();
-      c.fillStyle = "#c98a4c"; c.beginPath(); c.arc(r.anker.x, r.anker.y, 1, 0, 7); c.fill();
+      // knagen i loftet: en lille jernring på en træklods
+      const a = r.anker;
+      c.beginPath(); c.roundRect(a.x - 2.2, a.y - 1.6, 4.4, 2.2, .6); fyldOgStreg(c, lodret(c, a.y - 1.6, a.y + .6, "#c99a66", "#8d6540"), "#1e120a", .4);
+      c.beginPath(); c.arc(a.x, a.y + 1, 1.1, 0, 7); c.strokeStyle = "#1e120a"; c.lineWidth = 1; c.stroke();
+      c.strokeStyle = "#b9bcc4"; c.lineWidth = .5; c.stroke();
     }
-    // snoren tegnes i de stykker, der stadig hænger sammen
+    // snoren tegnes i de stykker, der stadig hænger sammen: mørk kant, lyst reb og snoninger
     const stykker = []; let cur = null;
     r.led.forEach(l => { if (l.on) { if (!cur) { cur = [l.a]; stykker.push(cur); } cur.push(l.b); } else cur = null; });
     stykker.forEach(s => {
       c.beginPath(); s.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y));
-      c.strokeStyle = "#7a5530"; c.lineWidth = 1.5; c.stroke();
-      c.strokeStyle = "#d9b27c"; c.lineWidth = .8; c.stroke();
+      c.strokeStyle = "#5e3d1f"; c.lineWidth = 1.6; c.stroke();
+      c.strokeStyle = "#e8c690"; c.lineWidth = .95; c.stroke();
+      c.strokeStyle = "#b98a55"; c.lineWidth = .95; c.lineCap = "butt"; c.setLineDash([.45, 1.25]); c.stroke(); c.setLineDash([]); c.lineCap = "round";
     });
   }
 
   function tegnSlynge(c, v, s) {
     const fod = paaJord(v, s.x, s.y + 1) + 3;
+    c.lineCap = c.lineJoin = "round";
     if (v.tema === "over") {
-      c.strokeStyle = "#3d7f3a"; c.lineWidth = 1.4; c.lineCap = "round";
-      c.beginPath(); c.moveTo(s.x, s.y + 1); c.quadraticCurveTo(s.x - 3, (s.y + fod) / 2, s.x + 1, fod); c.stroke();
-      c.fillStyle = "#6cc04f"; c.beginPath(); c.ellipse(s.x - 2.2, (s.y + fod) / 2 + 1, 2.4, 1, -.6, 0, 7); c.fill();
-      c.fillStyle = "#5fae47"; c.beginPath(); c.ellipse(s.x, s.y + .4, 8, 2.2, 0, 0, 7); c.fill();
-      c.strokeStyle = "#3d7f3a"; c.lineWidth = .5; c.beginPath(); c.moveTo(s.x - 7, s.y + .4); c.lineTo(s.x + 7, s.y + .4); c.stroke();
+      // et stort blad på en stilk
+      const stilk = () => { c.beginPath(); c.moveTo(s.x, s.y + 1); c.quadraticCurveTo(s.x - 3, (s.y + fod) / 2, s.x + 1, fod); };
+      stilk(); c.strokeStyle = "#255c26"; c.lineWidth = 2; c.stroke();
+      stilk(); c.strokeStyle = "#4f9e3c"; c.lineWidth = 1.2; c.stroke();
+      c.save(); c.translate(s.x - 2.4, (s.y + fod) / 2 + 1); c.rotate(-.6);
+      c.beginPath(); c.moveTo(-2.8, 0); c.quadraticCurveTo(0, -1.5, 2.8, 0); c.quadraticCurveTo(0, 1.5, -2.8, 0); fyldOgStreg(c, "#7ccb5a", "#255c26", .35);
+      c.restore();
+      c.save(); c.translate(s.x, s.y + .5);
+      c.beginPath(); c.moveTo(-9, 0); c.bezierCurveTo(-5, -2.2, 5, -2.2, 9, -.2); c.bezierCurveTo(5, 3.6, -5, 3.6, -9, 0); c.closePath();
+      fyldOgStreg(c, lodret(c, -1.6, 2.8, "#93da6c", "#5cb043", "#3d8a31"), "#255c26");
+      c.strokeStyle = "rgba(37,92,38,.7)"; c.lineWidth = .4;
+      c.beginPath(); c.moveTo(-8.2, .1); c.quadraticCurveTo(0, .9, 8.2, 0); c.stroke();
+      c.lineWidth = .28;
+      [-5, -2, 1, 4].forEach(x => { c.beginPath(); c.moveTo(x, .5); c.lineTo(x + 1.5, -.9); c.moveTo(x, .5); c.lineTo(x + 1.5, 1.9); c.stroke(); });
+      c.strokeStyle = "rgba(255,255,255,.4)"; c.lineWidth = .4; c.beginPath(); c.moveTo(-6, -.8); c.quadraticCurveTo(-1, -1.5, 4, -1.2); c.stroke();
+      c.restore();
     } else {
-      c.fillStyle = "#e9d7c0"; c.beginPath(); c.roundRect(s.x - 1.8, s.y, 3.6, fod - s.y, 1.4); c.fill();
-      c.fillStyle = "#ffb347"; c.beginPath(); c.ellipse(s.x, s.y + 1, 8, 3.4, 0, Math.PI, 0); c.closePath(); c.fill();
+      // en orange svampehat på en stilk
+      gloed(c, s.x, s.y, 13, "255,180,90", .25);
+      c.beginPath(); c.roundRect(s.x - 1.9, s.y, 3.8, fod - s.y, 1.4); fyldOgStreg(c, lodret(c, s.y, s.y + 12, "#f6ead8", "#cdb89c"), "#6e5a44");
+      c.beginPath(); c.ellipse(s.x, s.y + 1, 8.4, 3.1, 0, Math.PI, 0); c.closePath();
+      fyldOgStreg(c, lodret(c, s.y - 2.2, s.y + 1, "#ffd27a", "#ff9f3c", "#e07a1e"), "#8a4208");
+      [[-4.4, -.3, .9], [-1, -1.2, 1.1], [3, -.7, .9], [5.8, .1, .6]].forEach(([x, y, r]) => { c.fillStyle = "rgba(255,250,235,.85)"; c.beginPath(); c.ellipse(s.x + x, s.y + y, r, r * .6, 0, 0, 7); c.fill(); });
     }
   }
 
+  // En krans af pigge: n pigge fra vinklen a0 med da imellem; fra en indre ellipse (rx, ry) ud til en ydre (RX, RY)
+  function pigge(c, n, a0, da, rx, ry, RX, RY, farve, spring) {
+    c.fillStyle = farve; c.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = a0 + i * da;
+      if (spring && spring(a)) continue;
+      c.moveTo(Math.cos(a - da * .52) * rx, Math.sin(a - da * .52) * ry);
+      c.lineTo(Math.cos(a) * RX, Math.sin(a) * RY);
+      c.lineTo(Math.cos(a + da * .52) * rx, Math.sin(a + da * .52) * ry);
+    }
+    c.fill();
+  }
+  // Ansigtets små dele (fælles for det sammenrullede og det glade pindsvin)
+  function pindsvinAnsigt(c, x, y, k, glad) {
+    // øre
+    c.beginPath(); c.arc(x - 1.9 * k, y - 2.5 * k, .95 * k, 0, 7); fyldOgStreg(c, "#b57d4b", BLYANT, .3);
+    c.fillStyle = "#f2a9a0"; c.beginPath(); c.arc(x - 1.85 * k, y - 2.45 * k, .45 * k, 0, 7); c.fill();
+    // kind, øje, snude og smil
+    c.fillStyle = "rgba(255,130,140,.5)"; c.beginPath(); c.ellipse(x + .5 * k, y + 1 * k, .8 * k, .55 * k, 0, 0, 7); c.fill();
+    c.lineCap = "round";
+    if (glad) { c.strokeStyle = "#2b1a0e"; c.lineWidth = .45 * k; c.beginPath(); c.arc(x - .1 * k, y - .7 * k, .7 * k, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); }
+    else {
+      c.fillStyle = "#2b1a0e"; c.beginPath(); c.arc(x - .1 * k, y - 1 * k, .68 * k, 0, 7); c.fill();
+      c.fillStyle = "#fff"; c.beginPath(); c.arc(x + .12 * k, y - 1.22 * k, .24 * k, 0, 7); c.fill();
+    }
+    c.fillStyle = "#2b1a0e"; c.beginPath(); c.arc(x + 2.45 * k, y - .1 * k, .8 * k, 0, 7); c.fill();
+    c.fillStyle = "rgba(255,255,255,.6)"; c.beginPath(); c.arc(x + 2.25 * k, y - .35 * k, .22 * k, 0, 7); c.fill();
+    c.strokeStyle = "#7a4a2a"; c.lineWidth = .35 * k;
+    c.beginPath(); c.arc(x + 1.2 * k, y + .35 * k, .95 * k, .25, glad ? 2.2 : 1.7); c.stroke();
+  }
   // Pindsvinet: sammenrullet kugle med pigge og et lille ansigt, eller udrullet og glad (når det er hjemme)
   function tegnPindsvin(c, b, t, hjemme) {
-    c.save(); c.translate(b.x, b.y);
+    c.save(); c.translate(b.x, b.y); c.lineJoin = c.lineCap = "round";
     if (hjemme != null) {
       const hop = Math.abs(Math.sin(hjemme * 7)) * 3 * Math.min(1, hjemme * 2);
       c.translate(0, -hop);
-      c.fillStyle = "#6b4423";
-      for (let i = 0; i < 9; i++) { const a = Math.PI + .2 + i * .34; c.beginPath(); c.moveTo(Math.cos(a) * 4, Math.sin(a) * 3.4); c.lineTo(Math.cos(a) * 8, Math.sin(a) * 6.5 - 1); c.lineTo(Math.cos(a + .25) * 4, Math.sin(a + .25) * 3.4); c.fill(); }
-      c.fillStyle = "#b07a4a"; c.beginPath(); c.ellipse(0, 0, 6, 4.4, 0, 0, 7); c.fill();
-      c.fillStyle = "#f3d9b8"; c.beginPath(); c.ellipse(4.2, .6, 3.4, 2.8, 0, 0, 7); c.fill();
-      c.fillStyle = "#2b1a0e"; c.beginPath(); c.arc(7.4, .2, .9, 0, 7); c.fill();
-      c.beginPath(); c.arc(4.4, -.6, .7, 0, 7); c.fill();
-      c.fillStyle = "#ff9fb0"; c.beginPath(); c.arc(4.6, 1.6, .6, 0, 7); c.fill();
-      c.fillStyle = "#6b4423"; c.fillRect(-3, 3.6, 1.6, 2); c.fillRect(2, 3.6, 1.6, 2);
+      [[-2.6, 4.3], [2.4, 4.3]].forEach(([x, y]) => { c.beginPath(); c.ellipse(x, y, 1.5, 1, 0, 0, 7); fyldOgStreg(c, "#8f5f38", BLYANT, .35); });
+      pigge(c, 11, Math.PI + .02, .29, 5, 3.7, 8.6, 6.9, "#4a2f1a");
+      pigge(c, 10, Math.PI + .165, .29, 5, 3.7, 7.6, 6, "#80562f");
+      c.beginPath(); c.ellipse(0, 0, 6, 4.4, 0, 0, 7); fyldOgStreg(c, kugle(c, 0, 0, 6, "#cf9a66", "#8c5c36"));
+      c.strokeStyle = "rgba(74,47,26,.5)"; c.lineWidth = .35;
+      [[-3.6, -1.4], [-1.8, -2.6], [-4, .8], [-2, -.4], [-.2, -1.8], [-2.6, 1.8]].forEach(([x, y]) => { c.beginPath(); c.moveTo(x, y); c.lineTo(x - .7, y - .65); c.stroke(); });
+      c.beginPath(); c.ellipse(4.2, .6, 3.5, 2.9, 0, 0, 7); fyldOgStreg(c, lodret(c, -2.3, 3.5, "#fdecd2", "#ecc9a0"), "#8a6238", .35);
+      pindsvinAnsigt(c, 4.9, .5, 1.05, true);
       c.restore(); return;
     }
     c.rotate(b.rot);
-    // pigge
-    c.fillStyle = "#5e3b1e";
-    for (let i = 0; i < 16; i++) {
-      const a = i / 16 * Math.PI * 2;
-      if (Math.cos(a) > .55 && Math.sin(a) > -.5 && Math.sin(a) < .6) continue; // ansigtet
-      c.beginPath(); c.moveTo(Math.cos(a - .18) * 4.2, Math.sin(a - .18) * 4.2);
-      c.lineTo(Math.cos(a) * 6.4, Math.sin(a) * 6.4); c.lineTo(Math.cos(a + .18) * 4.2, Math.sin(a + .18) * 4.2); c.fill();
-    }
-    c.fillStyle = "#a06a3c"; c.beginPath(); c.arc(0, 0, 4.6, 0, 7); c.fill();
-    c.fillStyle = "#c48a55"; c.beginPath(); c.arc(-1, -1.2, 2.6, 0, 7); c.fill();
-    // ansigt
-    c.fillStyle = "#f3d9b8"; c.beginPath(); c.ellipse(3, .3, 2.6, 2.3, 0, 0, 7); c.fill();
-    c.fillStyle = "#2b1a0e"; c.beginPath(); c.arc(5.3, .2, .8, 0, 7); c.fill();
-    c.beginPath(); c.arc(2.8, -.8, .55, 0, 7); c.fill();
+    // pigge i to lag: mørke og lange bagest, lysere og kortere forrest
+    const ansigt = a => { const x = Math.cos(a), y = Math.sin(a); return x > .5 && y > -.6 && y < .68; };
+    pigge(c, 18, 0, Math.PI / 9, 4.2, 4.2, 6.7, 6.7, "#4a2f1a", ansigt);
+    pigge(c, 18, Math.PI / 18, Math.PI / 9, 4.2, 4.2, 5.9, 5.9, "#80562f", ansigt);
+    c.beginPath(); c.arc(0, 0, 4.7, 0, 7); fyldOgStreg(c, kugle(c, 0, 0, 4.7, "#cf9a66", "#8c5c36"));
+    // små pigge-streger på ryggen
+    c.strokeStyle = "rgba(74,47,26,.5)"; c.lineWidth = .35;
+    [[-2.7, -1.5], [-1.1, -3], [-3.2, .7], [-1.4, -.7], [-2.2, 2.3], [-.5, 1.6], [.5, -2.3], [-.2, 3.3]].forEach(([x, y]) => {
+      const l = Math.hypot(x, y) || 1; c.beginPath(); c.moveTo(x, y); c.lineTo(x + x / l * .85, y + y / l * .85); c.stroke();
+    });
+    c.beginPath(); c.ellipse(3, .3, 2.7, 2.4, 0, 0, 7); fyldOgStreg(c, lodret(c, -2.1, 2.7, "#fdecd2", "#ecc9a0"), "#8a6238", .35);
+    pindsvinAnsigt(c, 2.95, .3, .95, false);
     c.restore();
   }
 
+  /* ---------- Pynt ---------- */
   function tegnPynt(c, v, p0, t, i) {
     const p = p0.type === "sol" || p0.fri ? p0 : Object.assign({}, p0, { y: paaJord(v, p0.x, p0.y - 8, 24) + .6 });
-    const vugge = RM.matches ? 0 : Math.sin(t * 1.5 + i) * .08;
+    const ro = RM.matches, vugge = ro ? 0 : Math.sin(t * 1.5 + i) * .08;
+    c.lineCap = c.lineJoin = "round";
     if (p.type === "svamp") {
       const s = p.s ?? 1;
-      const g = c.createRadialGradient(p.x, p.y - 3 * s, 1, p.x, p.y - 3 * s, 12 * s);
-      g.addColorStop(0, "rgba(120,230,255,.35)"); g.addColorStop(1, "rgba(120,230,255,0)");
-      c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y - 3 * s, 12 * s, 0, 7); c.fill();
+      gloed(c, p.x, p.y - 3 * s, 12 * s, "120,230,255", .4);
       c.save(); c.translate(p.x, p.y); c.rotate(vugge); c.scale(s, s);
-      c.fillStyle = "#e9e3d6"; c.fillRect(-.8, -4, 1.6, 4);
-      c.fillStyle = "#7fe3ff"; c.beginPath(); c.ellipse(0, -4, 3.4, 2.2, 0, Math.PI, 0); c.closePath(); c.fill();
+      c.beginPath(); c.roundRect(-.9, -4.2, 1.8, 4.6, .6); fyldOgStreg(c, lodret(c, -4, 0, "#f6f1e6", "#c9c0ae"), "#5c6a70", .35);
+      c.beginPath(); c.ellipse(0, -4, 3.6, 2.5, 0, Math.PI, 0); c.closePath(); fyldOgStreg(c, lodret(c, -6.5, -4, "#c6f6ff", "#59cbee"), "#1f7ea3", .4);
+      [[-1.6, -4.9, .5], [.3, -5.6, .6], [1.9, -4.7, .4]].forEach(([x, y, r]) => { c.fillStyle = "rgba(255,255,255,.85)"; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); });
       c.restore();
     } else if (p.type === "blomst") {
+      const f = p.farve || "#ff7fbf";
       c.save(); c.translate(p.x, p.y); c.rotate(vugge);
-      c.strokeStyle = "#3d7f3a"; c.lineWidth = .6; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -5); c.stroke();
-      c.fillStyle = p.farve || "#ff7fbf";
-      for (let k = 0; k < 5; k++) { const a = k / 5 * 7; c.beginPath(); c.arc(Math.cos(a) * 1.3, -5 + Math.sin(a) * 1.3, 1.1, 0, 7); c.fill(); }
-      c.fillStyle = "#ffd84a"; c.beginPath(); c.arc(0, -5, .8, 0, 7); c.fill();
+      c.strokeStyle = "#255c26"; c.lineWidth = 1; c.beginPath(); c.moveTo(0, .4); c.quadraticCurveTo(.5, -2.6, 0, -5.4); c.stroke();
+      c.strokeStyle = "#4f9e3c"; c.lineWidth = .5; c.stroke();
+      c.beginPath(); c.moveTo(.2, -1.6); c.quadraticCurveTo(1.6, -3.2, 2.6, -2.2); c.quadraticCurveTo(1.6, -1.2, .2, -1.6); fyldOgStreg(c, "#7ccb5a", "#255c26", .3);
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * Math.PI * 2 - Math.PI / 2;
+        c.beginPath(); c.ellipse(Math.cos(a) * 1.45, -5.6 + Math.sin(a) * 1.45, 1.3, 1, a, 0, 7); fyldOgStreg(c, f, BLOED, .3);
+        c.fillStyle = "rgba(255,255,255,.35)"; c.beginPath(); c.ellipse(Math.cos(a) * 1.7, -5.6 + Math.sin(a) * 1.7, .55, .32, a, 0, 7); c.fill();
+      }
+      c.beginPath(); c.arc(0, -5.6, .95, 0, 7); fyldOgStreg(c, kugle(c, 0, -5.6, .95, "#fff0a0", "#f2b21e"), "#8a5a0a", .3);
       c.restore();
     } else if (p.type === "trae") {
-      c.fillStyle = "#8a5a32"; c.fillRect(p.x - 1.5, p.y - 14, 3, 14);
-      c.fillStyle = "#5fae47"; c.beginPath(); c.arc(p.x, p.y - 18, 9, 0, 7); c.fill();
-      c.fillStyle = "#8fd16f"; c.beginPath(); c.arc(p.x - 3, p.y - 21, 4, 0, 7); c.fill();
+      // stamme med rodfod, og en krone af bløde klumper
+      c.beginPath(); c.moveTo(p.x - 2.6, p.y + .5); c.quadraticCurveTo(p.x - 1.5, p.y - 3, p.x - 1.5, p.y - 15); c.lineTo(p.x + 1.5, p.y - 15); c.quadraticCurveTo(p.x + 1.5, p.y - 3, p.x + 2.6, p.y + .5); c.closePath();
+      fyldOgStreg(c, lodret(c, p.y - 15, p.y, TRAE.mork, TRAE.mellem));
+      c.strokeStyle = "rgba(58,32,14,.5)"; c.lineWidth = .3;
+      [[-.5, -4, 3], [.6, -8, 2.4], [-.3, -11.5, 2]].forEach(([x, y, l]) => { c.beginPath(); c.moveTo(p.x + x, p.y + y); c.lineTo(p.x + x + .1, p.y + y - l); c.stroke(); });
+      const kr = [[0, -19.5, 7.6], [-5.6, -16.5, 5], [5.6, -16.5, 5], [-3.4, -23, 5.2], [3.6, -23.2, 5]];
+      c.save(); c.translate(p.x, p.y); c.rotate(vugge * .25);
+      const krone = (dx, dy, k) => { c.beginPath(); kr.forEach(([x, y, r]) => { c.moveTo(x + dx + r * k, y + dy); c.arc(x + dx, y + dy, r * k, 0, 7); }); };
+      krone(0, 0, 1); c.strokeStyle = "#255c26"; c.lineWidth = STREG * 2; c.stroke();
+      c.fillStyle = lodret(c, -29, -11, "#7ccb5a", "#3f9136"); c.fill();
+      krone(-1.1, -1.2, .62); c.fillStyle = "rgba(170,230,120,.55)"; c.fill();
+      c.fillStyle = "rgba(37,92,38,.28)";
+      [[2.2, -14.6, 2], [-4.6, -13.6, 1.6], [5.6, -19.2, 1.5]].forEach(([x, y, r]) => { c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); });
+      c.restore();
+    } else if (p.type === "busk") {
+      const kr = [[-5.4, -3.6, 3.8], [0, -5.2, 5.2], [5.4, -3.4, 3.6]];
+      const krone = (dx, dy, k) => { c.beginPath(); kr.forEach(([x, y, r]) => { c.moveTo(p.x + x + dx + r * k, p.y + y + dy); c.arc(p.x + x + dx, p.y + y + dy, r * k, 0, 7); }); c.rect(p.x - 6, p.y - 3.6, 12, 4); };
+      krone(0, 0, 1); c.strokeStyle = "#255c26"; c.lineWidth = STREG * 2; c.stroke();
+      c.fillStyle = lodret(c, p.y - 10, p.y, "#7ccb5a", "#3f9136"); c.fill();
+      c.beginPath(); kr.forEach(([x, y, r]) => { c.moveTo(p.x + x - .6 + r * .55, p.y + y - .9); c.arc(p.x + x - .6, p.y + y - .9, r * .55, 0, 7); }); c.fillStyle = "rgba(170,230,120,.5)"; c.fill();
     } else if (p.type === "sol") {
-      c.fillStyle = "rgba(255,216,74,.35)"; c.beginPath(); c.arc(p.x, p.y, 13, 0, 7); c.fill();
-      c.fillStyle = "#ffd84a"; c.beginPath(); c.arc(p.x, p.y, 8.5, 0, 7); c.fill();
+      // sol med glød og stråler, der drejer langsomt
+      gloed(c, p.x, p.y, 22, "255,236,150", .55);
+      c.save(); c.translate(p.x, p.y); c.rotate(ro ? 0 : t * .12);
+      c.fillStyle = "rgba(255,214,90,.75)"; c.beginPath();
+      for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, l = k % 2 ? 12.4 : 14.2; c.moveTo(Math.cos(a - .12) * 8, Math.sin(a - .12) * 8); c.lineTo(Math.cos(a) * l, Math.sin(a) * l); c.lineTo(Math.cos(a + .12) * 8, Math.sin(a + .12) * 8); }
+      c.fill(); c.restore();
+      c.beginPath(); c.arc(p.x, p.y, 8.4, 0, 7); fyldOgStreg(c, kugle(c, p.x, p.y, 8.4, "#fff3a8", "#ffc93c"), "#e09a1a");
+      glimt(c, p.x - 3, p.y - 3.4, 1.6, 2.6, .7, .45);
     } else if (p.type === "krystal") {
-      c.fillStyle = p.farve || "#b48cf0";
-      c.beginPath(); c.moveTo(p.x, p.y - 6); c.lineTo(p.x + 2.2, p.y); c.lineTo(p.x - 2.2, p.y); c.closePath(); c.fill();
-      c.fillStyle = "rgba(255,255,255,.5)"; c.beginPath(); c.moveTo(p.x, p.y - 5); c.lineTo(p.x + .8, p.y - 1); c.lineTo(p.x - .2, p.y - 1); c.fill();
+      // en lille klynge lysende krystaller
+      const f = p.farve || "#b48cf0";
+      gloed(c, p.x, p.y - 3.5, 11, "200,170,255", .3);
+      const sten = (x, h, b, rot) => {
+        c.save(); c.translate(p.x + x, p.y + .4); c.rotate(rot);
+        c.beginPath(); c.moveTo(0, -h); c.lineTo(b, -h * .68); c.lineTo(b * .85, 0); c.lineTo(-b * .85, 0); c.lineTo(-b, -h * .68); c.closePath();
+        fyldOgStreg(c, f, BLOED, .35);
+        c.fillStyle = "rgba(255,255,255,.42)"; c.beginPath(); c.moveTo(0, -h); c.lineTo(-b, -h * .68); c.lineTo(-b * .85, 0); c.lineTo(-b * .1, 0); c.closePath(); c.fill();
+        c.fillStyle = "rgba(30,10,60,.22)"; c.beginPath(); c.moveTo(0, -h); c.lineTo(b, -h * .68); c.lineTo(b * .85, 0); c.lineTo(b * .25, 0); c.closePath(); c.fill();
+        c.restore();
+      };
+      sten(-2.6, 4.2, 1.2, -.42); sten(2.5, 3.6, 1.1, .45); sten(0, 7, 1.9, 0);
+      if (!ro) { const b = Math.max(0, Math.sin(t * 2 + i * 1.7)) * .7; c.fillStyle = `rgba(255,255,255,${b})`; c.beginPath(); c.arc(p.x - .7, p.y - 4.8, .5, 0, 7); c.fill(); }
     }
   }
 
@@ -650,6 +906,22 @@
       x: ud.l + (ud.r - ud.l) * hash(i + 1) + (RM.matches ? 0 : Math.sin(t * .6 + i) * 6),
       y: ud.t + (ud.b - ud.t) * (.15 + .7 * hash(i + 20)) + (RM.matches ? 0 : Math.cos(t * .5 + i * 2) * 4),
     }));
+  }
+
+  // Støvskyer, når pindsvinet lander eller støder på noget
+  let stoev = [];
+  function stoevPuf(x, y, under) {
+    if (RM.matches) return;
+    for (let k = 0; k < 5; k++) stoev.push({ x, y: y + 3.5, vx: (k - 2) * 5 + (Math.random() - .5) * 4, vy: -4 - Math.random() * 5, r: 1 + Math.random() * 1.2, liv: 1, under });
+    if (stoev.length > 40) stoev.splice(0, stoev.length - 40);
+  }
+  function tegnStoev(c, dt) {
+    stoev = stoev.filter(p => (p.liv -= dt * 2.2) > 0);
+    stoev.forEach(p => {
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .94;
+      c.fillStyle = p.under ? `rgba(230,205,175,${p.liv * .45})` : `rgba(255,250,235,${p.liv * .7})`;
+      c.beginPath(); c.arc(p.x, p.y, p.r * (1.6 - p.liv * .6), 0, 7); c.fill();
+    });
   }
 
   /* =====================================================================
@@ -666,7 +938,7 @@
     .rb-kort-in{position:relative;min-height:100%;margin:0 auto;max-width:620px}
     .rb-sti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
     .rb-kort-pynt{position:absolute;left:0;top:0;width:100%;overflow:hidden;pointer-events:none}
-    .rb-kort-pynt svg{position:absolute;overflow:visible}
+    .rb-kort-pynt svg,.rb-kort-pynt img{position:absolute;overflow:visible}
     .rb-boble{position:absolute;transform:translate(-50%,-50%);width:clamp(76px,11vh,100px);aspect-ratio:1;border-radius:50%;
       display:grid;place-items:center;font-size:clamp(34px,5.4vh,48px);background:#fffaf0;box-shadow:0 7px 0 rgba(31,58,95,.3),inset 0 0 0 5px #ffd84a}
     .rb-boble.under{background:#4a3426;box-shadow:0 7px 0 rgba(0,0,0,.4),inset 0 0 0 5px #b48cf0}
@@ -679,8 +951,8 @@
     /* Hjemme! */
     .rb-hjemme{position:absolute;inset:0;z-index:7;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2vh;
       padding-bottom:calc(6vh + env(safe-area-inset-bottom,0px));pointer-events:none}
-    .rb-aebler{font-size:clamp(34px,6vh,56px);letter-spacing:.1em;filter:drop-shadow(0 4px 4px rgba(0,0,0,.3))}
-    .rb-aebler i{font-style:normal;opacity:.3;filter:grayscale(1)}
+    .rb-aebler{display:flex;gap:.4vh;filter:drop-shadow(0 4px 4px rgba(0,0,0,.3))}
+    .rb-aebler img{width:clamp(56px,10vh,92px);height:auto}
     .rb-hjemme .rb-row{display:flex;gap:20px;pointer-events:auto}
     .rb-videre{width:clamp(92px,14vh,130px);font-size:clamp(44px,7vh,64px);background:#5cc46b;color:#fff;box-shadow:0 7px 0 #3d8f4d;animation:rb-puls2 1.2s ease-in-out infinite}
     @keyframes rb-puls2{50%{transform:scale(1.08)}}
@@ -722,28 +994,26 @@
     }
     if (type === "klip") {
       c.lineCap = "round";
-      c.strokeStyle = "#7a5530"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(11, -1); c.lineTo(11, 7.5); c.stroke();
-      c.strokeStyle = "#d9b27c"; c.lineWidth = .8; c.stroke();
+      c.strokeStyle = "#5e3d1f"; c.lineWidth = 1.6; c.beginPath(); c.moveTo(11, -1); c.lineTo(11, 7.5); c.stroke();
+      c.strokeStyle = "#e8c690"; c.lineWidth = .95; c.stroke();
       tegnPindsvin(c, { x: 11, y: 13, rot: -.35 }, 0, null);
     } else if (type === "kast") {
-      if (tema === "under") { c.fillStyle = "#ffb347"; c.beginPath(); c.ellipse(11, 19.6, 9, 3.6, 0, Math.PI, 0); c.closePath(); c.fill(); }
-      else {
-        c.fillStyle = "#5fae47"; c.beginPath(); c.ellipse(11, 18.6, 9.5, 2.4, 0, 0, 7); c.fill();
-        c.strokeStyle = "#3d7f3a"; c.lineWidth = .5; c.beginPath(); c.moveTo(3, 18.6); c.lineTo(19, 18.6); c.stroke();
-      }
+      c.save(); c.beginPath(); c.rect(0, 0, 22, 21.2); c.clip(); // stilken klippes af i boblens bund
+      tegnSlynge(c, { tema, statics: [] }, { x: 11, y: 18 });
+      c.restore();
       tegnPindsvin(c, { x: 11, y: 12, rot: 0 }, 0, null);
     } else if (type === "hjemme") {
       c.translate(11, 12); c.scale(1.2, 1.2); c.translate(-11, -12);
       tegnPindsvin(c, { x: 10.2, y: 12.6, rot: 0 }, 0, 0);
     } else {
-      c.translate(11, 12); c.scale(3, 3); c.translate(-11, -12);
-      if (type === "aeble") tegnAeble(c, { x: 11, y: 12.6, taget: false }, 0, 0);
+      c.translate(11, 12); c.scale(2.4, 2.4); c.translate(-11, -12);
+      if (type === "aeble") tegnAeble(c, { x: 11, y: 12, taget: false, ikon: true }, 0, 0);
       else {
         // et æble, der ikke er fundet endnu: en lys skygge af et æble
-        c.fillStyle = "rgba(255,255,255,.5)";
-        c.beginPath(); c.arc(10, 12.6, 2.6, 0, 7); c.arc(12, 12.6, 2.6, 0, 7); c.fill();
-        c.strokeStyle = "rgba(255,255,255,.5)"; c.lineWidth = .6; c.lineCap = "round";
-        c.beginPath(); c.moveTo(11, 10.2); c.lineTo(11.4, 8.6); c.stroke();
+        c.translate(11, 12.3);
+        aebleSti(c, 2.75); fyldOgStreg(c, "rgba(255,255,255,.4)", "rgba(255,255,255,.95)", .5);
+        c.strokeStyle = "rgba(255,255,255,.95)"; c.lineWidth = .65; c.lineCap = "round";
+        c.beginPath(); c.moveTo(0, -1.65); c.quadraticCurveTo(.1, -3, .7, -3.9); c.stroke();
       }
     }
     return (ikoner[k] = el.toDataURL());
@@ -777,40 +1047,55 @@
     q(".rb-igen").hidden = true;
   }
 
-  // Banekortets landskab bag boblerne: sol, skyer, træer og blomster på græsset; rødder, lysende svampe og krystaller under jorden
+  // Et lille billede tegnet med spillets egne figurer (til banekortet). bw × bh er i verdens enheder.
+  const billeder = {};
+  function billede(noegle, bw, bh, fn) {
+    if (billeder[noegle]) return billeder[noegle];
+    const el = document.createElement("canvas"), px = 8; el.width = Math.round(bw * px); el.height = Math.round(bh * px);
+    const c = el.getContext("2d"); c.scale(px, px); fn(c);
+    return (billeder[noegle] = el.toDataURL());
+  }
+  const pyntBillede = (noegle, bw, bh, p) => billede(noegle, bw, bh, c => tegnPynt(c, null, Object.assign({ fri: true }, p), 0, 0));
+
+  // Banekortets landskab bag boblerne: sol, skyer, træer og blomster på græsset; rødder, lysende svampe og krystaller under jorden.
+  // Alt er de samme tegninger som inde i banerne.
   function kortPynt(hoejde, graense) {
-    const svg = (x, y, w, h, indhold, stil = "") => `<svg style="left:${x}%;top:${y}px;${stil}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${indhold}</svg>`;
+    const K = 3.6; // skærmpixels pr. verdens-enhed på kortet
+    const img = (x, y, bw, bh, src, stil = "") => `<img alt="" src="${src}" style="left:${x}%;top:${y}px;width:${bw * K}px;height:${bh * K}px;margin-left:-${bw * K / 2}px;${stil}">`;
     const ting = [];
     const himmel = Math.min(graense, hoejde);
     if (himmel > 200) {
-      ting.push(svg(84, 26, 90, 90, `<circle cx="45" cy="45" r="44" fill="rgba(255,216,74,.35)"/><circle cx="45" cy="45" r="29" fill="#ffd84a"/>`, "margin-left:-45px"));
+      ting.push(img(84, 14, 46, 46, pyntBillede("sol", 46, 46, { type: "sol", x: 23, y: 23 })));
+      const sky = billede("sky", 48, 24, c => tegnSky(c, 13, 16, 9));
       for (let k = 0; 60 + k * 230 < himmel - 160; k++) {
-        const x = k % 2 ? 70 + hash(k + 3) * 18 : 2 + hash(k + 5) * 16, sk = .7 + hash(k + 8) * .5;
-        ting.push(svg(x, 150 + k * 230, 120, 50, `<g fill="#fff" opacity=".9" transform="scale(${sk})"><circle cx="30" cy="32" r="17"/><circle cx="58" cy="22" r="22"/><circle cx="88" cy="32" r="16"/><rect x="30" y="28" width="58" height="21" rx="10"/></g>`));
+        const x = k % 2 ? 76 + hash(k + 3) * 14 : 12 + hash(k + 5) * 14, sk = .65 + hash(k + 8) * .4;
+        ting.push(img(x, 150 + k * 230, 48 * sk, 24 * sk, sky, "opacity:.95"));
       }
     }
     if (graense < hoejde && graense > 120) {
       // på græsset (bunden af hver ting står på græskanten)
-      const paaGraes = (x, w, h, indhold) => ting.push(svg(x, graense - 4 - h, w, h, indhold, `margin-left:-${w / 2}px`));
-      const trae = `<rect x="31" y="55" width="8" height="45" fill="#8a5a32"/><circle cx="35" cy="40" r="30" fill="#5fae47"/><circle cx="25" cy="30" r="12" fill="#8fd16f"/>`;
-      const busk = `<circle cx="18" cy="24" r="14" fill="#4f9e3c"/><circle cx="36" cy="20" r="18" fill="#5fae47"/><circle cx="52" cy="26" r="12" fill="#4f9e3c"/><rect x="6" y="26" width="58" height="12" fill="#5fae47"/>`;
-      const blomst = f => `<path d="M10 30 V12" stroke="#3d7f3a" stroke-width="2"/>${[0, 1, 2, 3, 4].map(k => `<circle cx="${10 + Math.cos(k * 1.257) * 4.5}" cy="${11 + Math.sin(k * 1.257) * 4.5}" r="3.6" fill="${f}"/>`).join("")}<circle cx="10" cy="11" r="2.6" fill="#ffd84a"/>`;
-      paaGraes(6, 70, 100, trae); paaGraes(93, 70, 100, trae); paaGraes(17, 70, 38, busk); paaGraes(80, 70, 38, busk);
-      [[11, "#ff7fbf"], [24, "#b48cf0"], [73, "#ffd84a"], [87, "#ff7fbf"], [52, "#ffffff"]].forEach(([x, f]) => paaGraes(x, 20, 30, blomst(f)));
+      const paaGraes = (x, bw, bh, src) => ting.push(img(x, graense - 3 - bh * K, bw, bh, src));
+      const trae = pyntBillede("trae", 26, 32, { type: "trae", x: 13, y: 31 });
+      const busk = pyntBillede("busk", 22, 12, { type: "busk", x: 11, y: 11.4 });
+      paaGraes(7, 26, 32, trae); paaGraes(93, 26, 32, trae); paaGraes(19, 22, 12, busk); paaGraes(80, 22, 12, busk);
+      [[12, "#ff7fbf"], [27, "#b48cf0"], [72, "#ffd84a"], [87, "#ff7fbf"], [52, "#ffffff"]].forEach(([x, f]) =>
+        paaGraes(x, 8, 9, pyntBillede("blomst" + f, 8, 9, { type: "blomst", x: 3.6, y: 8.5, farve: f })));
       // rødder fra græsset og ned
       [5, 16, 29, 41, 58, 71, 83, 95].forEach((x, k) => {
         const l = 40 + hash(k + 40) * 60, b = (hash(k + 50) - .5) * 24;
-        ting.push(svg(x, graense + 2, 40, l + 4, `<path d="M20 0 Q${20 + b} ${l * .55} ${20 + b * .3} ${l}" stroke="#7a5236" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M${20 + b * .45} ${l * .45} q8 4 10 14" stroke="#7a5236" stroke-width="3" fill="none" stroke-linecap="round"/>`, "margin-left:-20px"));
+        const rod = `M20 0 Q${20 + b} ${l * .55} ${20 + b * .3} ${l}`, gren = `M${20 + b * .45} ${l * .45} q8 4 10 14`;
+        ting.push(`<svg style="left:${x}%;top:${graense + 2}px;margin-left:-20px" width="40" height="${l + 4}" viewBox="0 0 40 ${l + 4}" fill="none" stroke-linecap="round">
+          <path d="${rod}" stroke="#2c1a0e" stroke-width="7"/><path d="${gren}" stroke="#2c1a0e" stroke-width="5"/>
+          <path d="${rod}" stroke="#7d5534" stroke-width="5"/><path d="${gren}" stroke="#7d5534" stroke-width="3"/>
+          <path d="${rod}" stroke="rgba(255,226,180,.25)" stroke-width="1.4"/></svg>`);
       });
       // lysende svampe og krystaller ude i siderne
       for (let k = 0, y = graense + 150; y < hoejde - 50; k++, y += 120) {
         const x = k % 2 ? 86 + hash(k + 60) * 8 : 6 + hash(k + 70) * 8; // midten af tingen; holdes inde på skærmen
         if (k % 3 === 2) {
-          const f = ["#b48cf0", "#ff9fd0", "#7fe3ff"][k % 3 === 2 ? (k >> 1) % 3 : 0];
-          ting.push(svg(x, y, 30, 40, `<path d="M15 2 L23 38 H7 Z" fill="${f}"/><path d="M15 8 L18 34 H14 Z" fill="rgba(255,255,255,.5)"/><path d="M5 18 L10 38 H1 Z" fill="${f}" opacity=".8"/>`, `margin-left:-15px;filter:drop-shadow(0 0 7px ${f})`));
-        } else {
-          ting.push(svg(x, y, 44, 40, `<rect x="19" y="18" width="6" height="22" rx="2" fill="#e9e3d6"/><path d="M4 20 Q22 -4 40 20 Z" fill="#7fe3ff"/><circle cx="15" cy="13" r="2" fill="rgba(255,255,255,.7)"/><circle cx="27" cy="10" r="2.4" fill="rgba(255,255,255,.7)"/>`, "margin-left:-22px;filter:drop-shadow(0 0 9px rgba(120,230,255,.85))"));
-        }
+          const f = ["#b48cf0", "#ff9fd0", "#7fe3ff"][(k >> 1) % 3];
+          ting.push(img(x, y, 26, 26, pyntBillede("krystal" + f, 26, 26, { type: "krystal", x: 13, y: 16.5, farve: f })));
+        } else ting.push(img(x, y, 36, 36, pyntBillede("svamp", 36, 36, { type: "svamp", x: 18, y: 22.5, s: 1.4 })));
       }
     }
     return `<div class="rb-kort-pynt" style="height:${hoejde}px">${ting.join("")}</div>`;
@@ -852,7 +1137,7 @@
     if (af && fik === af) Spil.say("Hjemme! Godt klaret! Du fandt alle æblerne!", null, ["rulle-hjemme", "rulle-alle-aebler"]);
     else Spil.say("Hjemme! Godt klaret!", null, "rulle-hjemme");
     const el = q(".rb-hjemme");
-    el.innerHTML = `${af ? `<div class="rb-aebler">${Array.from({ length: af }, (_, k) => k < fik ? "🍎" : "<i>🍎</i>").join("")}</div>` : ""}
+    el.innerHTML = `${af ? `<div class="rb-aebler">${Array.from({ length: af }, (_, k) => `<img alt="" src="${kortIkon(k < fik ? "aeble" : "tomt")}">`).join("")}</div>` : ""}
       <div class="rb-row"><button class="rb-knap rb-videre" aria-label="Næste bane">▶</button></div>`;
     el.hidden = false;
     el.querySelector(".rb-videre").onclick = () => { Spil.sfx.click(); naesteBane(); };
@@ -926,7 +1211,7 @@
       for (const h of w.haendelser.splice(0)) {
         if (h === "boing") { lyd("boing"); w.trampoliner.forEach(t => t._puls = nu / 1000); }
         else if (h === "aeble") { lyd("aeble"); const sp = tilSkaerm(w.ball.x, w.ball.y); Spil.burst(sp[0], sp[1], "🍎✨"); }
-        else if (h === "bump") lyd("bump");
+        else if (h === "bump") { lyd("bump"); stoevPuf(w.ball.x, w.ball.y, w.tema === "under"); }
         else if (h === "hov") hov();
         else if (h === "hjemme") hjemme();
       }
@@ -950,10 +1235,18 @@
     if (w.hule) tegnHule(c, w, w.hule, t);
     w.trampoliner.forEach(e => tegnTrampolin(c, w, e, t));
     if (w.slynge) tegnSlynge(c, w, w.slynge);
-    w.jord.forEach(e => tegnJord(c, w, e, ud));
-    if (w.tema === "under") w.jord.forEach(e => e.fyld === "op" && !e.skjult && tegnRoedder(c, w, e, ud));
-    w.planker.forEach(e => tegnPlanke(c, w, e));
+    // Jord, vægge og planker står stille: de tegnes én gang til et lag og kopieres ind hver gang
+    if (!w._lag || w._lag.width !== canvas.width || w._lag.height !== canvas.height) {
+      const lag = w._lag = document.createElement("canvas"); lag.width = canvas.width; lag.height = canvas.height;
+      const l = lag.getContext("2d"); l.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
+      w.jord.forEach(e => tegnJord(l, w, e, ud));
+      if (w.tema === "under") w.jord.forEach(e => e.fyld === "op" && !e.skjult && tegnRoedder(l, w, e, ud));
+      w.planker.forEach(e => tegnPlanke(l, w, e));
+    }
+    c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(w._lag, 0, 0);
+    c.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
     w.aebler.forEach((a, i) => tegnAeble(c, a, t, i));
+    tegnStoev(c, RM.matches ? 1 : Math.min(.05, t - (tegn.sidst ?? t))); tegn.sidst = t;
     // elastikken og den prikkede bane, mens man trækker
     if (traek && w.slynge) {
       const sl = w.slynge, b = w.ball;
