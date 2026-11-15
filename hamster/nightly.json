@@ -413,6 +413,31 @@
           "description": "A thimble with a lid of waxed paper. It holds a little of the weather, set aside for later."
         }
       }
+    },
+    {
+      "date": "2026-11-15",
+      "text": "The soup pot has room for one more thing. I am torn between the dried apple and the last small turnip. Which shall go in?",
+      "extras": [
+        "The crescent moon is thicker still, a proper slice now. I think it has been at the bread.",
+        "Sunday afternoon has gone soft at the edges. I am letting it.",
+        "A little grey comma is still on the lamp shade. I have decided not to wipe it. It was there first.",
+        "The wind tried the latch twice and gave up politely. I called thank you through the door.",
+        "Cold hands, warm mug. That is the whole of my winter plan so far."
+      ],
+      "choice": {
+        "options": [
+          {
+            "label": "The dried apple",
+            "reply": "The apple, then. It will go sweet and soft, and the whole burrow will smell like a good idea.",
+            "later": "The soup was sweet at the edges, as promised. I had a second bowl and told nobody."
+          },
+          {
+            "label": "The small turnip",
+            "reply": "The turnip. A sturdy choice. It has waited all autumn in the corner and will be glad to be asked.",
+            "later": "The turnip did very well in the pot. It was quiet and round, and it knew just what to do."
+          }
+        ]
+      }
     }
   ]
 }
