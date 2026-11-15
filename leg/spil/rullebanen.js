@@ -960,7 +960,7 @@
   `);
 
   let root, alive, timers, canvas, ctx, raf, last, acc, w, nr, forsoeg, sidstRoert, hjaelpFra, spor, traek, hjemmeT, gemt, ud, dybTest;
-  let s = 1, ox = 0, oy = 0, cw = 0, ch = 0, dpr = 1;
+  let s = 1, ox = 0, oy = 0, cw = 0, ch = 0, dpr = 1, snit = 0;
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
   const q = sel => root.querySelector(sel);
   const BANER = () => window.RULLEBANER || [];
@@ -1204,7 +1204,11 @@
   function loop(nu) {
     if (!alive) return;
     raf = requestAnimationFrame(loop);
-    const dt = Math.min(.05, (nu - last) / 1000 || 0); last = nu;
+    // Firefox på Android giver ujævne billedtider (fx 14, 19, 16 ms). Ligger et billede tæt på det
+    // normale, bruges det normale, så fysikken får lige meget tid hvert billede og ikke hakker.
+    const raa = Math.min(.05, (nu - last) / 1000 || 0); last = nu;
+    if (raa > 0) snit = snit ? snit + (raa - snit) * .05 : raa;
+    const dt = snit && Math.abs(raa - snit) < snit * .3 ? snit : raa;
     if (w && w.status === "spil") {
       acc += dt;
       while (acc >= H) { trin(w); acc -= H; if (w.status !== "spil") break; }
@@ -1220,7 +1224,18 @@
     } else acc = 0;
     if (hjemmeT != null) hjemmeT += dt;
     if (w) ballonerFlyver(w, dt, nu / 1000);
+    // Fysikken er et stykke (acc) bagefter skærmens tid. Tegn pindsvinet og snorene dér, hvor de er
+    // nået til lige nu, mellem sidste og næste skridt; ellers springer de 2, 3 eller 4 skridt pr. billede.
+    const flyt = w && w.status === "spil" ? mellemSkridt(w, acc / H) : null;
     tegn(nu / 1000);
+    if (flyt) flyt();
+  }
+  function mellemSkridt(w, a) {
+    const b = w.ball, ps = b.fast ? w.parts : w.parts.concat(b), gl = ps.map(p => [p.x, p.y]), rot = b.rot;
+    const k = 1 - a;
+    ps.forEach(p => { p.x -= (p.x - p.px) * k; p.y -= (p.y - p.py) * k; });
+    if (!b.fast) b.rot -= (b.kontakt ? b.spin : b.spin * .995) * k;
+    return () => { ps.forEach((p, i) => { p.x = gl[i][0]; p.y = gl[i][1]; }); b.rot = rot; };
   }
   const tilSkaerm = (x, y) => { const r = canvas.getBoundingClientRect(); return [r.left + ox + x * s, r.top + oy + y * s]; };
 
@@ -1347,7 +1362,7 @@
     id: "rullebanen", navn: "Rullebanen", ikon: "🦔", farve: "#c9e7a7",
     start(r) {
       Spil.preload(["rulle-hej", "rulle-klip", "rulle-kast", "rulle-hov", "rulle-elastik", "rulle-hjemme", "rulle-under", "rulle-alle-aebler"]);
-      alive = true; timers = []; acc = 0; last = performance.now(); gemt = hent(); w = null; nr = -1; forsoeg = 0; hjaelpFra = null; spor = []; traek = null; hjemmeT = null;
+      alive = true; timers = []; acc = 0; snit = 0; last = performance.now(); gemt = hent(); w = null; nr = -1; forsoeg = 0; hjaelpFra = null; spor = []; traek = null; hjemmeT = null;
       r.innerHTML = `<div class="rb">
         <canvas class="rb-c" aria-label="Rullebanen"></canvas>
         <div class="rb-knapper"><button class="rb-knap rb-igen" aria-label="Start forfra" hidden>↻</button><button class="rb-knap rb-kort-knap" aria-label="Banerne" hidden>🗺️</button></div>
