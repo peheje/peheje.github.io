@@ -830,8 +830,15 @@
     el.innerHTML = `${af ? `<div class="rb-aebler">${Array.from({ length: af }, (_, k) => k < fik ? "🍎" : "<i>🍎</i>").join("")}</div>` : ""}
       <div class="rb-row"><button class="rb-knap rb-videre" aria-label="Næste bane">▶</button></div>`;
     el.hidden = false;
-    el.querySelector(".rb-videre").onclick = () => { Spil.sfx.click(); naesteBane(); };
-    later(() => { if (w && w.status === "hjemme" && !q(".rb-hjemme").hidden) naesteBane(); }, 9000);
+    el.querySelector(".rb-videre").onclick = () => { Spil.sfx.click(); videreNaarStille(); };
+    later(() => { if (w && w.status === "hjemme" && !q(".rb-hjemme").hidden) videreNaarStille(); }, 9000);
+  }
+  // Videre til næste bane, men først når stemmen har sagt "Hjemme! Godt klaret!" færdig
+  // (ellers afbryder den næste banes replik rosen). Højst 6 s ventetid.
+  function videreNaarStille(fra = performance.now()) {
+    if (!w || w.status !== "hjemme") return;
+    if (Spil.isTalking() && performance.now() - fra < 6000) { later(() => videreNaarStille(fra), 120); return; }
+    naesteBane();
   }
   function naesteBane() { if (nr + 1 < BANER().length) startBane(nr + 1, true); else visKort(); }
 
