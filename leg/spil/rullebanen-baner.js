@@ -85,6 +85,25 @@ window.RULLEBANER = [
     pynt: [{ type: "sol", x: 80, y: 22 }, { type: "trae", x: 8, y: 150 }, { type: "blomst", x: 50, y: 150 }, { type: "blomst", x: 94, y: 150, farve: "#ffd84a" }],
     hjaelp: [{ type: "klip", fra: [20, 30], til: [40, 30] }],
   },
+  // Zigzag: klip snoren, og pindsvinet triller frem og tilbage ned ad tre planker
+  {
+    id: "zigzag-1", tema: "over",
+    start: [20, 32],
+    elementer: [
+      { type: "jord", fyld: "ned", punkter: [[0, 150], [100, 150]] },
+      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[0, 150], [0, 20]] },
+      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 150], [100, 20]] },
+      { type: "planke", fra: [8, 48], til: [74, 72] },
+      { type: "planke", fra: [94, 84], til: [28, 108] },
+      { type: "planke", fra: [6, 118], til: [62, 136] },
+      { type: "snor", anker: [22, 14] },
+      { type: "aeble", x: 56, y: 59 },
+      { type: "aeble", x: 44, y: 95 },
+      { type: "hule", x: 84, y: 142, r: 8 },
+    ],
+    pynt: [{ type: "sol", x: 82, y: 20 }, { type: "blomst", x: 30, y: 150 }, { type: "trae", x: 8, y: 150 }, { type: "blomst", x: 66, y: 150, farve: "#ffd84a" }],
+    hjaelp: [{ type: "klip", fra: [12, 22], til: [32, 22] }],
+  },
   // ---- Lidt sværere over jorden: ingen usynlige kanter, man kan skyde for kort eller for langt ----
   {
     id: "kast-3", tema: "over",
@@ -155,6 +174,40 @@ window.RULLEBANER = [
     pynt: [{ type: "sol", x: 80, y: 22 }, { type: "blomst", x: 6, y: 128 }, { type: "blomst", x: 60, y: 128, farve: "#b48cf0" }, { type: "trae", x: 92, y: 128 }],
     hjaelp: [{ type: "kast", traek: [-16, 15] }],
   },
+  // Kast pindsvinet på trampolinen, så hopper det over roden og ned til hulen
+  {
+    id: "kast-6", tema: "over",
+    start: [14, 120],
+    elementer: [
+      { type: "jord", fyld: "ned", punkter: [[0, 130], [100, 130]] },
+      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 130], [100, 60]] },
+      { type: "trampolin", fra: [30, 127], til: [54, 127] },
+      { type: "jord", fyld: "ingen", tyk: 3, punkter: [[64, 130], [64, 96]] },
+      { type: "slynge", x: 14, y: 126 },
+      { type: "aeble", x: 56, y: 76 },
+      { type: "hule", x: 84, y: 121, r: 10 },
+    ],
+    pynt: [{ type: "sol", x: 20, y: 22 }, { type: "blomst", x: 6, y: 130 }, { type: "blomst", x: 74, y: 130, farve: "#b48cf0" }, { type: "trae", x: 96, y: 130 }],
+    hjaelp: [{ type: "kast", traek: [-10, 10] }],
+  },
+  // Kædereaktion: klip snoren, trampolinen kaster pindsvinet over til planken, og det triller tilbage til hulen
+  {
+    id: "klip-7", tema: "over",
+    start: [16, 40],
+    elementer: [
+      { type: "jord", fyld: "ned", punkter: [[0, 150], [100, 150]] },
+      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 150], [100, 40]] },
+      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[0, 150], [0, 40]] },
+      { type: "trampolin", fra: [4, 106], til: [30, 114], hop: 150 },
+      { type: "planke", fra: [98, 96], til: [58, 114] },
+      { type: "snor", anker: [18, 16] },
+      { type: "aeble", x: 46, y: 72 },
+      { type: "aeble", x: 76, y: 66 },
+      { type: "hule", x: 40, y: 142, r: 9 },
+    ],
+    pynt: [{ type: "sol", x: 82, y: 20 }, { type: "blomst", x: 20, y: 150 }, { type: "blomst", x: 72, y: 150, farve: "#b48cf0" }, { type: "trae", x: 60, y: 150 }],
+    hjaelp: [{ type: "klip", fra: [7, 26], til: [27, 26] }],
+  },
   {
     id: "under-1", tema: "under",
     start: [20, 42],
@@ -206,6 +259,25 @@ window.RULLEBANER = [
     pynt: [{ type: "svamp", x: 80, y: 144 }, { type: "krystal", x: 70, y: 144, farve: "#ff9fd0" }, { type: "svamp", x: 40, y: 144, s: 1.2 }],
     hjaelp: [{ type: "klip", fra: [50, 40], til: [70, 40] }],
   },
+  // Under jorden: zigzag ned gennem hulerne
+  {
+    id: "under-7", tema: "under",
+    start: [80, 36],
+    elementer: [
+      { type: "jord", fyld: "op", punkter: [[0, 12], [100, 12]] },
+      { type: "jord", fyld: "ned", punkter: [[0, 148], [100, 148]] },
+      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[0, 148], [0, 12]] },
+      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 148], [100, 12]] },
+      { type: "planke", fra: [94, 58], til: [30, 76] },
+      { type: "planke", fra: [6, 92], til: [72, 110] },
+      { type: "aeble", x: 44, y: 64 },
+      { type: "aeble", x: 56, y: 98 },
+      { type: "snor", anker: [80, 12] },
+      { type: "hule", x: 86, y: 139, r: 9 },
+    ],
+    pynt: [{ type: "svamp", x: 50, y: 148 }, { type: "krystal", x: 94, y: 148, farve: "#7fe3ff" }, { type: "svamp", x: 76, y: 148, s: .8 }],
+    hjaelp: [{ type: "klip", fra: [70, 24], til: [90, 24] }],
+  },
   // ---- Lidt sværere under jorden ----
   {
     id: "under-4", tema: "under",
@@ -251,5 +323,37 @@ window.RULLEBANER = [
     ],
     pynt: [{ type: "svamp", x: 62, y: 150 }, { type: "krystal", x: 96, y: 150, farve: "#7fe3ff" }, { type: "svamp", x: 6, y: 134, s: .8 }],
     hjaelp: [{ type: "kast", traek: [11, 20] }],
+  },
+  // Lavt loft: kast fladt hen over hullet
+  {
+    id: "under-8", tema: "under",
+    start: [14, 132],
+    elementer: [
+      { type: "jord", fyld: "op", punkter: [[0, 96], [100, 96]] },
+      { type: "jord", fyld: "ned", punkter: [[0, 140], [30, 140], [32, 170]] },
+      { type: "jord", fyld: "ned", punkter: [[58, 170], [60, 140], [100, 140]] },
+      { type: "jord", fyld: "ingen", skjult: true, tyk: 1.2, punkter: [[100, 140], [100, 96]] },
+      { type: "slynge", x: 14, y: 136 },
+      { type: "aeble", x: 45, y: 118 },
+      { type: "hule", x: 84, y: 131, r: 10 },
+    ],
+    pynt: [{ type: "svamp", x: 24, y: 140 }, { type: "krystal", x: 70, y: 140, farve: "#ff9fd0" }, { type: "svamp", x: 94, y: 140, s: .8 }],
+    hjaelp: [{ type: "kast", traek: [-21, 9] }],
+  },
+  // To snore: klip den højre, sving mod venstre, og klip den anden, så pindsvinet lander på hylden
+  {
+    id: "under-9", tema: "under",
+    start: [70, 70],
+    elementer: [
+      { type: "jord", fyld: "op", punkter: [[0, 12], [100, 12]] },
+      { type: "jord", fyld: "ned", punkter: [[0, 104], [36, 104], [40, 170]] },
+      { type: "snor", anker: [92, 12] },
+      { type: "snor", anker: [40, 12] },
+      { type: "aeble", x: 48, y: 79 },
+      { type: "hule", x: 14, y: 95, r: 10 },
+    ],
+    pynt: [{ type: "svamp", x: 28, y: 104 }, { type: "krystal", x: 4, y: 104, farve: "#7fe3ff" }],
+    // Det andet klip skal vente, til pindsvinet er svinget over (mindst ca. 0,6 s); derefter virker det når som helst
+    hjaelp: [{ type: "klip", fra: [85, 15], til: [99, 15], t: 0.3 }, { type: "klip", fra: [33, 15], til: [47, 15], t: 1.3 }],
   },
 ];
