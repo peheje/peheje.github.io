@@ -438,6 +438,21 @@
           }
         ]
       }
+    },
+    {
+      "date": "2026-11-16",
+      "text": "A second envelope, sealed with jam again. This one is only a flap of paper with a drawing of a very small lamp. I have put it by the other.",
+      "extras": [
+        "The moon is half a face tonight, tilted towards the lane. I think it is listening for the kettle.",
+        "Monday has arrived in good order. I have asked it to wait on the step a while.",
+        "There is a bead of cold on every twig. The hedge looks like it has been given a necklace.",
+        "I found the other half of the string ball under the chair. It was not lost, only resting.",
+        "The lamp burns a little steadier now that the grey comma is on its shade. Or I imagine so."
+      ],
+      "note": {
+        "text": "Heaven is under our feet as well as over our heads.",
+        "source": "Henry David Thoreau, Walden (1854)"
+      }
     }
   ]
 }
