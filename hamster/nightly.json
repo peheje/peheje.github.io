@@ -453,6 +453,26 @@
         "text": "Heaven is under our feet as well as over our heads.",
         "source": "Henry David Thoreau, Walden (1854)"
       }
+    },
+    {
+      "date": "2026-11-17",
+      "text": "Two envelopes now, and I would like to hear whoever brings them. Might we have five minutes of quiet by the door, to listen?",
+      "extras": [
+        "The moon is cut clean in half tonight, like a loaf for two. I took the bigger side, in spirit.",
+        "Tuesday has put on its plain brown cloak. It suits it.",
+        "I found a walnut shell on the sill. It makes a fine bowl and an even finer boat, in theory.",
+        "The chimney has been drawing well. I thanked it, and it huffed, which I take as welcome."
+      ],
+      "quest": {
+        "kind": "timer",
+        "minutes": 5,
+        "timeBand": "evening",
+        "done": "Five minutes, and I heard only a soft scratch of paper, and then nothing. Thank you. I think someone was near.",
+        "keepsake": {
+          "name": "A jam-sealed paper lamp",
+          "description": "A tiny folded paper lamp, sealed with a dab of jam. It was on the mat when we finished."
+        }
+      }
     }
   ]
 }
