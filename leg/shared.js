@@ -35,6 +35,10 @@
   let token = 0, talking = false, src = null;
   const AC = window.AudioContext || window.webkitAudioContext;
   function ctx() { actx = actx || new AC(); if (actx.state === "suspended") actx.resume(); return actx; }
+  // Browseren starter lyden "på pause", indtil man har rørt siden. Åbnes et spil direkte (dybt link), eller rører
+  // barnet kun et lærred, kaldes ctx() måske ikke i selve trykket, så lyden ville forblive slukket. Vågn ved hvert tryk.
+  const vaek = () => { if (actx && actx.state !== "running") { try { actx.resume(); } catch (e) {} } };
+  ["pointerdown", "touchend", "keydown"].forEach(t => addEventListener(t, vaek, { capture: true, passive: true }));
   const clips = {};
   // Lyd-pakker: den udgivne artifact kan højst have ~500 filer, så dér samles lydene i én pakke pr. præfiks
   // (lyd/pakke-<præfiks>.json med {nøgle: base64-mp3}). Kun når siden sætter window.LYD_PAKKER; ellers hentes
@@ -161,6 +165,17 @@
 
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-  Object.assign(Spil, { say, stopTalking, isTalking, preload, key, jaDyr, audio: ctx, tone, sfx, burst, burstAt, css, shuffle, danishVoices, label, setVoice, getVoice: () => voice });
+  /* ---------- 3D ----------
+     three.js ligger i vendor/ og hentes først, når et spil beder om det (Spil.three().then(T => ...)). */
+  let threeP = null;
+  function three() {
+    if (!threeP) {
+      threeP = import(new URL("vendor/three-0.170.0.module.min.js", document.baseURI).href);
+      threeP.catch(() => { threeP = null; });
+    }
+    return threeP;
+  }
+
+  Object.assign(Spil, { three, say, stopTalking, isTalking, preload, key, jaDyr, audio: ctx, tone, sfx, burst, burstAt, css, shuffle, danishVoices, label, setVoice, getVoice: () => voice });
   window.Spil = Spil;
 })();
