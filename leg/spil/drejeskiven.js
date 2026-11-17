@@ -62,6 +62,7 @@
   let ned = false, punkt = null, modus = null, modusD = 0, sidstD = 0, sagtAabn = false, sidstUV = null, farve = null, flod = null, malet = 0;
   let formTid = 0, sidstRoert = 0, sagtHul = false, sagtMal = false, sidstTid = 0;
   let kamPos, kamMaal, kamPosMaal, kamMaalMaal, ovnAnim = null, hyldeKrukker = [], dans = [];
+  let vist = null, snurr = null, slor = null, sagtSnur = false; // krukken der vises tæt på fra hylden
   let fingre = new Map(), kamGreb = null, kamTilt = 0, kamZoom = 1; // kamera: to fingre / højreklik / hjul
   let lyd = null, V0 = 1, klat = null, fyld = null, sagtMere = false, sagtHint = false;
   const MAXV = 2.2;       // højst så mange klumper ler (målt i startklumper)
@@ -422,8 +423,11 @@
   function lavHylde(ny) {
     // Ryd den gamle hylde
     hyldeGrp.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
-    hyldeGrp.clear(); hyldeKrukker = []; dans = [];
+    hyldeGrp.clear(); hyldeKrukker = []; dans = []; vist = null; snurr = null;
     hyldeGrp.visible = true;
+    // Et slør, der lægger sig foran hylden, når en krukke vises tæt på
+    slor = new T.Mesh(new T.PlaneGeometry(80, 80), new T.MeshBasicMaterial({ color: "#f7e6cf", transparent: true, opacity: 0, depthWrite: false }));
+    slor.visible = false; hyldeGrp.add(slor);
     const { kol, rk } = hyldeLayout(), { b } = hyldeMaal();
     const trae = new T.MeshStandardMaterial({ color: "#b07a4f", roughness: .7 });
     const bag = new T.Mesh(new T.PlaneGeometry(b + 1.2, rk * RAEKKE + .8), new T.MeshStandardMaterial({ color: "#f0d8b8", roughness: .95 }));
@@ -448,11 +452,56 @@
       m.scale.setScalar(sk); m.castShadow = m.receiveShadow = true;
       m.position.set((plads - (kol - 1) / 2) * PLADS, rad * RAEKKE, 0);
       m.rotation.y = Math.random() * 6;
-      m.userData = { basisY: m.position.y, sk };
+      m.userData = { basisY: m.position.y, sk, h: k.H, maxR };
       hyldeGrp.add(m); hyldeKrukker.push(m);
       if (ny && i === 0) dans.push({ m, t: 0, lande: true });
     });
   }
+  /* ---------- Se en krukke tæt på: tryk på den på hylden, træk for at dreje den, tryk ved siden af for at sætte den tilbage ---------- */
+  function loeft(m) {
+    dans = dans.filter(d => d.m !== m); m.position.y = m.userData.basisY; m.rotation.z = 0;
+    const { sk, h, maxR } = m.userData, pivot = new T.Group();
+    pivot.position.set(m.position.x, m.position.y + h * sk / 2, m.position.z); // drej om krukkens midte
+    hyldeGrp.add(pivot); pivot.add(m); m.position.set(0, -h * sk / 2, 0);
+    const dir = kamPosMaal.clone().sub(kamMaalMaal), Dk = dir.length(); dir.normalize();
+    const maal = kamMaalMaal.clone().addScaledVector(dir, Dk * .45), Dc = Dk * .55;
+    const vh = 2 * Dc * Math.tan(T.MathUtils.degToRad(camera.fov / 2)), vb = vh * camera.aspect;
+    // Den skal kunne vippes, så en bred skål vender kanten mod os: hold den inden for skærmen i alle retninger
+    const f = Math.min(.55 * vh / Math.max(h, 2 * maxR), .7 * vb / (2 * maxR));
+    vist = { m, pivot, fra: pivot.position.clone(), maal, skala: f / sk, t: 0, retning: 1, vel: 0, rx: .35 };
+    slor.position.copy(maal).addScaledVector(dir, -(maxR * f + .4)); slor.lookAt(kamPosMaal);
+    Spil.tone([392, 523, 659], .1, "triangle");
+    if (!sagtSnur) { sagtSnur = true; later(() => vist && Spil.say("Træk med fingeren, så drejer krukken rundt.", null, "drej-snur"), 600); }
+  }
+  function saetTilbage() {
+    if (!vist || vist.retning < 0) return;
+    vist.retning = -1; Spil.tone([523, 392], .08, "triangle");
+  }
+  function visTrin(dt) {
+    if (!vist) return;
+    const v = vist; v.t = Math.max(0, Math.min(1, v.t + dt / .55 * v.retning));
+    const e = v.t * v.t * (3 - 2 * v.t);
+    v.pivot.position.lerpVectors(v.fra, v.maal, e);
+    v.pivot.scale.setScalar(1 + (v.skala - 1) * e);
+    v.pivot.rotation.x = v.rx * e;
+    if (!snurr) { v.vel *= Math.pow(.3, dt); v.pivot.rotation.y += (v.vel + .5 * e) * dt; } // efter et skub snurrer den videre, ellers drejer den roligt
+    slor.material.opacity = .65 * e; slor.visible = e > .001;
+    if (v.retning < 0 && v.t <= 0) { // tilbage på hylden, og den beholder den side, barnet drejede frem
+      const m = v.m; v.pivot.remove(m); hyldeGrp.add(m);
+      m.position.set(v.fra.x, m.userData.basisY, v.fra.z); m.rotation.y += v.pivot.rotation.y;
+      hyldeGrp.remove(v.pivot); vist = null;
+    }
+  }
+  function snurrFlyt(e) {
+    const nu = performance.now(), dx = e.clientX - snurr.lx, dy = e.clientY - snurr.ly;
+    if (Math.hypot(e.clientX - snurr.x, e.clientY - snurr.y) > 10) snurr.flyttet = true;
+    vist.pivot.rotation.y += dx * .012;
+    vist.rx = Math.max(-.6, Math.min(1.3, vist.rx + dy * .008));
+    const dtE = Math.max(1, nu - snurr.lt) / 1000;
+    snurr.vel = snurr.vel * .5 + (dx * .012 / dtE) * .5;
+    snurr.lx = e.clientX; snurr.ly = e.clientY; snurr.lt = nu;
+  }
+
   function profilFra(k) {
     const rr = k.r.length === K ? k.r : Array.from({ length: K }, (_, i) => k.r[Math.round(i / (K - 1) * (k.r.length - 1))]);
     return profil(rr, k.H, k.hul || 0);
@@ -493,7 +542,7 @@
     if (fase !== "hylde" && (fingre.size >= 2 || e.button === 2)) { startGreb(); return; }
     if (kamGreb) return;
     ned = true; modus = null; sidstUV = null; tilNdc(e);
-    if (fase === "hylde") tryk_hylde();
+    if (fase === "hylde") { ned = false; tryk_hylde(e); }
     if (fase === "glasur" && !farve) {
       ray.setFromCamera(ndc, camera);
       if (ray.intersectObject(krukke).length) Spil.say("Vælg en farve først.", null, "drej-vaelg");
@@ -501,18 +550,29 @@
   }
   function onMove(e) {
     if (fingre.has(e.pointerId)) fingre.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (kamGreb) flytGreb(); else if (ned) tilNdc(e);
+    if (snurr && vist) snurrFlyt(e);
+    else if (kamGreb) flytGreb(); else if (ned) tilNdc(e);
   }
   function onUp(e) {
     fingre.delete(e.pointerId);
+    if (snurr && vist) {
+      if (snurr.flyttet) vist.vel = Math.max(-14, Math.min(14, performance.now() - snurr.lt < 120 ? snurr.vel : 0));
+      else if (snurr.paa) { vist.vel += 7; Spil.tone([523, 659, 784].map(f => f * (.8 + Math.random() * .4)), .1, "triangle"); }
+      else saetTilbage();
+    }
+    snurr = null;
     if (kamGreb) { if (fingre.size === 0) kamGreb = null; else startGreb(); } // nyt udgangspunkt, så kameraet ikke hopper
     ned = false; modus = null; sidstUV = null;
   }
 
-  function tryk_hylde() {
+  function tryk_hylde(e) {
     ray.setFromCamera(ndc, camera);
     const hit = ray.intersectObjects(hyldeKrukker)[0];
-    if (hit) { dans.push({ m: hit.object, t: 0 }); Spil.tone([523, 659, 784].map(f => f * (.8 + Math.random() * .4)), .1, "triangle"); }
+    if (vist) { // en krukke vises tæt på: træk = drej den, tryk ved siden af = sæt den tilbage
+      if (vist.retning < 0) return;
+      const nu = performance.now();
+      snurr = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, lt: nu, vel: 0, flyttet: false, paa: !!hit && hit.object === vist.m };
+    } else if (hit) loeft(hit.object);
   }
 
   const plan = () => { const n = new T.Vector3(camera.position.x, 0, camera.position.z).normalize(); return new T.Plane(n, 0); };
@@ -749,6 +809,7 @@
     if (fase === "glasur") { flodTrin(dt); mal(); }
     ovnTrin(dt);
     dansTrin(dt);
+    if (fase === "hylde") visTrin(dt);
 
     kamPos.lerp(kamPosMaal, Math.min(1, dt * 3)); kamMaal.lerp(kamMaalMaal, Math.min(1, dt * 3));
     camera.position.copy(kamPos); camera.lookAt(kamMaal);
@@ -765,7 +826,7 @@
     id: "drejeskiven", navn: "Drejeskiven", ikon: "🏺", farve: "#f7c9a3",
     start(rt) {
       alive = true; timers = []; fase = "start"; vinkel = 0; omega = 0; sidstTid = 0; ned = false; dans = []; ovnAnim = null;
-      Spil.preload(["drej-hej", "drej-hul", "drej-glasur", "drej-mal", "drej-ovn", "drej-skinner", "drej-hylde", "drej-ny", "drej-alle", "drej-vaelg", "drej-hint", "drej-mere", "drej-mere-hint", "drej-aabn"]);
+      Spil.preload(["drej-hej", "drej-hul", "drej-glasur", "drej-mal", "drej-ovn", "drej-skinner", "drej-hylde", "drej-ny", "drej-alle", "drej-vaelg", "drej-hint", "drej-mere", "drej-mere-hint", "drej-aabn", "drej-snur"]);
       rt.innerHTML = `<div class="dr"><canvas class="dr-cv"></canvas><div class="dr-vent">🏺</div>
         <div class="dr-farver" hidden>${FARVER.map((f, i) => `<button data-i="${i}" style="background:${f[1]}" aria-label="${f[2]}"></button>`).join("")}</div>
         <button class="dr-videre" hidden>✅</button>
@@ -779,7 +840,7 @@
       cv.addEventListener("pointerdown", onDown); cv.addEventListener("pointermove", onMove);
       cv.addEventListener("pointerup", onUp); cv.addEventListener("pointercancel", onUp);
       cv.addEventListener("wheel", onHjul, { passive: false });
-      fingre = new Map(); kamGreb = null; kamTilt = 0; kamZoom = 1;
+      fingre = new Map(); kamGreb = null; kamTilt = 0; kamZoom = 1; vist = snurr = slor = null; sagtSnur = false;
       addEventListener("resize", tilpas);
       lydStart();
       Spil.three().then(mod => {
