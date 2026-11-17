@@ -1,4 +1,4 @@
-// Spil: Toget — et farverigt tog kører gennem et blødt landskab (eng, bro, tunnel, by).
+// Spil: Toget — et farverigt tog holder ved stationer på landet og i byen.
 // Toget ruller ind på en station, og barnet hjælper tre dyr ombord ved at trykke på det dyr,
 // stemmen beder om. Tryk på lokomotivet giver "tut-tut", damp og et lille hop. Ingen tabe-tilstand.
 (function () {
@@ -20,12 +20,12 @@
   const CARS = ["#ff8fb1", "#ffd166", "#8bd17c"]; // hver vogn sin glade farve
   // Gemmesteder: [dække, plads]. Tre af dem bruges ved hver station
   const SPOTS = [["🧳", "s1"], ["🛒", "s2"], ["🧺", "s3"], ["🌳", "s4"], ["🌲", "s5"]];
-  const STATIONER = 4;
-  const LAND = ["tunnel", "bro", "by"];
+  const STATIONER = 4; // hver anden station ligger i byen
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const mod = (a, b) => ((a % b) + b) % b;
+  // Blide kurver (kvadratiske): toget starter og bremser roligt i stedet for at fare ind og ud
   const easeIn = t => t * t;
-  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  const easeOut = t => 1 - (1 - t) * (1 - t);
 
   Spil.css("css-toget", `
     .tg{position:absolute;inset:0;overflow:hidden;--ph:26vh;
@@ -220,38 +220,12 @@
       padding:.1em .6em;border-radius:999px;background:rgba(255,253,247,.86);box-shadow:0 5px 0 rgba(31,58,95,.18);
       pointer-events:none}
     .tg-prompt:empty{display:none}
-    .tg-land{position:absolute;left:0;bottom:calc(var(--ph) + 4.2vh);z-index:3;
-      width:calc(var(--lw)*2.4);height:calc(var(--lw)*.95)}
+    /* Byen: huse med tage, oplyste vinduer og døre, kirketårn med ur, butik med markise.
+       Står bag sporet ved hver anden station og toner frem/væk, mens toget er ude af billedet */
+    .tg-land{position:absolute;left:50%;bottom:calc(var(--ph) + 4.2vh);z-index:3;pointer-events:none;
+      transform:translateX(-50%);opacity:0;transition:opacity .8s}
+    .tg-land.vis{opacity:1}
     .tg-land>*{position:absolute}
-    /* Tunnelen: en græsbakke med en stenport, så høj at toget kan køre ind i den */
-    .tg-land.tunnel{z-index:6;height:calc(var(--lw)*1.3)}
-    .tg-land.tunnel .hillback{inset:0;border-radius:50% 50% 4% 4%/78% 78% 3% 3%;
-      background:radial-gradient(ellipse 70% 40% at 38% 18%,rgba(255,255,255,.28),rgba(255,255,255,0) 70%),
-        linear-gradient(#b2e39a,#82c46f 62%,#5f9f52);box-shadow:inset 0 -.7vh 0 rgba(0,0,0,.12)}
-    .tg-land.tunnel .portal{left:23%;right:23%;bottom:0;height:84%;border-radius:50% 50% 0 0/42% 42% 0 0;
-      background:repeating-conic-gradient(from -90deg at 50% 58%,#d9d3c7 0 13deg,#9c958a 13deg 15deg);
-      box-shadow:inset 0 0 0 .35vh rgba(70,62,52,.35),0 .5vh 0 rgba(0,0,0,.12)}
-    .tg-land.tunnel .arch{left:31%;right:31%;bottom:0;height:72%;
-      background:radial-gradient(ellipse 60% 50% at 50% 100%,#4a3f63,#1d1830 70%);
-      border-radius:50% 50% 0 0/38% 38% 0 0;box-shadow:inset 0 1.4vh 2vh rgba(0,0,0,.6)}
-    .tg-land.tunnel .sten{left:46%;width:8%;top:14%;height:12%;background:#ece7dc;border-radius:.4vh;
-      box-shadow:inset 0 0 0 .3vh rgba(70,62,52,.3)}
-    .tg-land.tunnel .pynt{font-size:calc(var(--lw)*.17);line-height:1}
-    /* Broen: toget kører hen over den. Under sporet buer af sten over en å, foran hjulene et lavt rækværk */
-    .tg-land.bro{z-index:6;bottom:var(--ph);width:calc(var(--lw)*2.6);height:calc(6.8vh + var(--lw)*.17)}
-    .tg-land.bro .water{left:-6%;right:-6%;bottom:0;height:3.4vh;border-radius:1.4vh 1.4vh 0 0;
-      background:radial-gradient(ellipse 50% 40% at 50% 0,rgba(255,255,255,.75) 0 40%,rgba(255,255,255,0) 44%) 0 .5vh/4vh 1.2vh repeat-x,
-        linear-gradient(#8fd3f7,#4fa6dd)}
-    .tg-land.bro .buer{left:0;right:0;bottom:0;height:5vh;
-      background:radial-gradient(ellipse 38% 74% at 50% 100%,rgba(0,0,0,0) 97%,#c9b48f 100%) 0 0/25% 100% repeat-x;
-      box-shadow:inset 0 .5vh 0 rgba(255,255,255,.35)}
-    .tg-land.bro .kant{left:-1%;right:-1%;bottom:4.4vh;height:1vh;background:#a8834f;border-radius:.4vh}
-    .tg-land.bro .rail{left:0;right:0;bottom:6.6vh;height:calc(var(--lw)*.17);
-      background:linear-gradient(#e85d5d,#c94444) 0 0/100% 22% no-repeat,
-        linear-gradient(#e85d5d,#c94444) 0 60%/100% 14% no-repeat,
-        repeating-linear-gradient(90deg,#d94b4b 0 1vh,rgba(0,0,0,0) 1vh 7vh);
-      border-radius:.4vh .4vh 0 0;filter:drop-shadow(0 .3vh 0 rgba(0,0,0,.15))}
-    /* Byen: huse med tage, oplyste vinduer og døre, kirketårn med ur, butik med markise */
     .tg-land.by{width:calc(var(--lw)*3.4);height:calc(var(--lw)*1.2)}
     .tg-land.by .hus{bottom:0;border-radius:6% 6% 0 0;background:var(--c);
       box-shadow:inset 0 -.6vh 0 rgba(0,0,0,.1),inset .5vh 0 0 rgba(255,255,255,.25)}
@@ -306,9 +280,9 @@
     }
   `);
 
-  let root, alive, timers, raf = 0, lastT = 0, W = 0, H = 0, loopW = 1200, clock = 0,
-    travel = 0, speed = 0, trainX = 0, tween = null, phase = "", deck = [], dyr = [], raekke = [],
-    idx = 0, target = null, boarded = 0, station = 0, hintT = 0, klar = false, land = null;
+  let root, alive, timers, raf = 0, lastT = 0, W = 0, H = 0, clock = 0,
+    hjul = 0, trainX = 0, tween = null, phase = "", deck = [], dyr = [], raekke = [],
+    idx = 0, target = null, boarded = 0, station = 0, hintT = 0, klar = false;
   const el = {};
   let clouds = [], traeer = [], blomster = [];
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
@@ -326,6 +300,7 @@
       <button class="tg-sun" aria-label="Solen">🌞</button>
       <button class="tg-mill" aria-label="Vindmøllen"><span class="tg-blades"><i></i><i></i><i></i><i></i></span><span class="tg-tower"></span></button>
       <button class="tg-cow" aria-label="Traktoren på marken">🚜</button>
+      <div class="tg-land by" aria-hidden="true">${byHTML()}</div>
       <div class="tg-trees"></div>
       <div class="tg-track"></div>
       <div class="tg-flowers"></div>
@@ -347,8 +322,8 @@
     el.spots = [...root.querySelectorAll(".gz")];
     el.spots.forEach(sp => { sp.onclick = () => trykSted(sp); });
     el.loco = q(".tg-loco"); el.prompt = q(".tg-prompt");
-    el.far = q(".tg-hills.far"); el.near = q(".tg-hills.near");
-    el.track = q(".tg-track"); el.trees = q(".tg-trees:not(.fjern)"); el.flowers = q(".tg-flowers");
+    el.by = q(".tg-land.by");
+    el.trees = q(".tg-trees:not(.fjern)"); el.flowers = q(".tg-flowers");
     el.treesFar = q(".tg-trees.fjern");
 
     for (let i = 0; i < 3; i++) {
@@ -362,17 +337,17 @@
     el.carEls = [...el.cars.children];
     el.wheels = [...root.querySelectorAll(".wheel")];
 
-    // træer og blomster, der glider forbi i hver sin fart
+    // træer og blomster står stille i landskabet (placeres i layout)
     const TYPER = ["🌳", "🌲", "🌳", "🌿", "🌲", "🌳"];
-    for (let i = 0; i < 9; i++) lagTrae(el.trees, TYPER[i % TYPER.length], traeer, i, 9, .8, 1.35);
-    for (let i = 0; i < 7; i++) lagTrae(el.treesFar, i % 2 ? "🌲" : "🌳", traeer, i, 7, .85, 1.25, true);
-    const BLOMSTER = ["🌼", "🌷", "🌼", "🌿", "🌸", "🌼", "🌻", "🌿", "🌼", "🌷"];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 6; i++) lagTrae(el.trees, TYPER[i % TYPER.length], traeer, i, 6, .8, 1.35);
+    for (let i = 0; i < 5; i++) lagTrae(el.treesFar, i % 2 ? "🌲" : "🌳", traeer, i, 5, .85, 1.25, true);
+    const BLOMSTER = ["🌼", "🌷", "🌼", "🌿", "🌸", "🌼", "🌻", "🌷"];
+    for (let i = 0; i < BLOMSTER.length; i++) {
       const s = document.createElement("span");
       s.className = "tg-sprite"; s.textContent = BLOMSTER[i];
       s.style.fontSize = (.75 + Math.random() * .5).toFixed(2) + "em";
       el.flowers.appendChild(s);
-      blomster.push({ el: s, f: (i + Math.random() * .5) / 10 });
+      blomster.push({ el: s, f: (i + Math.random() * .5) / BLOMSTER.length });
     }
 
     clouds = [
@@ -395,7 +370,7 @@
     if (!alive) return;
     W = el.tg.clientWidth || innerWidth;
     H = el.tg.clientHeight || innerHeight;
-    loopW = Math.max(W * 1.7, 1000);
+    traeer.concat(blomster).forEach(s => { s.el.style.transform = `translateX(${(s.f * (W + 40) - 30).toFixed(1)}px)`; });
     if (!klar) {
       klar = true;
       clouds[0].x = W * .06; clouds[1].x = W * .56; clouds[2].x = W * .34;
@@ -404,8 +379,6 @@
   }
 
   /* ---------- Animation ---------- */
-  const fart = () => Math.max(150, W * .22);
-
   function frame(t) {
     if (!alive) return;
     if (!lastT) lastT = t;
@@ -417,42 +390,32 @@
 
   function update(dt) {
     clock += dt;
+    // Landskabet står stille; kun toget kører. Det ruller roligt ind, bremser blødt og kører roligt ud igen
+    const x0 = trainX;
     if (tween) {
       tween.t = Math.min(1, tween.t + dt / tween.dur);
       trainX = tween.from + (tween.to - tween.from) * tween.ease(tween.t);
       if (tween.t >= 1) { const d = tween.done; tween = null; d && d(); }
     }
-    const maal = tween ? (phase === "depart" ? 1.5 : 1) : 0;
-    speed += (maal - speed) * Math.min(1, dt * 4);
-    if (!still) travel += speed * fart() * dt;
+    const dx = trainX - x0, v = dt > 0 ? Math.abs(dx) / dt : 0;
 
-    const bob = (!still && speed > .04) ? Math.sin(clock * 15) * Math.min(3, speed * 3) : 0;
+    const bob = (!still && v > 20) ? Math.sin(clock * 9) * Math.min(1.5, v / 300) : 0;
     el.train.style.transform = `translate3d(${trainX.toFixed(1)}px,${bob.toFixed(1)}px,0)`;
-    // Toget kører mod venstre, så hjulene drejer mod uret (negativ vinkel) og landskabet glider mod højre
-    const spin = still ? 0 : mod(-travel * 2.2, 360);
-    el.wheels.forEach(w => w.style.setProperty("--spin", spin.toFixed(1) + "deg"));
+    // Hjulene drejer med togets fart (mod uret, når det kører mod venstre) og står stille, når toget holder
+    if (!still) hjul = mod(hjul + dx * 1.6, 360);
+    el.wheels.forEach(w => w.style.setProperty("--spin", hjul.toFixed(1) + "deg"));
     // kobberstangen følger hjulene i en lille cirkel
-    const sr = spin * Math.PI / 180, rr = el.loco.clientWidth * .028;
+    const sr = hjul * Math.PI / 180, rr = el.loco.clientWidth * .028;
     el.rod.style.transform = `translate(${(Math.sin(sr) * rr).toFixed(1)}px,${(-Math.cos(sr) * rr).toFixed(1)}px)`;
-
-    traeer.forEach(s => { s.el.style.transform = `translate3d(${mod(s.f * loopW + travel * (s.fjern ? .78 : 1.02), loopW).toFixed(1)}px,0,0)`; });
-    blomster.forEach(s => { s.el.style.transform = `translate3d(${mod(s.f * loopW + travel * 1.22, loopW).toFixed(1)}px,0,0)`; });
-    el.track.style.backgroundPositionX = travel + "px";
-    el.far.style.backgroundPositionX = (travel * .3) + "px";
-    el.near.style.backgroundPositionX = (travel * .55) + "px";
 
     clouds.forEach(c => {
       if (!still) { c.x += c.v * dt; if (c.x > W + 140) c.x = -160; }
       c.el.style.transform = `translateX(${c.x.toFixed(1)}px)`;
     });
-
-    if (land) {
-      // glider med jorden (samme fart som træerne), så toget kører ind i det
-      land.x += (still ? 0 : speed * fart() * 1.02 * dt) + fart() * .35 * dt;
-      land.el.style.transform = `translateX(${land.x.toFixed(1)}px)`;
-      if (land.x > W + 40) { land.el.remove(); land = null; }
-    }
   }
+
+  // Byen står bag sporet ved hver anden station
+  const skiftSted = () => el.by.classList.toggle("vis", station % 2 === 1);
 
   /* ---------- Lyd og damp ---------- */
   function tut(lang) {
@@ -488,7 +451,7 @@
     hvilSteder();
     el.prompt.textContent = "";
     trainX = W + 100; // toget holder uden for skærmen til højre og ruller ind
-    tween = { from: trainX, to: 0, t: 0, dur: still ? 1.5 : 2.0, ease: easeOut, done: () => {
+    tween = { from: trainX, to: 0, t: 0, dur: still ? 1.5 : 4.0, ease: easeOut, done: () => {
       if (!alive) return;
       byggPerron();
       phase = "ask";
@@ -625,16 +588,18 @@
     el.prompt.textContent = "";
     tut(true);
     Spil.say("Alle er med! Nu kører toget!", null, "tog-klar");
-    const land = LAND[station % LAND.length];
-    // Landemærket kommer med det samme, så toget når at køre ind i tunnelen / over broen, mens man kan se det
-    later(() => { if (alive) visLand(land); }, still ? 200 : 60);
-    tween = { from: trainX, to: -(W + el.train.offsetWidth + 140), t: 0, dur: still ? 1.6 : 2.4, ease: easeIn,
-      done: () => {
-        if (!alive) return;
-        station++;
-        if (station >= STATIONER) fest();
-        else nyStation();
-      } };
+    // Toget står lidt, mens det tuder, og ruller så roligt ud til venstre
+    later(() => {
+      tween = { from: trainX, to: -(W + el.train.offsetWidth + 140), t: 0, dur: still ? 1.6 : 4.5, ease: easeIn,
+        done: () => {
+          if (!alive) return;
+          station++;
+          if (station >= STATIONER) { fest(); return; }
+          // Nyt sted, mens toget er ude af billedet: byen toner frem eller væk, og så ruller toget ind
+          skiftSted();
+          later(nyStation, still ? 300 : 1000);
+        } };
+    }, 600);
   }
 
   // Byens huse: x, bredde, højde (i % af byen), farve, tag-farve, tag-type, vinduer (kolonner x rækker), ekstra
@@ -673,30 +638,6 @@
     return h;
   }
 
-  function visLand(kind) {
-    if (land) { land.el.remove(); land = null; }
-    const d = document.createElement("div");
-    d.className = "tg-land " + kind;
-    d.innerHTML = kind === "tunnel" ? `<span class="hillback"></span><span class="portal"></span><span class="arch"></span><span class="sten"></span>`
-        + `<span class="pynt" style="left:9%;bottom:22%">🌼</span><span class="pynt" style="left:80%;bottom:30%">🌷</span>`
-      : kind === "bro" ? `<span class="water"></span><span class="buer"></span><span class="kant"></span><span class="rail"></span>`
-      : byHTML();
-    el.tg.appendChild(d);
-    if (still) {
-      // Roligt: landemærket står stille og toner frem
-      d.style.left = "50%"; d.style.transform = "translateX(-50%)"; d.style.opacity = "0";
-      d.style.transition = "opacity .5s";
-      requestAnimationFrame(() => { if (alive) d.style.opacity = "1"; });
-      later(() => d.remove(), 2800);
-    } else {
-      // Glider forbi fra venstre mod højre, mens toget kører mod venstre (styres i animationsløkken)
-      // starter med højre kant lidt inde på skærmen til venstre, så toget kører ind i det
-      const w = d.offsetWidth || W;
-      land = { el: d, x: Math.min(W * .1, W * .5 - w) - w * .55, w };
-      d.style.transform = `translateX(${land.x.toFixed(1)}px)`;
-    }
-  }
-
   const FESTFARVER = ["#ffd6e3", "#fff0b0", "#d4f0c8", "#d6ecff"];
   const VIMPEL = ["#ff6b6b", "#ffd166", "#6cc56c", "#5aa9e6"];
   function fest() {
@@ -718,7 +659,7 @@
       later(regn, 1000);
     };
     regn();
-    later(() => { if (!alive) return; p.remove(); station = 0; nyStation(); }, 9000);
+    later(() => { if (!alive) return; p.remove(); station = 0; skiftSted(); nyStation(); }, 9000);
   }
 
   /* ---------- Små ting i landskabet ---------- */
@@ -765,13 +706,14 @@
 
   /* ---------- Dybe links (til test) ----------
      perron            toget holder allerede ved perronen, og stemmen spørger med det samme
-     tunnel / bro / by  vognene er fulde, og toget kører af sted forbi det landemærke
+     afgang            vognene er fulde, og toget kører af sted (og ruller ind ved byen)
+     by                toget ruller ind ved stationen i byen
      fest              festen til sidst */
   function dybStart(d) {
     if (d === "perron") { nyStation(); tween = null; trainX = 0; byggPerron(); phase = "ask"; spoerg(); return true; }
-    const li = LAND.indexOf(d);
-    if (li >= 0) {
-      station = li; phase = "board";
+    if (d === "by") { station = 1; skiftSted(); nyStation(); return true; }
+    if (d === "afgang") {
+      phase = "board";
       dyr = deck.splice(0, 3);
       el.carEls.forEach((c, i) => { c.querySelector(".who").textContent = dyr[i][0]; c.classList.add("full"); });
       boarded = 3;
@@ -786,9 +728,9 @@
   Spil.register({
     id: "toget", navn: "Toget", ikon: "🚂", farve: "#a9c6f2",
     start(r) {
-      root = r; alive = true; timers = []; clock = 0; travel = 0; speed = 0; trainX = 0;
+      root = r; alive = true; timers = []; clock = 0; hjul = 0; trainX = 0;
       tween = null; phase = ""; target = null; boarded = 0; idx = 0; station = 0; lastT = 0; klar = false;
-      deck = Spil.shuffle(ANIMALS.slice()); dyr = []; raekke = []; traeer = []; blomster = []; clouds = []; land = null;
+      deck = Spil.shuffle(ANIMALS.slice()); dyr = []; raekke = []; traeer = []; blomster = []; clouds = [];
       Spil.preload(ANIMALS.flatMap(a => ["find-" + a[2], "er-" + a[2], "ja-" + a[2], "dyr-" + a[2]])
         .concat(["tog-hej", "tog-klar", "tog-hurra"]));
       bygg();
@@ -804,13 +746,9 @@
       alive = false;
       timers.forEach(clearTimeout); timers = [];
       clearTimeout(hintT);
-      land = null;
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
       removeEventListener("resize", layout);
     }
   });
-
-  // Til test: Spil.toget.visLand("by") viser et landemærke med det samme, mens spillet kører
-  Spil.toget = { visLand: k => { if (alive) visLand(k); } };
 })();
