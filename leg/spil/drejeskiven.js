@@ -1,6 +1,7 @@
 // Spil: Drejeskiven — en klump ler drejer rundt på en drejeskive (rigtig 3D med three.js).
 // 1) Form: rør ved leret. Fingeren skubber leret ind eller trækker det ud; leret bevarer sin mængde,
-//    så en smal krukke bliver høj og en bred bliver lav. Tryk midt på toppen for at lave et hul.
+//    så en smal krukke bliver høj og en bred bliver lav. Tryk midt på toppen for at lave et hul;
+//    træk så fingeren ud til siden inde i hullet, så åbner krukken sig til en skål. Tryk ovenfra, så bliver klumpen flad.
 // 2) Glasur: vælg en farve (den første farve dypper hele krukken), og rør ved krukken mens den drejer,
 //    så bliver der striber (flyt fingeren op og ned for bølger).
 // 3) Ovnen sænker sig ned over krukken, gløder, og løfter sig igen: nu skinner glasuren.
@@ -58,9 +59,10 @@
   let T, root, alive, timers, raf, cv, renderer, scene, camera, ray, ndc;
   let gulv, hjulGrp, hoved, krukke, krukkeMat, lerTex, ovn, ovnVindue, ovnLys, hyldeGrp, envTex;
   let fase, r, H, V, hul, vinkel, omega, lerCanvas, raaCanvas, braendtCanvas, raaTex, braendtTex;
-  let ned = false, punkt = null, kontakt = false, sidstUV = null, farve = null, flod = null, malet = 0;
+  let ned = false, punkt = null, modus = null, modusD = 0, sidstD = 0, sagtAabn = false, sidstUV = null, farve = null, flod = null, malet = 0;
   let formTid = 0, sidstRoert = 0, sagtHul = false, sagtMal = false, sidstTid = 0;
   let kamPos, kamMaal, kamPosMaal, kamMaalMaal, ovnAnim = null, hyldeKrukker = [], dans = [];
+  let fingre = new Map(), kamGreb = null, kamTilt = 0, kamZoom = 1; // kamera: to fingre / højreklik / hjul
   let lyd = null, V0 = 1, klat = null, fyld = null, sagtMere = false, sagtHint = false;
   const MAXV = 2.2;       // højst så mange klumper ler (målt i startklumper)
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
@@ -285,11 +287,14 @@
     }
     // Drejeskiven: krukken (op til 3.3 høj) og skiven skal kunne ses, med plads til knapperne forneden
     const ovnen = visning === "ovn", halvH = ovnen ? 3.7 : 3.0, halvB = 2.45;
-    const d = Math.max(halvH / tv, halvB / (tv * asp)) + 1.2;
+    const d = (Math.max(halvH / tv, halvB / (tv * asp)) + 1.2) * kamZoom;
     const op = asp < 1 ? .55 : .35; // skub billedet op, så knapperne forneden ikke dækker
     const my = ovnen ? 2.0 : .9 - op;
+    // Er krukken blevet til en åben skål, kigger kameraet mere ovenfra, så man kan se ned i den
+    const skaal = !ovnen && r ? hul * Math.max(0, Math.min(1, (r[K - 1] - .45) / .7)) : 0;
+    const e = Math.max(.05, Math.min(.97, .4 + .22 * skaal + kamTilt));
     kamMaalMaal.set(0, my, 0);
-    kamPosMaal.set(0, my + d * .4, d * .92);
+    kamPosMaal.set(0, my + d * e, d * Math.sqrt(1 - e * e));
   }
   function tilpas() {
     if (!renderer) return;
@@ -308,7 +313,7 @@
 
   function nyKlump(snak = true) {
     fjernKlat(); fase = "drej"; startForm(); nyGeometri();
-    sagtMere = false; sagtHint = false;
+    sagtMere = false; sagtHint = false; sagtAabn = false;
     $(".dr-mere").hidden = false; $(".dr-mere").classList.remove("vis");
     lerFarve(lerCanvas.getContext("2d"), TEX, TEX); lerTex.needsUpdate = true;
     krukke.material = krukkeMat; krukke.visible = true; krukke.position.set(0, 0, 0); krukke.rotation.set(0, 0, 0); krukke.scale.setScalar(1);
@@ -458,18 +463,51 @@
     const b = cv.getBoundingClientRect();
     ndc.set((e.clientX - b.left) / b.width * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1);
   }
+  /* ---------- Kameraet: to fingre (træk op/ned = vip, knib = zoom), højreklik-træk og musehjul ---------- */
+  const kamVisning = () => fase === "ovn" ? "ovn" : "hjul";
+  function grebInfo() {
+    const p = [...fingre.values()], y =p.reduce((s, q) => s + q.y, 0) / p.length;
+    return { y, afst: p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0 };
+  }
+  function startGreb() {
+    const g = grebInfo(); kamGreb = { y0: g.y, afst0: g.afst, tilt0: kamTilt, zoom0: kamZoom };
+    ned = false; modus = null; sidstUV = null;
+  }
+  function flytGreb() {
+    const g = grebInfo(), h = Math.max(1, cv.clientHeight);
+    kamTilt = Math.max(-.4, Math.min(.6, kamGreb.tilt0 + (g.y - kamGreb.y0) / h * 1.6));
+    if (kamGreb.afst0 > 20 && g.afst > 20) kamZoom = Math.max(.55, Math.min(1.6, kamGreb.zoom0 * kamGreb.afst0 / g.afst));
+    indram(kamVisning());
+  }
+  function onHjul(e) {
+    if (!alive || !renderer || fase === "hylde") return;
+    e.preventDefault();
+    kamZoom = Math.max(.55, Math.min(1.6, kamZoom * Math.exp(e.deltaY * .001)));
+    indram(kamVisning());
+  }
+
   function onDown(e) {
     if (!alive || !renderer) return;
     try { cv.setPointerCapture(e.pointerId); } catch (x) {}
-    ned = true; kontakt = false; sidstUV = null; tilNdc(e);
+    fingre.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (fase !== "hylde" && (fingre.size >= 2 || e.button === 2)) { startGreb(); return; }
+    if (kamGreb) return;
+    ned = true; modus = null; sidstUV = null; tilNdc(e);
     if (fase === "hylde") tryk_hylde();
     if (fase === "glasur" && !farve) {
       ray.setFromCamera(ndc, camera);
       if (ray.intersectObject(krukke).length) Spil.say("Vælg en farve først.", null, "drej-vaelg");
     }
   }
-  function onMove(e) { if (ned) tilNdc(e); }
-  function onUp() { ned = false; kontakt = false; sidstUV = null; }
+  function onMove(e) {
+    if (fingre.has(e.pointerId)) fingre.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (kamGreb) flytGreb(); else if (ned) tilNdc(e);
+  }
+  function onUp(e) {
+    fingre.delete(e.pointerId);
+    if (kamGreb) { if (fingre.size === 0) kamGreb = null; else startGreb(); } // nyt udgangspunkt, så kameraet ikke hopper
+    ned = false; modus = null; sidstUV = null;
+  }
 
   function tryk_hylde() {
     ray.setFromCamera(ndc, camera);
@@ -479,6 +517,60 @@
 
   const plan = () => { const n = new T.Vector3(camera.position.x, 0, camera.position.z).normalize(); return new T.Plane(n, 0); };
 
+  // Hullets dybde (samme regel som i profil())
+  const hulDybde = () => hul * (H - Math.min(.3, H * .22));
+
+  // Fingeren inde i hullet skubber væggen ud: indersiden følger en skålform fra hullets bund op til fingeren,
+  // og væggen over fingeren skubbes ud til fingeren. Leret bevarer sin mængde, så en bred skål bliver lav.
+  function aabn(d, y, yb, dt) {
+    const vil = Math.min(MAXR, d + VAEG), bundR = .12 + VAEG;
+    const yf = Math.min(H, Math.max(yb + .1, y)), jf = yf / H * (K - 1), fart = Math.min(1, dt * 4);
+    let roert = 0;
+    for (let j = 0; j < K; j++) {
+      const yj = H * j / (K - 1);
+      if (yj < yb) continue;
+      let maal, w = 1;
+      if (yj <= yf) maal = bundR + (vil - bundR) * Math.sin((yj - yb) / (yf - yb) * Math.PI / 2);
+      else { maal = vil; w = Math.exp(-Math.pow((j - jf) / 4, 2)); }
+      if (maal > r[j]) { const ny = r[j] + (maal - r[j]) * w * fart; roert += ny - r[j]; r[j] = ny; }
+    }
+    return roert;
+  }
+
+  // Fingeren inde i hullet glider ind mod midten: væggen ved fingeren og alt over den følger med ind
+  // (så en udbøjet kant kan bøjes ind igen). Leret under hullets bund røres ikke.
+  function ind(dd, y, yb) {
+    const jf = Math.min(K - 1, Math.max(0, y / H * (K - 1)));
+    let roert = 0;
+    for (let j = 0; j < K; j++) {
+      if (H * j / (K - 1) < yb) continue;
+      // bred overgang, så hele den udbøjede væg retter sig op (ikke kun en læbe øverst)
+      const w = j >= jf ? 1 : Math.exp(-Math.pow((j - jf) / 10, 2));
+      const ny = Math.max(Math.min(r[j], VAEG + .15), r[j] - dd * w);
+      roert += r[j] - ny; r[j] = ny;
+    }
+    return roert;
+  }
+
+  // Tryk ovenfra: klumpen bliver lavere og bredere, og toppen bliver flad
+  function tryk(y, dt) {
+    const nyH = Math.max(MINH, H + (Math.max(MINH, y) - H) * Math.min(1, dt * 2.5));
+    const f = Math.sqrt(H / nyH), maxR = Math.max(...r), fl = Math.min(1, dt * 1.5);
+    let roert = 0;
+    for (let j = 0; j < K; j++) {
+      let ny = Math.min(MAXR, r[j] * f);
+      ny += (Math.max(ny, Math.min(MAXR, maxR * f) * .85) - ny) * fl * (j / (K - 1));
+      roert += Math.abs(ny - r[j]); r[j] = ny;
+    }
+    return roert;
+  }
+
+  function aabnHint() {
+    if (sagtAabn) return; sagtAabn = true;
+    later(() => fase === "drej" && r[K - 1] < .7 && !Spil.isTalking() &&
+      Spil.say("Tryk i hullet og træk ud til siden, så bliver det en skål!", null, "drej-aabn"), 700);
+  }
+
   function form(dt) {
     let roert = 0;
     if (ned) {
@@ -486,34 +578,51 @@
       const p = new T.Vector3();
       if (ray.ray.intersectPlane(plan(), p)) {
         const d = Math.hypot(p.x, p.z), y = p.y, top = r[K - 1];
-        if (!kontakt && d < Math.max(.4, top * .7) && y > H - .35 && y < H + .9 && hul < 1) {
+        const yb = H - hulDybde(), indeTop = Math.max(.02, top - VAEG);
+        if (!modus) {
+          // Hvad fingeren gør, bestemmes dér, hvor den først rammer leret, og gælder resten af strøget
+          const midt = d < Math.max(.4, top * .7) && y > H - .35 && y < H + .9;
+          if (midt) modus = hul < 1 ? "hul" : "inde";
+          else if (hul > .3 && y > yb && y < H + .9 && d < indeTop + .1) modus = "inde";
+          // Kanten af en åben skål kan gribes udefra lidt over og under kanten
+          else if (hul > .3 && d < top + .3 && y > H - .4 && y < H + .4) modus = "ude";
+          else if (y > H + .05 && y < H + 1.4 && d < Math.max(...r) + .2) modus = "tryk";
+          else if (y > -.1 && y < H + .05 && d <= rVed(r, H, Math.max(0, y)) + .06) modus = "ude";
+          modusD = sidstD = d;
+        }
+        if (modus === "hul") {
           // Hul: tryk midt på toppen
           hul = Math.min(1, hul + dt * .7); roert = .6;
-          if (hul >= 1) Spil.sfx.pop();
-        } else {
-          const kf = y / H * (K - 1);
-          if (kf > -1 && kf < K) {
-            if (!kontakt && d <= rVed(r, H, Math.max(0, y)) + .06) kontakt = true;
-            if (kontakt) {
-              const maal = Math.max(hul > .05 ? VAEG + .12 : MINR * .6, Math.min(MAXR, d));
-              // Ind (gøre tyndere) går langsommere end ud, så man skal holde fingeren der et stykke tid
-              const fartUd = Math.min(1, dt * 7), fartInd = Math.min(1, dt * 2.8);
-              for (let j = 0; j < K; j++) {
-                const w = Math.exp(-Math.pow((j - kf) / 2.8, 2));
-                const lav = j < 3 ? .45 : MINR, m = Math.max(lav, maal);
-                const ny = r[j] + (m - r[j]) * w * (m < r[j] ? fartInd : fartUd);
-                roert += Math.abs(ny - r[j]); r[j] = ny;
-              }
+          if (hul >= 1) { Spil.sfx.pop(); aabnHint(); }
+          // Når hullet er dybt nok, eller fingeren glider ud til siden, åbner fingeren hullet i stedet
+          if (hul >= 1 || (hul > .3 && d > modusD + .15)) modus = "inde";
+        } else if (modus === "inde") {
+          roert += aabn(d, y, yb, dt);
+          if (d < sidstD) roert += ind(sidstD - d, y, yb);
+        } else if (modus === "tryk") {
+          if (y < H) roert += tryk(y, dt);
+        } else if (modus === "ude") {
+          const kf = Math.min(K - 1, y / H * (K - 1)); // over kanten tæller som selve kanten
+          if (kf > -1 && y < H + .5) {
+            const maal = Math.max(hul > .05 ? VAEG + .12 : MINR * .6, Math.min(MAXR, d));
+            // Ind (gøre tyndere) går langsommere end ud, så man skal holde fingeren der et stykke tid
+            const fartUd = Math.min(1, dt * 7), fartInd = Math.min(1, dt * 2.8);
+            for (let j = 0; j < K; j++) {
+              const w = Math.exp(-Math.pow((j - kf) / 2.8, 2));
+              const lav = j < 3 ? .45 : MINR, m = Math.max(lav, maal);
+              const ny = r[j] + (m - r[j]) * w * (m < r[j] ? fartInd : fartUd);
+              roert += Math.abs(ny - r[j]); r[j] = ny;
             }
-          } else kontakt = false;
+          } else modus = null;
         }
+        sidstD = d;
       }
     }
     if (roert > 0) {
       // lidt udglatning, og bevar mængden af ler: smal → høj, bred → lav
       for (let j = 1; j < K - 1; j++) r[j] = r[j] * .94 + (r[j - 1] + r[j + 1]) * .03;
       H = Math.max(MINH, Math.min(MAXH, V / middelR2(r)));
-      nyGeometri();
+      nyGeometri(); indram("hjul");
       formTid += dt; sidstRoert = performance.now();
       if (formTid > 2 && $(".dr-videre").hidden) visKnap("✅", true);
       if (formTid > 4 && hul < .3 && !sagtHul) {
@@ -656,7 +765,7 @@
     id: "drejeskiven", navn: "Drejeskiven", ikon: "🏺", farve: "#f7c9a3",
     start(rt) {
       alive = true; timers = []; fase = "start"; vinkel = 0; omega = 0; sidstTid = 0; ned = false; dans = []; ovnAnim = null;
-      Spil.preload(["drej-hej", "drej-hul", "drej-glasur", "drej-mal", "drej-ovn", "drej-skinner", "drej-hylde", "drej-ny", "drej-alle", "drej-vaelg", "drej-hint", "drej-mere", "drej-mere-hint"]);
+      Spil.preload(["drej-hej", "drej-hul", "drej-glasur", "drej-mal", "drej-ovn", "drej-skinner", "drej-hylde", "drej-ny", "drej-alle", "drej-vaelg", "drej-hint", "drej-mere", "drej-mere-hint", "drej-aabn"]);
       rt.innerHTML = `<div class="dr"><canvas class="dr-cv"></canvas><div class="dr-vent">🏺</div>
         <div class="dr-farver" hidden>${FARVER.map((f, i) => `<button data-i="${i}" style="background:${f[1]}" aria-label="${f[2]}"></button>`).join("")}</div>
         <button class="dr-videre" hidden>✅</button>
@@ -669,6 +778,8 @@
       $(".dr-farver").querySelectorAll("button").forEach(b => b.addEventListener("click", () => vaelgFarve(+b.dataset.i, b)));
       cv.addEventListener("pointerdown", onDown); cv.addEventListener("pointermove", onMove);
       cv.addEventListener("pointerup", onUp); cv.addEventListener("pointercancel", onUp);
+      cv.addEventListener("wheel", onHjul, { passive: false });
+      fingre = new Map(); kamGreb = null; kamTilt = 0; kamZoom = 1;
       addEventListener("resize", tilpas);
       lydStart();
       Spil.three().then(mod => {
@@ -682,6 +793,7 @@
           hul = 1; H = Math.max(MINH, Math.min(MAXH, V / middelR2(r))); nyGeometri(); tilGlasur();
           if (dyb === "ovn") { vaelgFarve(4, $(".dr-farver button[data-i='4']")); later(tilOvn, 1500); }
         } else if (dyb === "hylde") visHylde(false);
+        else if (dyb === "hul") { hul = 1; sagtAabn = true; nyGeometri(); } // test: klump med hul, klar til at blive en skål
         kamPos.copy(kamPosMaal); kamMaal.copy(kamMaalMaal);
         raf = requestAnimationFrame(loop);
       }, () => { if (alive) { const v = $(".dr-vent"); if (v) { v.style.animation = "none"; v.textContent = "😕"; } } });
