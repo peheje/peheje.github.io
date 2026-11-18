@@ -5,11 +5,16 @@
 // 2) Glasur: vælg en farve (den første farve dypper hele krukken), og rør ved krukken mens den drejer,
 //    så bliver der striber (flyt fingeren op og ned for bølger).
 // 3) Ovnen sænker sig ned over krukken, gløder, og løfter sig igen: nu skinner glasuren.
+// 3b) Valgfrit: har krukken et hul, kan man sætte blomster i (smal åbning) eller lægge frugt i (bred skål). ✅ springer over.
 // 4) Krukken stilles på hylden (gemmes i localStorage "lk-krukker", højst 8). Tryk på en krukke for at få den til at danse.
 // Ingen rigtige eller forkerte svar: enhver form er en krukke.
 (function () {
   const FARVER = [["roed", "#e5483f", "rød"], ["orange", "#f4962c", "orange"], ["gul", "#f5cd34", "gul"], ["groen", "#4caf50", "grøn"],
-    ["blaa", "#3b7dd8", "blå"], ["lilla", "#8e5ccc", "lilla"], ["lyseroed", "#f290bb", "lyserød"]];
+    ["blaa", "#3b7dd8", "blå"], ["lilla", "#8e5ccc", "lilla"], ["lyseroed", "#f290bb", "lyserød"],
+    ["hvid", "#f1eadb", "hvid"], ["sort", "#2f2b2b", "sort"],
+    null, // ny række: dæmpede "voksne" glasurfarver
+    ["graa", "#8d9199", "grå"], ["brun", "#8a5233", "brun"], ["turkis", "#3aa79e", "turkis"], ["moerkeblaa", "#26407a", "mørkeblå"],
+    ["mosgroen", "#76885a", "mosgrøn"], ["sennepsgul", "#c99a2e", "sennepsgul"], ["vinroed", "#7a2633", "vinrød"], ["gammelrosa", "#c58c8a", "gammelrosa"]];
   const K = 40;            // punkter i krukkens ydre profil (nedefra og op)
   const KI = 22;           // punkter i hullets inderside
   const SEG = 72;          // segmenter rundt
@@ -29,7 +34,8 @@
       animation:dr-snur 1.6s linear infinite}
     @keyframes dr-snur{to{transform:rotate(360deg)}}
     .dr button{position:absolute;border-radius:50%;background:var(--card);box-shadow:0 6px 0 rgba(31,58,95,.25);
-      display:flex;align-items:center;justify-content:center;line-height:1;transition:transform .15s,opacity .3s}
+      display:flex;align-items:center;justify-content:center;line-height:1;transition:transform .15s,opacity .3s;
+      padding:0;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif}
     .dr button:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(31,58,95,.25)}
     .dr button[hidden]{display:none}
     .dr-videre{right:max(18px,env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));
@@ -45,13 +51,22 @@
     .dr-farver{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));
       display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(8px,1.6vw,18px);pointer-events:none;
       padding:0 calc(clamp(76px,13vh,120px) + 30px)}
-    .dr-farver[hidden]{display:none}
+    .dr-farver[hidden],.dr-pynt[hidden]{display:none}
+    .dr-pynt{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));
+      display:flex;justify-content:center;gap:clamp(12px,2.4vw,26px);pointer-events:none;
+      padding:0 calc(clamp(76px,13vh,120px) + 30px)}
+    .dr-pynt button{position:relative;pointer-events:auto;width:clamp(72px,12vh,104px);aspect-ratio:1;
+      font-size:clamp(40px,7vh,62px);border:5px solid #fff}
+    .dr-pynt button.valgt{transform:translateY(-12px) scale(1.12)}
     .dr-farver button{position:relative;pointer-events:auto;width:clamp(60px,10vh,90px);aspect-ratio:1;
       border:6px solid #fff;box-shadow:0 6px 0 rgba(31,58,95,.25),inset 0 -8px 0 rgba(0,0,0,.15)}
     .dr-farver button.valgt{transform:translateY(-12px) scale(1.12)}
+    .dr-brud{flex-basis:100%;height:0}
     @media (max-aspect-ratio:1/1){
       .dr-farver{padding:0 16px calc(clamp(76px,13vh,120px) + 14px);max-width:440px;margin:0 auto}
       .dr-farver button{width:clamp(60px,15vw,84px)}
+      .dr-brud{display:none}
+      .dr-pynt{padding:0 16px calc(clamp(76px,13vh,120px) + 14px)}
     }
     @media (prefers-reduced-motion:reduce){.dr-videre.vis,.dr-mere.vis{animation:none}.dr-vent{animation:none}}
   `);
@@ -65,6 +80,7 @@
   let vist = null, snurr = null, slor = null, sagtSnur = false; // krukken der vises tæt på fra hylden
   let fingre = new Map(), kamGreb = null, kamTilt = 0, kamZoom = 1; // kamera: to fingre / højreklik / hjul
   let lyd = null, V0 = 1, klat = null, fyld = null, sagtMere = false, sagtHint = false;
+  let pyntGrp = null, pyntAnim = null, valgtPynt = null, pyntFroe = 1;   // blomster/frugt i krukken på skiven
   const MAXV = 2.2;       // højst så mange klumper ler (målt i startklumper)
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
 
@@ -153,6 +169,296 @@
     const g = new T.LatheGeometry(profil(r, H, hul), SEG);
     if (krukke.geometry) krukke.geometry.dispose();
     krukke.geometry = g;
+  }
+
+  /* ---------- Pynt: blomster i en høj krukke, frugt i en åben skål (valgfrit, efter ovnen) ---------- */
+  const PYNT = {
+    tulipan: { ikon: "🌷", navn: "Tulipaner!", lyd: "drej-tulipan", slags: "blomst" },
+    solsikke: { ikon: "🌻", navn: "En solsikke!", lyd: "drej-solsikke", slags: "blomst" },
+    margerit: { ikon: "🌼", navn: "Margeritter!", lyd: "drej-margerit", slags: "blomst" },
+    aeble: { ikon: "🍎", navn: "Æbler!", lyd: "drej-aeble", slags: "frugt" },
+    appelsin: { ikon: "🍊", navn: "Appelsiner!", lyd: "drej-appelsin", slags: "frugt" },
+    citron: { ikon: "🍋", navn: "Citroner!", lyd: "drej-citron", slags: "frugt" }
+  };
+  const PYNT_LYDE = ["drej-blomst", "drej-frugt", ...Object.values(PYNT).map(p => p.lyd)];
+  // Er der et hul, kan krukken få pynt: en bred åbning bliver til en frugtskål, en smal til en vase
+  function pyntSlags(rr, hh, hu) {
+    if (hu < .3) return null;
+    return Math.max(.02, rr[K - 1] - VAEG) >= .6 ? "frugt" : "blomst";
+  }
+  // Samme frø giver samme buket, så krukken ser ens ud på hylden
+  function tilfaeldig(s) {
+    return () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  // Citrusskræl: et prikket relief (bumpMap), delt af alle appelsiner og citroner; frigives i stop()
+  let skraelTex = null;
+  function skrael(farve, ru, bump) {
+    if (!skraelTex) {
+      const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
+      g.fillStyle = "#808080"; g.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 2600; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = .8 + Math.random() * 1.8;
+        g.fillStyle = `rgba(${Math.random() < .7 ? "40,40,40" : "220,220,220"},${.25 + Math.random() * .35})`;
+        g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+      }
+      skraelTex = new T.CanvasTexture(c); skraelTex.wrapS = skraelTex.wrapT = T.RepeatWrapping; skraelTex.repeat.set(3, 2);
+    }
+    return new T.MeshStandardMaterial({ color: farve, roughness: ru, bumpMap: skraelTex, bumpScale: bump });
+  }
+  // Æbleskræl: grundfarve, en lysere/gullig kind på den ene side, tynde striber fra stilk til bund og små lyse prikker.
+  // I en drejet form (LatheGeometry) går x rundt om æblet og y fra bund til top. Én tekstur pr. farve; frigives i stop().
+  let aebleTex = {};
+  function aebleMat(farve, kind) {
+    if (!aebleTex[farve]) {
+      const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
+      g.fillStyle = farve; g.fillRect(0, 0, 256, 256);
+      const kg = g.createLinearGradient(0, 0, 256, 0);   // kinden: blød overgang rundt om æblet
+      kg.addColorStop(0, kind + "00"); kg.addColorStop(.3, kind + "aa"); kg.addColorStop(.45, kind + "cc"); kg.addColorStop(.62, kind + "55"); kg.addColorStop(.8, kind + "00"); kg.addColorStop(1, kind + "00");
+      g.fillStyle = kg; g.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 90; i++) {                     // striber, let bølgede
+        const x = Math.random() * 256, b = .6 + Math.random() * 1.6;
+        const groen = farve === "#9fcf4a";
+        g.strokeStyle = Math.random() < .7 ? (groen ? `rgba(90,140,30,${.06 + Math.random() * .1})` : `rgba(120,10,20,${.06 + Math.random() * .12})`)
+          : `rgba(255,225,130,${.05 + Math.random() * .08})`;
+        g.lineWidth = b; g.beginPath(); g.moveTo(x, 0);
+        for (let y = 0; y <= 256; y += 16) g.lineTo(x + Math.sin(y * .05 + i) * 2.5, y);
+        g.stroke();
+      }
+      for (let i = 0; i < 420; i++) {                    // små lyse prikker (lenticeller)
+        g.fillStyle = `rgba(255,240,200,${.25 + Math.random() * .3})`;
+        g.beginPath(); g.ellipse(Math.random() * 256, Math.random() * 256, .6 + Math.random() * .9, .5 + Math.random() * .7, 0, 0, 7); g.fill();
+      }
+      for (const [y0, y1] of [[0, 34], [256, 214]]) {    // mørkere/grønligt ved stilken og bunden
+        const ig = g.createLinearGradient(0, y0, 0, y1); ig.addColorStop(0, "rgba(90,100,30,.55)"); ig.addColorStop(1, "rgba(90,100,30,0)");
+        g.fillStyle = ig; g.fillRect(0, Math.min(y0, y1), 256, Math.abs(y1 - y0));
+      }
+      const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4; aebleTex[farve] = t;
+    }
+    return new T.MeshPhysicalMaterial({ map: aebleTex[farve], roughness: .38, clearcoat: .35, clearcoatRoughness: .3 });
+  }
+  function aebleGeo() {   // med en fordybning ved stilken og ved bunden
+    const p = [[0, -.7], [.14, -.79], [.42, -.86], [.74, -.72], [.94, -.38], [1, 0], [.97, .3], [.86, .6], [.62, .82], [.32, .86], [.14, .76], [0, .66]];
+    return new T.LatheGeometry(p.map(([r, y]) => new T.Vector2(r, y)), 28);
+  }
+  function citronGeo() {
+    const p = [[0, -1.38], [.07, -1.36], [.13, -1.28], [.2, -1.16], [.36, -1.06], [.58, -.9], [.76, -.66], [.87, -.36], [.91, 0]];
+    const alle = [...p, ...p.slice(0, -1).reverse().map(([r, y]) => [r, -y])];
+    return new T.LatheGeometry(alle.map(([r, y]) => new T.Vector2(r, y)), 24);
+  }
+
+  // Et kronblad (eller blad) som en buet flade: længden går op ad +Y, bredden ud ad X, og fladen buer ud mod +Z.
+  // L/W: længde/bredde, kop: hvor meget kanterne bøjer ind, bue: bule udad, kroel: spidsen bøjer ud (+) eller ind (-),
+  // top: hvor på bladet det er bredest (>1 = højt oppe), spids: <1 = rundere spids. Farven går fra "fra" ved roden til "til",
+  // med lysere kanter ("kant"), en mørkere midterribbe og svage årer.
+  function kronbladGeo(o) {
+    const nu = 12, nv = 14, pos = [], col = [], idx = [];
+    const ca = new T.Color(o.fra), cb = new T.Color(o.til), ck = new T.Color(o.kant || o.til), c = new T.Color();
+    for (let j = 0; j <= nv; j++) {
+      const v = j / nv, w = o.W * Math.pow(Math.sin(Math.PI * Math.min(.995, Math.pow(v, o.top || 1))), o.spids || .75) + .004;
+      for (let i = 0; i <= nu; i++) {
+        const u = i / nu * 2 - 1, x = u * w;
+        pos.push(x, v * o.L, -(o.kop || 0) * x * x + (o.bue || 0) * Math.sin(Math.PI * v) + (o.kroel || 0) * v * v * v);
+        c.copy(ca).lerp(cb, Math.min(1, v / (o.overgang || .35)));
+        c.lerp(ck, (o.kantLys || 0) * Math.pow(Math.abs(u), 2.5) * Math.min(1, v * 1.5));
+        c.multiplyScalar(1 - (o.ribbe ?? .14) * Math.pow(1 - Math.abs(u), 8) - .05 * (Math.cos(u * Math.PI * 6) * .5 + .5) * v);
+        col.push(c.r, c.g, c.b);
+      }
+    }
+    for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+      const a = j * (nu + 1) + i, b = a + 1, d = a + nu + 1, e = d + 1;
+      idx.push(a, d, b, b, d, e);
+    }
+    const g = new T.BufferGeometry();
+    g.setAttribute("position", new T.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new T.Float32BufferAttribute(col, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  }
+  // Solsikkens frøstand: frø i en gylden-vinkel-spiral, mørkest i midten og med små orange blomster yderst. Frigives i stop().
+  let froeTexCache = null;
+  function froeTex() {
+    if (!froeTexCache) {
+      const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
+      const rg = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+      rg.addColorStop(0, "#5a3a12"); rg.addColorStop(.35, "#3a220c"); rg.addColorStop(.85, "#4a2c10"); rg.addColorStop(1, "#8a5a1a");
+      g.fillStyle = rg; g.fillRect(0, 0, 256, 256);
+      for (let i = 1; i < 900; i++) {
+        const r = 4.1 * Math.sqrt(i), a = i * 2.39996;
+        if (r > 126) break;
+        const yderst = r > 104;
+        g.fillStyle = yderst ? (i % 3 ? "#c77a1f" : "#e0a030") : r < 30 ? "#6b4a1a" : (i % 2 ? "#2a170a" : "#5c3a16");
+        g.beginPath(); g.arc(128 + Math.cos(a) * r, 128 + Math.sin(a) * r, yderst ? 2.6 : 1.9, 0, 7); g.fill();
+      }
+      froeTexCache = new T.CanvasTexture(c); froeTexCache.colorSpace = T.SRGBColorSpace; froeTexCache.anisotropy = 4;
+    }
+    return froeTexCache;
+  }
+
+  // Bygger pynten i krukkens eget koordinatsystem. userData: top (højeste punkt), bredde, dele (til animationen)
+  function lavPynt(id, froe, rr, hh, hu) {
+    const rnd = tilfaeldig(froe), grp = new T.Group(), dele = [];
+    const mat = (c, ru = .55) => new T.MeshStandardMaterial({ color: c, roughness: ru });
+    const kugle = new T.SphereGeometry(1, 20, 14);
+    const yb = hh - hu * (hh - Math.min(.3, hh * .22));       // hullets bund (samme regel som i profil())
+    const mund = Math.max(.05, rr[K - 1] - VAEG);
+    let top = hh, bredde = Math.max(...rr);
+
+    if (PYNT[id].slags === "blomst") {
+      const n = id === "solsikke" ? (mund > .4 ? 2 : 1) : id === "tulipan" ? 3 : 5;
+      const ekstra = .55 + hh * .3;                            // høj krukke = høje blomster
+      const stilk = mat("#4f9a3c"), blad = mat("#5fb04a");
+      // Stilkene starter lidt under kanten (resten skjules af krukken), så buketten kan brede sig ud
+      const by = Math.max(yb + .02, hh - .45);
+      for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2 + rnd() * .6, rb = n > 1 ? mund * .4 : 0;
+        const base = new T.Vector3(Math.cos(a) * rb, by, Math.sin(a) * rb);
+        const yT = hh + ekstra - (n > 1 ? rnd() * .35 : 0);
+        // Stilken må ikke gå gennem kanten: ved kanten skal den være inden for åbningen
+        const f = Math.max(.05, (hh - by) / (yT - by)), hrMaks = rb + (mund * .8 - rb) / f;
+        const hr = n > 1 ? Math.min(hrMaks, .35 + rnd() * .35) : Math.min(hrMaks, .12);
+        const hoved = new T.Vector3(Math.cos(a) * hr, yT, Math.sin(a) * hr);
+        const ret = hoved.clone().sub(base), L = ret.length();
+        const plante = new T.Group(); plante.position.copy(base);
+        plante.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), ret.normalize());
+        // En let buet stilk; blomsthovedet sidder vinkelret på stilkens ende
+        const OP = new T.Vector3(0, 1, 0);
+        const kurve = new T.QuadraticBezierCurve3(new T.Vector3(0, 0, 0), new T.Vector3((rnd() - .5) * L * .16, L * .55, (rnd() - .5) * L * .16), new T.Vector3(0, L, 0));
+        plante.add(new T.Mesh(new T.TubeGeometry(kurve, 16, .03, 7, false), stilk));
+        const hd = new T.Group(); hd.position.y = L; hd.quaternion.setFromUnitVectors(OP, kurve.getTangent(1)); plante.add(hd);
+        const hovedet = new T.Group(); hd.add(hovedet);
+        const bladMat = new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide, roughness: .6 });
+        const lavBlad = (o, y, vinkel, laen) => {
+          const b = new T.Mesh(kronbladGeo({ fra: "#3d7a32", til: "#6db35a", kant: "#8fcf74", kantLys: .3, overgang: 1, ribbe: .2, ...o }), bladMat);
+          b.position.y = y; b.rotation.set(laen, vinkel, 0, "YXZ"); plante.add(b);
+        };
+        if (id === "tulipan") {
+          // Seks buede kronblade (tre ydre, tre indre), der lukker sig om hinanden. Nogle tulipaner er tofarvede.
+          const [farve, kant] = [["#e5483f", "#ffb0a0"], ["#f5cd34", "#fff3a8"], ["#f290bb", "#fff0f6"], ["#f4962c", "#ffe08a"],
+            ["#c94fb0", "#f6d0ee"], ["#d8323a", "#f5cd34"], ["#6e2a86", "#c9a0e0"]][Math.floor(rnd() * 7)];
+          const pm = new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide, roughness: .42 });
+          for (let k = 0; k < 6; k++) {
+            const ydre = k < 3, a = (k % 3) / 3 * Math.PI * 2 + (ydre ? 0 : Math.PI / 3) + rnd() * .15, r = ydre ? .035 : .018;
+            const p = new T.Mesh(kronbladGeo({ L: ydre ? .45 : .42, W: ydre ? .17 : .15, kop: 2.4, bue: ydre ? .08 : .055, kroel: ydre ? -.015 : -.04,
+              top: 1.35, spids: .6, fra: "#b9c766", til: farve, kant, kantLys: .55, overgang: .32 }), pm);
+            p.rotation.y = a; p.position.set(Math.sin(a) * r, -.03, Math.cos(a) * r); hovedet.add(p);
+          }
+          const bund = new T.Mesh(kugle, stilk); bund.scale.set(.05, .04, .05); hovedet.add(bund);
+          hovedet.scale.setScalar(1.25);
+          // To lange, rendeformede blade, der bøjer sig ud over kanten
+          const bv = rnd() * 6.3;
+          lavBlad({ L: .8, W: .11, kop: 4, bue: .02, kroel: .2, top: .9, spids: .55 }, .26, bv, .32);
+          lavBlad({ L: .66, W: .1, kop: 4, bue: .02, kroel: .17, top: .9, spids: .55 }, .32, bv + 2.6, .4);
+        } else {
+          const sol = id === "solsikke", R0 = sol ? .2 : .085;
+          hovedet.rotation.x = sol ? -.6 : -.45;                // blomsten kigger skråt op og ud (kameraet ser oppefra)
+          if (sol) hovedet.scale.setScalar(1.3);
+          // Hvide kronblade får lidt eget lys, så de ikke bliver grå i skyggen
+          const pm = new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide, roughness: .5, emissive: sol ? "#000000" : "#4a4842" });
+          if (sol) {
+            // Frøstand med spiralmønster, en brun kant og to kranse af spidse, gule kronblade
+            const side = new T.Mesh(new T.CylinderGeometry(R0, R0 * .9, R0 * .35, 32, 1, true), mat("#4a2c12", .9)); hovedet.add(side);
+            const froestand = new T.Mesh(new T.CircleGeometry(R0, 40), new T.MeshStandardMaterial({ map: froeTex(), roughness: .95 }));
+            froestand.rotation.x = -Math.PI / 2; froestand.position.y = R0 * .175 + .002; hovedet.add(froestand);
+            // Bagsiden: en grøn bund, så hovedet ikke er hult set bagfra
+            const bag = new T.Mesh(new T.CircleGeometry(R0 * .9, 32), mat("#4f8a35", .8));
+            bag.rotation.x = Math.PI / 2; bag.position.y = -R0 * .175 - .002; hovedet.add(bag);
+          } else {
+            const midt = new T.Mesh(kugle, skrael("#f4b81a", .7, 1.5)); midt.scale.set(R0, R0 * .5, R0); midt.position.y = .015; hovedet.add(midt);
+          }
+          const ring = (N, o, loeft, r, forskyd) => {
+            for (let k = 0; k < N; k++) {
+              const piv = new T.Group(); piv.rotation.y = (k + forskyd) / N * Math.PI * 2 + (rnd() - .5) * .08; hovedet.add(piv);
+              const p = new T.Mesh(kronbladGeo(o), pm); p.rotation.x = Math.PI / 2 - loeft - (rnd() - .5) * .12; p.position.z = r; piv.add(p);
+            }
+          };
+          const kb = sol ? { L: .27, W: .065, kop: 4, bue: .012, kroel: .03, spids: .5, top: 1.1, fra: "#f0a018", til: "#ffd02a", kant: "#fff07a", kantLys: .5, overgang: .3 }
+            : { L: .19, W: .042, kop: 3, bue: .008, kroel: .015, spids: .4, top: 1, fra: "#e9e4c8", til: "#ffffff", kant: "#ffffff", overgang: .3, ribbe: .06 };
+          ring(sol ? 18 : 14, kb, .1, R0 * .85, 0);
+          ring(sol ? 16 : 13, { ...kb, L: kb.L * .88 }, sol ? .3 : .28, R0 * .78, .5);
+          // Grønne bægerblade bag hovedet
+          ring(sol ? 14 : 10, { L: sol ? .15 : .08, W: sol ? .05 : .025, kop: 3, bue: .005, kroel: .02, spids: .5, fra: "#3d7a32", til: "#5fa04a" }, -.4, R0 * .7, .25);
+          const bv = rnd() * 6.3;
+          if (sol) { lavBlad({ L: .46, W: .19, kop: 1.6, bue: .02, kroel: .1, top: .7, spids: .7 }, .45, bv, .95); lavBlad({ L: .4, W: .17, kop: 1.6, bue: .02, kroel: .09, top: .7, spids: .7 }, .7, bv + 3, .9); }
+          else lavBlad({ L: .26, W: .04, kop: 4, bue: .01, kroel: .06, top: .8, spids: .5 }, .42, bv, .6);
+        }
+        grp.add(plante);
+        dele.push({ o: plante, slags: "blomst", forsink: i * .18 });
+        top = Math.max(top, yT + .35); bredde = Math.max(bredde, hr + .35);
+      }
+    } else {
+      // Frugt i lag nedefra, så skålen fyldes, og til sidst en lille bunke over kanten
+      const fr = Math.max(.14, Math.min(.3, mund * .3)), pos = [];
+      let y = yb + fr * .95, lag = 0;
+      while (pos.length < 22) {
+        const sidste = lag > 0 && y > hh - fr * .4;
+        const inde = Math.max(.02, rVed(rr, hh, Math.min(y, hh)) - VAEG);
+        const ring = sidste ? Math.min(inde * .4, fr * 1.2) : inde - fr * 1.05;
+        if (ring < fr * .6) pos.push([0, y, 0]);
+        else {
+          const n = Math.max(2, Math.floor(Math.PI * 2 * ring / (fr * 2.1))), skift = lag * .6 + rnd();
+          for (let j = 0; j < (sidste ? Math.min(3, n) : n); j++) { const v = j / (sidste ? Math.min(3, n) : n) * Math.PI * 2 + skift; pos.push([Math.cos(v) * ring, y, Math.sin(v) * ring]); }
+          if (!sidste && ring > fr * 2.2) pos.push([0, y, 0]);
+        }
+        if (sidste) break;
+        y += fr * 1.5; lag++;
+      }
+      const stilk = mat("#6b4a2b", .8), blad = mat("#4f9a3c");
+      pos.forEach(([x, py, z], i) => {
+        const frugt = new T.Group(), s = fr * (.9 + rnd() * .2);
+        frugt.position.set(x, py, z); frugt.rotation.set((rnd() - .5) * .5, rnd() * 6.3, (rnd() - .5) * .5);
+        if (id === "aeble") {
+          const [c, kind] = rnd() < .15 ? ["#9fcf4a", "#f2e26a"] : [["#d8322c", "#f4b63c"], ["#c62d2d", "#f08a3a"], ["#e5483f", "#ffd24a"]][Math.floor(rnd() * 3)];
+          const m = new T.Mesh(aebleGeo(), aebleMat(c, kind)); m.scale.setScalar(s); frugt.add(m);
+          const st = new T.Mesh(new T.CylinderGeometry(.015, .022, s * .45, 5), stilk); st.position.y = s * .82; st.rotation.z = .15; frugt.add(st);
+          const b = new T.Mesh(kugle, blad); b.scale.set(s * .3, .015, s * .14); b.position.set(s * .16, s * .9, 0); b.rotation.z = .3; frugt.add(b);
+        } else if (id === "appelsin") {
+          // Lidt fladtrykt, med en ujævn, prikket skræl og en lille grøn stilk-stjerne på toppen
+          const c = ["#f7931e", "#f28a1a", "#fa9d2a"][Math.floor(rnd() * 3)];
+          const m = new T.Mesh(kugle, skrael(c, .62, .9)); m.scale.set(s, s * .93, s); frugt.add(m);
+          const nub = new T.Mesh(new T.CylinderGeometry(s * .07, s * .1, s * .08, 8), mat("#6f8a2e", .7)); nub.position.y = s * .93; frugt.add(nub);
+          for (let b = 0; b < 5; b++) {
+            const bl = new T.Mesh(kugle, blad), v = b / 5 * Math.PI * 2;
+            bl.scale.set(s * .1, s * .02, s * .045); bl.position.set(Math.cos(v) * s * .1, s * .925, Math.sin(v) * s * .1); bl.rotation.y = -v; frugt.add(bl);
+          }
+        } else {
+          // Citronform: aflang, med en spids "næse" i hver ende
+          const m = new T.Mesh(citronGeo(), skrael(["#f4d33a", "#f7dc4a", "#eecb2c"][Math.floor(rnd() * 3)], .45, .6));
+          m.scale.setScalar(s); m.rotation.z = Math.PI / 2; frugt.add(m);
+        }
+        grp.add(frugt);
+        dele.push({ o: frugt, slags: "frugt", maalY: py, forsink: i * .09 });
+        top = Math.max(top, py + s);
+      });
+    }
+    grp.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    grp.userData = { top, bredde, dele };
+    return grp;
+  }
+  // Blomsterne vokser op med et lille hop, frugterne falder ned i skålen og hopper
+  function pyntTrin(dt) {
+    if (!pyntAnim) return;
+    pyntAnim.t += dt;
+    let faerdig = true;
+    for (const d of pyntAnim.dele) {
+      const k = Math.max(0, Math.min(1, (pyntAnim.t - d.forsink) / (d.slags === "blomst" ? .7 : .45)));
+      if (d.slags === "blomst") {
+        const s = 1 - Math.pow(1 - k, 3) + Math.sin(k * Math.PI) * .15;
+        d.o.scale.setScalar(Math.max(.001, s));
+        if (k > 0 && !d.lyd) { d.lyd = true; Spil.tone([523 + Math.random() * 200, 784], .07, "sine"); }
+      } else {
+        d.o.visible = k > 0;
+        const efter = pyntAnim.t - d.forsink - .45;
+        d.o.position.y = d.maalY + 3 * (1 - k * k) + (efter > 0 && efter < .25 ? Math.sin(efter / .25 * Math.PI) * .12 : 0);
+        if (k >= 1 && !d.lyd) { d.lyd = true; Spil.tone([180 + Math.random() * 80], .06, "triangle"); }
+      }
+      if (k < 1 || (d.slags === "frugt" && pyntAnim.t - d.forsink < .7)) faerdig = false;
+    }
+    if (faerdig) pyntAnim = null;
+  }
+  function fjernPynt() {
+    if (!pyntGrp) return;
+    pyntGrp.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    if (pyntGrp.parent) pyntGrp.parent.remove(pyntGrp);
+    pyntGrp = null; pyntAnim = null;
   }
 
   /* ---------- Teksturer ---------- */
@@ -287,10 +593,14 @@
       return;
     }
     // Drejeskiven: krukken (op til 3.3 høj) og skiven skal kunne ses, med plads til knapperne forneden
-    const ovnen = visning === "ovn", halvH = ovnen ? 3.7 : 3.0, halvB = 2.45;
+    // Har krukken fået blomster, skal de også være i billedet
+    const ovnen = visning === "ovn", oeverst = Math.max(3.5, pyntGrp ? pyntGrp.userData.top + .5 : 0);
+    // På en smal telefon fylder farvevælgeren den nederste halvdel: zoom lidt ud, og løft krukken op over farverne
+    const glasurTlf = !ovnen && fase === "glasur" && asp < 1;
+    const halvH = ovnen ? 3.7 : glasurTlf ? 4.2 : (oeverst + 2.5) / 2, halvB = 2.45;
     const d = (Math.max(halvH / tv, halvB / (tv * asp)) + 1.2) * kamZoom;
-    const op = asp < 1 ? .55 : .35; // skub billedet op, så knapperne forneden ikke dækker
-    const my = ovnen ? 2.0 : .9 - op;
+    const op = glasurTlf ? 1.6 : asp < 1 ? .55 : .35; // skub billedet op, så knapperne forneden ikke dækker
+    const my = ovnen ? 2.0 : (oeverst - 2.5) / 2 + .4 - op;
     // Er krukken blevet til en åben skål, kigger kameraet mere ovenfra, så man kan se ned i den
     const skaal = !ovnen && r ? hul * Math.max(0, Math.min(1, (r[K - 1] - .45) / .7)) : 0;
     const e = Math.max(.05, Math.min(.97, .4 + .22 * skaal + kamTilt));
@@ -313,7 +623,8 @@
   }
 
   function nyKlump(snak = true) {
-    fjernKlat(); fase = "drej"; startForm(); nyGeometri();
+    fjernKlat(); fjernPynt(); valgtPynt = null; $(".dr-pynt").hidden = true;
+    fase = "drej"; startForm(); nyGeometri();
     sagtMere = false; sagtHint = false; sagtAabn = false;
     $(".dr-mere").hidden = false; $(".dr-mere").classList.remove("vis");
     lerFarve(lerCanvas.getContext("2d"), TEX, TEX); lerTex.needsUpdate = true;
@@ -344,6 +655,7 @@
     raaTex = canvasTex(raaCanvas); braendtTex = canvasTex(braendtCanvas);
     krukke.material = new T.MeshStandardMaterial({ map: raaTex, roughness: .88 });
     $(".dr-farver").hidden = false; $(".dr-hyldeknap").hidden = true;
+    indram("hjul");
     visKnap("🔥", false);
     later(() => Spil.say("Flot! Nu skal krukken have farve. Vælg en farve!", null, "drej-glasur"), 300);
   }
@@ -388,22 +700,52 @@
     const p = skaermPunkt(new T.Vector3(0, H / 2, 0));
     if (!roligt()) Spil.burst(p.x, p.y, "✨⭐✨🌟✨⭐");
     Spil.say("Se, hvor den skinner!", null, "drej-skinner");
-    later(stilPaaHylde, 4200);
+    const slags = pyntSlags(r, H, hul);
+    if (slags) later(() => visPynt(slags), 2600);
+    else later(stilPaaHylde, 4200);
+  }
+
+  // Valgfrit: vælg blomster eller frugt til krukken, eller tryk ✅ for at stille den på hylden som den er
+  function visPynt(slags) {
+    if (fase !== "ovn") return;
+    fase = "pynt"; valgtPynt = null; pyntFroe = 1 + Math.floor(Math.random() * 1e8);
+    const boks = $(".dr-pynt");
+    boks.innerHTML = Object.entries(PYNT).filter(([, p]) => p.slags === slags)
+      .map(([id, p]) => `<button data-p="${id}" aria-label="${p.navn}">${p.ikon}</button>`).join("");
+    boks.querySelectorAll("button").forEach(b => b.addEventListener("click", () => vaelgPynt(b.dataset.p, b)));
+    boks.hidden = false;
+    visKnap("✅", true);
+    Spil.say(slags === "frugt" ? "Vil du lægge frugt i skålen?" : "Vil du sætte blomster i krukken?", null, slags === "frugt" ? "drej-frugt" : "drej-blomst");
+  }
+  function vaelgPynt(id, knap) {
+    if (fase !== "pynt") return;
+    Spil.sfx.pop();
+    $(".dr-pynt").querySelectorAll("button").forEach(b => b.classList.toggle("valgt", b === knap));
+    fjernPynt();
+    valgtPynt = id; pyntFroe = pyntFroe % 1e8 + 7919;        // nyt tryk = en ny buket
+    pyntGrp = lavPynt(id, pyntFroe, r, H, hul);
+    pyntGrp.userData.dele.forEach(d => { if (d.slags === "blomst") d.o.scale.setScalar(.001); else d.o.visible = false; });
+    krukke.add(pyntGrp); pyntAnim = { t: 0, dele: pyntGrp.userData.dele };
+    indram("hjul");
+    Spil.say(PYNT[id].navn, null, PYNT[id].lyd);
   }
 
   function stilPaaHylde() {
-    // Gem krukken: form + et lille billede af glasuren
+    // Gem krukken: form + et lille billede af glasuren (+ evt. pynt)
     const lille = document.createElement("canvas"); lille.width = lille.height = 256;
     lille.getContext("2d").drawImage(braendtCanvas, 0, 0, 256, 256);
     let billede = ""; try { billede = lille.toDataURL("image/jpeg", .8); } catch (e) {}
-    gem({ r: r.map(x => Math.round(x * 1000) / 1000), H: Math.round(H * 1000) / 1000, hul: Math.round(hul * 100) / 100, billede });
+    const k = { r: r.map(x => Math.round(x * 1000) / 1000), H: Math.round(H * 1000) / 1000, hul: Math.round(hul * 100) / 100, billede };
+    if (valgtPynt) { k.pynt = valgtPynt; k.froe = pyntFroe; }
+    gem(k);
+    fjernPynt();
     visHylde(true);
   }
 
   function visHylde(ny) {
     fase = "hylde"; ned = false;
     hjulGrp.visible = false; ovn.visible = false; gulv.visible = false;
-    $(".dr-farver").hidden = true; $(".dr-hyldeknap").hidden = true; $(".dr-mere").hidden = true;
+    $(".dr-farver").hidden = true; $(".dr-hyldeknap").hidden = true; $(".dr-mere").hidden = true; $(".dr-pynt").hidden = true;
     lavHylde(ny);
     indram("hylde");
     visKnap("➕", false);
@@ -447,12 +789,17 @@
       const geo = new T.LatheGeometry(profilFra(k), 48);
       const mat = new T.MeshPhysicalMaterial({ color: k.billede ? "#ffffff" : "#c98760", roughness: .22, clearcoat: 1, clearcoatRoughness: .06 });
       if (k.billede) { const t = loader.load(k.billede); t.colorSpace = T.SRGBColorSpace; mat.map = t; }
-      const m = new T.Mesh(geo, mat), maxR = Math.max(...k.r);
-      const sk = Math.min(.8, 1.0 / maxR, 2.35 / k.H);
+      const m = new T.Mesh(geo, mat);
+      let maxR = Math.max(...k.r), hoej = k.H;
+      if (k.pynt && PYNT[k.pynt]) { // blomster/frugt følger med krukken og regnes med i dens størrelse
+        const pg = lavPynt(k.pynt, k.froe || 1, rrFra(k), k.H, k.hul || 0);
+        m.add(pg); hoej = pg.userData.top; maxR = Math.max(maxR, pg.userData.bredde);
+      }
+      const sk = Math.min(.8, 1.0 / maxR, 2.35 / hoej);
       m.scale.setScalar(sk); m.castShadow = m.receiveShadow = true;
       m.position.set((plads - (kol - 1) / 2) * PLADS, rad * RAEKKE, 0);
       m.rotation.y = Math.random() * 6;
-      m.userData = { basisY: m.position.y, sk, h: k.H, maxR };
+      m.userData = { basisY: m.position.y, sk, h: hoej, maxR };
       hyldeGrp.add(m); hyldeKrukker.push(m);
       if (ny && i === 0) dans.push({ m, t: 0, lande: true });
     });
@@ -502,10 +849,8 @@
     snurr.lx = e.clientX; snurr.ly = e.clientY; snurr.lt = nu;
   }
 
-  function profilFra(k) {
-    const rr = k.r.length === K ? k.r : Array.from({ length: K }, (_, i) => k.r[Math.round(i / (K - 1) * (k.r.length - 1))]);
-    return profil(rr, k.H, k.hul || 0);
-  }
+  const rrFra = k => k.r.length === K ? k.r : Array.from({ length: K }, (_, i) => k.r[Math.round(i / (K - 1) * (k.r.length - 1))]);
+  function profilFra(k) { return profil(rrFra(k), k.H, k.hul || 0); }
 
   /* ---------- Fingeren ---------- */
   function tilNdc(e) {
@@ -567,7 +912,10 @@
 
   function tryk_hylde(e) {
     ray.setFromCamera(ndc, camera);
-    const hit = ray.intersectObjects(hyldeKrukker)[0];
+    const h0 = ray.intersectObjects(hyldeKrukker)[0];
+    // Rammer man en blomst eller en frugt, er det krukken, man har trykket på
+    let obj = h0 && h0.object; while (obj && !hyldeKrukker.includes(obj)) obj = obj.parent;
+    const hit = obj ? { object: obj } : null;
     if (vist) { // en krukke vises tæt på: træk = drej den, tryk ved siden af = sæt den tilbage
       if (vist.retning < 0) return;
       const nu = performance.now();
@@ -798,11 +1146,12 @@
     raf = requestAnimationFrame(loop);
     const dt = Math.min(.05, (nu - (sidstTid || nu)) / 1000); sidstTid = nu;
     // Skivens fart
-    const maalO = fase === "drej" ? 7 : fase === "glasur" ? 5 : fase === "ovn" ? 2.5 : 0;
+    const maalO = fase === "drej" ? 7 : fase === "glasur" ? 5 : fase === "ovn" ? 2.5 : fase === "pynt" ? 1 : 0;
     omega += (maalO - omega) * Math.min(1, dt * 1.5);
     vinkel = (vinkel + omega * dt) % (Math.PI * 2);
     hoved.rotation.y = vinkel; krukke.rotation.y = vinkel;
-    lydSaet(lyd && lyd.master, fase === "hylde" ? 0 : Math.min(1, omega / 7) * .9, .3);
+    lydSaet(lyd && lyd.master, fase === "hylde" || fase === "pynt" ? 0 : Math.min(1, omega / 7) * .9, .3);
+    pyntTrin(dt);
 
     if (fase === "drej") { form(dt); klatTrin(dt); }
     else lydSaet(lyd && lyd.smatG, 0);
@@ -819,6 +1168,7 @@
   function videre() {
     if (fase === "drej") tilGlasur();
     else if (fase === "glasur" && malet) tilOvn();
+    else if (fase === "pynt") { Spil.sfx.click(); $(".dr-pynt").hidden = true; visKnap("✅", false); stilPaaHylde(); }
     else if (fase === "hylde") { Spil.sfx.click(); nyKlump(false); later(() => Spil.say("Her er en ny klump ler.", null, "drej-ny"), 300); }
   }
 
@@ -826,9 +1176,10 @@
     id: "drejeskiven", navn: "Drejeskiven", ikon: "🏺", farve: "#f7c9a3",
     start(rt) {
       alive = true; timers = []; fase = "start"; vinkel = 0; omega = 0; sidstTid = 0; ned = false; dans = []; ovnAnim = null;
-      Spil.preload(["drej-hej", "drej-hul", "drej-glasur", "drej-mal", "drej-ovn", "drej-skinner", "drej-hylde", "drej-ny", "drej-alle", "drej-vaelg", "drej-hint", "drej-mere", "drej-mere-hint", "drej-aabn", "drej-snur"]);
+      Spil.preload(["drej-hej", "drej-hul", "drej-glasur", "drej-mal", "drej-ovn", "drej-skinner", "drej-hylde", "drej-ny", "drej-alle", "drej-vaelg", "drej-hint", "drej-mere", "drej-mere-hint", "drej-aabn", "drej-snur", ...PYNT_LYDE]);
       rt.innerHTML = `<div class="dr"><canvas class="dr-cv"></canvas><div class="dr-vent">🏺</div>
-        <div class="dr-farver" hidden>${FARVER.map((f, i) => `<button data-i="${i}" style="background:${f[1]}" aria-label="${f[2]}"></button>`).join("")}</div>
+        <div class="dr-farver" hidden>${FARVER.map((f, i) => f ? `<button data-i="${i}" style="background:${f[1]}" aria-label="${f[2]}"></button>` : `<i class="dr-brud"></i>`).join("")}</div>
+        <div class="dr-pynt" hidden></div>
         <button class="dr-videre" hidden>✅</button>
         <button class="dr-mere" hidden aria-label="Mere ler"><i></i></button>
         <button class="dr-hyldeknap" hidden aria-label="Se hylden">🏺</button></div>`;
@@ -849,10 +1200,15 @@
         byg(); tilpas();
         const dyb = Spil.dyb;
         nyKlump(!dyb);
-        if (dyb === "glasur" || dyb === "ovn") {
-          for (let j = 0; j < K; j++) r[j] = .75 + .35 * Math.sin(j / (K - 1) * Math.PI * 1.3);
+        if (dyb === "glasur" || dyb === "ovn" || dyb === "pynt" || dyb === "skaal") {
+          // test: "pynt" = en høj vase klar til blomster, "skaal" = en bred skål klar til frugt
+          for (let j = 0; j < K; j++) { const t = j / (K - 1); r[j] = dyb === "skaal" ? .55 + .75 * Math.pow(t, .7) : dyb === "pynt" ? .55 + .2 * Math.sin(t * Math.PI) - .12 * t : .75 + .35 * Math.sin(t * Math.PI * 1.3); }
           hul = 1; H = Math.max(MINH, Math.min(MAXH, V / middelR2(r))); nyGeometri(); tilGlasur();
           if (dyb === "ovn") { vaelgFarve(4, $(".dr-farver button[data-i='4']")); later(tilOvn, 1500); }
+          if (dyb === "pynt" || dyb === "skaal") {
+            vaelgFarve(dyb === "pynt" ? 4 : 2, $(`.dr-farver button[data-i='${dyb === "pynt" ? 4 : 2}']`));
+            later(() => { fase = "ovn"; $(".dr-farver").hidden = true; braend(); visPynt(pyntSlags(r, H, hul)); }, 1000);
+          }
         } else if (dyb === "hylde") visHylde(false);
         else if (dyb === "hul") { hul = 1; sagtAabn = true; nyGeometri(); } // test: klump med hul, klar til at blive en skål
         kamPos.copy(kamPosMaal); kamMaal.copy(kamMaalMaal);
@@ -868,6 +1224,9 @@
         if (envTex) envTex.dispose();
         renderer.dispose(); try { renderer.forceContextLoss(); } catch (e) {}
       }
+      if (skraelTex) { skraelTex.dispose(); skraelTex = null; }
+      Object.values(aebleTex).forEach(t => t.dispose()); aebleTex = {};
+      if (froeTexCache) { froeTexCache.dispose(); froeTexCache = null; }
       renderer = scene = camera = krukke = null; raaTex = braendtTex = null; klat = fyld = null;
     }
   });

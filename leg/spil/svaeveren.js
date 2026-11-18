@@ -3,14 +3,16 @@
 // 1) Ræven står på toppen af bjerget. Tryk, så løber den, skærmen folder sig ud, og den hopper ud.
 // 2) Hold fingeren til venstre eller højre på skærmen for at dreje. Højt oppe på skærmen læner ræven sig tilbage
 //    og svæver langsomt; langt nede læner den sig frem og får fart på (men daler også hurtigere).
-//    Glitrende vindsøjler løfter ræven højt op; stjerner i luften kan fanges; man kan flyve gennem skyerne.
+//    Glitrende vindsøjler løfter ræven højt op; man kan flyve gennem skyerne.
+//    Stjerner i luften kan fanges: der ligger altid én lige foran ræven, og tæt på trækkes de hen til den.
+//    Blød baggrundsmusik bliver lysere, jo højere man er; den dukker sig under stemmen, og 🎵 slår den fra.
 // 3) Ræven daler langsomt og lander til sidst (på græsset, på stranden eller i vandet).
 //    Tryk, så løfter en hvirvelvind den op i luften igen, og man flyver videre.
 // Ingen tabe-tilstand: man kan ikke styrte, kun lande.
 (function () {
   const R = 175, S = 470;          // øens radius og terrænets størrelse
   const FART = 10.5;               // grundfart fremad
-  const SYNK = 1.4;                // hvor hurtigt ræven daler
+  const SYNK = .85;                // hvor hurtigt ræven daler (lavt, så man kan blive ved med at svæve)
   const LOEFT = 7.5;               // vindsøjlernes løft
   const DREJ = 1.2;                // drejehastighed (radianer/s)
   const LOFT = 100;                // højere op end det løfter vinden ikke
@@ -37,12 +39,18 @@
       box-shadow:0 6px 0 rgba(61,43,61,.3);display:flex;align-items:center;justify-content:center;
       font-size:clamp(46px,8vh,74px);line-height:1;animation:sv-hop 1.4s ease-in-out infinite}
     .sv-knap[hidden]{display:none}
+    .sv-knap,.sv-musik{padding:0;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif}
     .sv-knap:active{transform:translateX(-50%) translateY(4px)}
     @keyframes sv-hop{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.1)}}
     .sv-stj{position:absolute;top:calc(2vh + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));
       padding:8px 18px;border-radius:40px;background:rgba(255,250,240,.8);box-shadow:0 4px 0 rgba(61,43,61,.2);
       font:700 clamp(26px,4.5vh,40px)/1.1 var(--display,system-ui);color:#7a5200;pointer-events:none}
     .sv-stj.pop{animation:sv-pop .5s ease-out}
+    .sv-musik{position:absolute;top:calc(2vh + clamp(52px,8vh,70px) + 12px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));
+      width:clamp(60px,8.5vh,76px);aspect-ratio:1;border-radius:50%;background:rgba(255,250,240,.8);box-shadow:0 4px 0 rgba(61,43,61,.2);
+      display:flex;align-items:center;justify-content:center;font-size:clamp(28px,4.5vh,40px);line-height:1}
+    .sv-musik.fra{opacity:.55;filter:grayscale(1)}
+    .sv-musik:active{transform:translateY(3px)}
     @keyframes sv-pop{40%{transform:scale(1.3)}}
     @media (prefers-reduced-motion:reduce){.sv-vent,.sv-knap,.sv-stj.pop{animation:none}}
   `);
@@ -55,8 +63,9 @@
   let kol = 1, svR = { x: 0, v: 0 }, svP = { x: 0, v: 0 }, haleS = { x: 0, v: 0 }, iVind = false, blink = 0, naesteBlink = 3;
   let finger = null, taster = { v: false, h: false, n: false, o: false }, styr = 0, styrTid = 0, flyveTid = 0;
   let laen = 0, kropLaen = 0, kropHop = 0;   // læn frem (+) / tilbage (-)
-  let sagt = {}, antalOp = 0, antalStj = 0, ventLyd = 0;
-  let lyd = null;
+  let sagt = {}, antalOp = 0, antalStj = 0, ventLyd = 0, naesteForan = 0;
+  let lyd = null, musikTil = true;
+  const MUSIK = "lk-svaev-musik";
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
   const $ = s => root.querySelector(s);
   const ss = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -180,8 +189,49 @@
         const o = ac.createOscillator(); o.type = "sine"; o.frequency.value = f; o.detune.value = (i - 1.5) * 4;
         const g = gain(.25 / (i + 1)); o.connect(g).connect(kTrem); o.start(); return o;
       });
-      lyd = { ac, master, vF, vG, sF, sG, fG, lfo, kG, kilder: [brun, lys, lfo, trem, ...toner] };
+      // Musik: en blød flade af akkorder gennem et filter, der åbner sig (bliver lysere) jo højere ræven er,
+      // og spredte klokketoner, der kommer oftere højt oppe. Den dukker sig, når stemmen taler.
+      const mG = gain(0), mF = filter("lowpass", 500, .5); mF.connect(mG); mG.connect(master);
+      const klokke = gain(1); klokke.connect(mG);
+      lyd = { ac, master, vF, vG, sF, sG, fG, lfo, kG, mG, mF, klokke, naesteAkkord: ac.currentTime + .3, akkordNr: 0, naesteKlokke: ac.currentTime + 3,
+        kilder: [brun, lys, lfo, trem, ...toner] };
     } catch (e) { lyd = null; }
+  }
+  // C-dur: C(add9) – Am7 – Fmaj7 – G(sus)
+  const AKKORDER = [[130.81, 196, 293.66, 329.63], [110, 164.81, 261.63, 392], [87.31, 174.61, 220, 329.63], [98, 146.83, 293.66, 392]];
+  const PENTA = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51];
+  const AKKORD_LAENGDE = 7;
+  function musikTrin(hoejdeF) {
+    const ac = lyd.ac, nu = ac.currentTime;
+    if (lyd.naesteAkkord < nu + .5) {
+      const t0 = Math.max(lyd.naesteAkkord, nu), varig = AKKORD_LAENGDE + 3.5;
+      AKKORDER[lyd.akkordNr++ % AKKORDER.length].forEach((f, i) => {
+        for (const [type, det, v] of [["sine", 0, .05], ["triangle", 7, .018]]) {
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type = type; o.frequency.value = f; o.detune.value = det * (i % 2 ? 1 : -1);
+          g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(v, t0 + 2.2);
+          g.gain.setValueAtTime(v, t0 + AKKORD_LAENGDE); g.gain.linearRampToValueAtTime(0, t0 + varig);
+          o.connect(g).connect(lyd.mF); o.start(t0); o.stop(t0 + varig + .1);
+        }
+      });
+      lyd.naesteAkkord = t0 + AKKORD_LAENGDE;
+    }
+    if (lyd.naesteKlokke < nu) {
+      // Højt oppe: flere og lysere klokketoner
+      const n = PENTA.length, lav = Math.floor(hoejdeF * 3), f = PENTA[lav + Math.floor(Math.random() * (n - 3))];
+      const o = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
+      o.type = "sine"; o.frequency.value = f; o2.type = "sine"; o2.frequency.value = f * 2;
+      const g2 = ac.createGain(); g2.gain.value = .25;
+      g.gain.setValueAtTime(0, nu); g.gain.linearRampToValueAtTime(.035, nu + .02); g.gain.exponentialRampToValueAtTime(.0005, nu + 2.6);
+      o.connect(g); o2.connect(g2).connect(g); g.connect(lyd.klokke);
+      o.start(nu); o2.start(nu); o.stop(nu + 2.7); o2.stop(nu + 2.7);
+      lyd.naesteKlokke = nu + (3.4 - hoejdeF * 2) * (.6 + Math.random() * .8);
+    }
+  }
+  function saetMusik(til) {
+    musikTil = til;
+    try { localStorage.setItem(MUSIK, til ? "1" : "0"); } catch (e) {}
+    const b = root && $(".sv-musik"); if (b) { b.classList.toggle("fra", !til); b.textContent = til ? "🎵" : "🔇"; }
   }
   function lydTrin() {
     if (!lyd) return;
@@ -196,6 +246,14 @@
     saet(lyd.fG.gain, flyver ? .015 + Math.abs(styr) * .05 + Math.max(0, fn - .55) * .12 : hvirvl ? .03 : 0, .2);
     saet(lyd.lfo.frequency, 6 + fn * 14 + Math.abs(styr) * 4, .2);
     saet(lyd.kG.gain, (flyver && iVind) || hvirvl ? .05 : 0, iVind || hvirvl ? .4 : .8);
+    // Musikken: højden (0 ved jorden, 1 højt oppe) styrer, hvor lys den er
+    const hoejdeF = p ? klem((p.y - bund(p.x, p.z)) / 55, 0, 1) : 0;
+    musikTrin(hoejdeF);
+    // Musikken er en baggrund: lav, og næsten væk mens stemmen taler (kommer langsomt igen bagefter)
+    const taler = Spil.isTalking();
+    const mVol = !musikTil ? 0 : (flyver || hvirvl ? .45 : .3) * (taler ? .08 : 1);
+    saet(lyd.mG.gain, mVol, taler ? .08 : 1.5);
+    saet(lyd.mF.frequency, 420 + hoejdeF * hoejdeF * 2600, .8);
   }
   function lydStop() {
     if (!lyd) return;
@@ -454,9 +512,9 @@
     const glimt = new T.SpriteMaterial({ map: prikTex(), color: "#fff1a8", transparent: true, opacity: .75, depthWrite: false, blending: T.AdditiveBlending });
     stjerner = [];
     for (let i = 0; i < 16; i++) {
-      const grp = new T.Group(), m = new T.Mesh(geo, mat); m.scale.setScalar(1.25); m.castShadow = true; grp.add(m);
+      const grp = new T.Group(), m = new T.Mesh(geo, mat); m.scale.setScalar(1.7); m.castShadow = true; grp.add(m);
       m.add(new T.Mesh(geo, streg(.08)));
-      const sp = new T.Sprite(glimt); sp.scale.setScalar(5); grp.add(sp);
+      const sp = new T.Sprite(glimt); sp.scale.setScalar(7); grp.add(sp);
       grp.userData = { m, ventTil: 0 }; flytStjerne(grp); scene.add(grp); stjerner.push(grp);
     }
   }
@@ -784,7 +842,7 @@
     let l = 0, naermest = 1e9;
     for (const [x, z] of VINDE) {
       const d = Math.hypot(p.x - x, p.z - z); naermest = Math.min(naermest, d);
-      l += 1 - ss(5, 11, d);
+      l += 1 - ss(7, 15, d);   // brede vindsøjler, så de er lette at ramme
     }
     return { l: Math.min(1, l) * LOEFT * (1 - ss(LOFT - 25, LOFT, p.y)), naermest };
   }
@@ -821,7 +879,7 @@
       const { l, naermest } = vindLoeft();
       // Læn frem = hurtigere (men man daler mere); læn tilbage = langsomt og svævende.
       // Og fart og højde hænger sammen: dykker man, går det stærkere; stiger man, går det langsommere.
-      const synk = SYNK * (1 + Math.abs(styr) * .5) * (laen > 0 ? 1 + laen * 1.5 : 1 + laen * .3);
+      const synk = SYNK * (1 + Math.abs(styr) * .25) * (laen > 0 ? 1 + laen * 1.2 : 1 + laen * .3);
       vy += ((-synk + l) - vy) * Math.min(1, dt * 1.6);
       const fartMaal = FART + laen * (laen > 0 ? 7 : 4.5) + (-vy - SYNK) * .8;
       fart += (klem(fartMaal, 5.5, 20) - fart) * Math.min(1, dt * 1.2);
@@ -905,14 +963,43 @@
     }
   }
 
+  // Der ligger altid en stjerne foran ræven, i den højde den er på vej ned til, så man rammer den bare ved at flyve ligeud
+  function stjerneForan(dt) {
+    naesteForan -= dt;
+    if (fase !== "flyv" || naesteForan > 0) return;
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    for (const s of stjerner) {
+      if (!s.visible) continue;
+      // Ligger der allerede en stjerne på ruten (lige foran og i den højde, ræven kommer forbi i)?
+      const dx = s.position.x - p.x, dz = s.position.z - p.z, frem = dx * fx + dz * fz, side = Math.abs(dx * fz - dz * fx);
+      const forventetY = p.y + vy * frem / Math.max(fart, 5);
+      if (frem > 8 && frem < 80 && side < 7 && Math.abs(s.userData.y0 - forventetY) < 7) return;
+    }
+    // Brug den synlige stjerne, der er længst væk (eller en der venter på at komme igen)
+    let valgt = stjerner.find(s => !s.visible), bedst = -1;
+    if (!valgt) for (const s of stjerner) { const d = s.position.distanceTo(p); if (d > bedst) { bedst = d; valgt = s; } }
+    const afst = 42 + Math.random() * 16, side = (Math.random() - .5) * 8;
+    const x = p.x + fx * afst - fz * side, z = p.z + fz * afst + fx * side;
+    const y = klem(p.y + vy * afst / Math.max(fart, 5) + .5, bund(x, z) + 5, 88);
+    valgt.position.set(x, y, z); valgt.userData.y0 = y; valgt.visible = true; valgt.userData.ventTil = 0;
+    naesteForan = 2.5;
+  }
+
   function stjerneTrin(dt, t) {
-    const c = new T.Vector3(p.x, p.y + 1.6, p.z);
+    const c = new T.Vector3(p.x, p.y + 1.6, p.z), flyver = fase === "flyv" || fase === "hvirvel";
+    stjerneForan(dt);
     for (const s of stjerner) {
       if (!s.visible) { if (t > s.userData.ventTil) flytStjerne(s); continue; }
       s.userData.m.rotation.y += dt * 2;
+      // Er ræven tæt på, trækkes stjernen hen til den (som en magnet), så man ikke skal ramme præcist
+      const til = c.clone().sub(s.position), d = til.length();
+      if (flyver && d < 18 && d > .01) {
+        const skridt = Math.min(d, dt * (10 + (18 - d) * 1.8));
+        s.position.x += til.x / d * skridt; s.position.z += til.z / d * skridt; s.userData.y0 += til.y / d * skridt;
+      }
       s.position.y = s.userData.y0 + Math.sin(t * 1.5 + s.id) * .4;
-      if ((fase === "flyv" || fase === "hvirvel") && s.position.distanceTo(c) < 3.6) {
-        s.visible = false; s.userData.ventTil = t + 10;
+      if (flyver && s.position.distanceTo(c) < 6) {
+        s.visible = false; s.userData.ventTil = t + 10; naesteForan = Math.min(naesteForan, 1.2);
         antalStj++; try { localStorage.setItem(GEM, String(antalStj)); } catch (e) {}
         const el = $(".sv-stj"); el.querySelector("b").textContent = antalStj; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
         Spil.tone([1047, 1319, 1568, 2093], .07, "sine");
@@ -985,15 +1072,19 @@
     id: "svaeveren", navn: "Svæveren", ikon: "🪂", farve: "#bfe3ff",
     start(rt) {
       alive = true; timers = []; tex = []; matCache = {}; sidstTid = 0; finger = null; taster = { v: false, h: false, n: false, o: false }; laen = 0; kropLaen = 0; kropHop = 0;
-      sagt = {}; antalOp = 0; styrTid = 0; flyveTid = 0; faseTid = 0; fase = "start"; styr = 0; kol = 1;
+      sagt = {}; antalOp = 0; naesteForan = 3; styrTid = 0;
+      try { musikTil = localStorage.getItem(MUSIK) !== "0"; } catch (e) { musikTil = true; } flyveTid = 0; faseTid = 0; fase = "start"; styr = 0; kol = 1;
       oejne = []; oerer = []; ben = []; kamRul = 0; fov = 60; fovKick = 0; iVind = false;
       svR = { x: 0, v: 0 }; svP = { x: 0, v: 0 }; haleS = { x: 0, v: 0 };
       try { antalStj = parseInt(localStorage.getItem(GEM) || "0", 10) || 0; } catch (e) { antalStj = 0; }
       Spil.preload(["svaev-hej", "svaev-styr", "svaev-vind", "svaev-landet", "svaev-plask", "svaev-op", "svaev-stjerne", ...ROS]);
       rt.innerHTML = `<div class="sv"><canvas class="sv-cv"></canvas><div class="sv-vent">🪂</div>
         <div class="sv-stj">⭐ <b>${antalStj}</b></div>
+        <button class="sv-musik" aria-label="Musik">🎵</button>
         <button class="sv-knap" hidden aria-label="Flyv">🪂</button></div>`;
       root = rt.querySelector(".sv"); cv = $(".sv-cv");
+      saetMusik(musikTil);
+      $(".sv-musik").addEventListener("click", e => { e.stopPropagation(); Spil.sfx.click(); saetMusik(!musikTil); });
       $(".sv-knap").addEventListener("click", e => { e.stopPropagation(); tryk(); });
       cv.addEventListener("pointerdown", onDown); cv.addEventListener("pointermove", onMove);
       cv.addEventListener("pointerup", onUp); cv.addEventListener("pointercancel", onUp);
