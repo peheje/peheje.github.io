@@ -139,6 +139,7 @@
   }
   const klar = i => i && i.complete && i.naturalWidth > 0;
   const alleBilleder = () => [...ARTER.flatMap(a => [a.k + "-unge", a.k + "-voksen"]), "koral-roed", "tang", "skattekiste", "muslinge", "sten-koral"];
+  const hentSovBilleder = () => ARTER.filter(a => !a.lys).flatMap(a => [a.k + "-unge-sov", a.k + "-voksen-sov"]).forEach(billede);
 
   // Blækspruttens farveskift: samme billede, ny farvetone ("hue"), men samme lys og skygge
   const FARVET = {};
@@ -527,7 +528,7 @@
       w: S, h: S * .7, tx: 0, ty: 0, tz: .5, wt: 0, hvil: 0, skraek: 0, pause: 0, spd: 1, mad: m, grown: !mor && m >= VOKS, lurTil: mor ? 0 : (gem.lur && gem.lur[k]) || 0, growT: -1, eatT: 0,
       unge: !!mor, mor: mor || null, ind: 1,
       spot: 0, spotT: 0, heroS: 1, trick: null, ride: null, scene: false, over: false, glow: 0, tint: 0, tintA: 0, laas: false, drej: null,
-      sovY: 0, zUr: rnd(2, 6), selvUr: 0, rul: -1, pulsLaas: false,
+      sovY: 0, sovA: nightF > .5 && !a.lys ? 1 : 0, zUr: rnd(2, 6), selvUr: 0, rul: -1, pulsLaas: false,
     };
     if (a.front) { f.dir = -1; f.dirS = -1; } else f.dirS = f.dir;
     f.tz = f.z; dims(f); nytMaal(f);
@@ -1353,6 +1354,7 @@
   /* ---------- Dag og nat ---------- */
   function skiftNat(nat) {
     night = nat;
+    if (nat) hentSovBilleder();
     const k = q(".ak-natknap"); k.textContent = nat ? "☀️" : "🌙"; k.classList.toggle("nat", nat); k.setAttribute("aria-label", nat ? "Dag" : "Nat");
     fish.forEach(f => { f.sovY = 0; });
     if (nat) { LYD.nat(); Spil.say("Godnat, fisk. Nu sover de.", null, "akva-nat"); }
@@ -1783,6 +1785,8 @@
     if (f.ind < 1) { f.ind = Math.min(1, f.ind + dt / .6); const s = Math.max(.05, fjeder(f.ind)); f.mx *= s; f.my *= s; } // en ny unge popper frem
     f.spot += (f.spotT - f.spot) * Math.min(1, dt * 2.4);
     if (f.skraek > 0) f.skraek -= dt;
+    const sovMaal = !f.a.lys && nightF > .5 && !f.trick && !f.scene && !f.ride && f.eatT <= 0 && f.skraek <= 0 ? 1 : 0;
+    f.sovA = (f.sovA || 0) + (sovMaal - (f.sovA || 0)) * Math.min(1, dt * (sovMaal ? 2.5 : 8));
     f.bp += dt * 1.4;
     const px = f.x, py = f.y;
     let styret = false;
@@ -1920,7 +1924,16 @@
       if (klar(u)) { const ar = u.naturalHeight / u.naturalWidth, uw = ar > 1 ? f.d / ar : f.d, uh = ar > 1 ? f.d : f.d * ar; cx.globalAlpha = 1 - p; cx.drawImage(u, -uw / 2, -uh / 2, uw, uh); }
       cx.globalAlpha = p;
     }
-    cx.drawImage(img, -f.w / 2, -f.h / 2, f.w, f.h);
+    const sovImg = f.sovA > .02 && f.growT < 0 && !f.a.lys ? billede(navn + "-sov") : null;
+    if (klar(sovImg)) {
+      if (f.sovA > .98) cx.drawImage(sovImg, -f.w / 2, -f.h / 2, f.w, f.h);
+      else {
+        cx.drawImage(img, -f.w / 2, -f.h / 2, f.w, f.h);
+        cx.globalAlpha = f.sovA;
+        cx.drawImage(sovImg, -f.w / 2, -f.h / 2, f.w, f.h);
+        cx.globalAlpha = 1;
+      }
+    } else cx.drawImage(img, -f.w / 2, -f.h / 2, f.w, f.h);
     if (f.tintA > .02 && f.tint) {
       const c = farvet(navn, BLAEK_FARVER[f.tint - 1]);
       if (c) { cx.globalAlpha = f.tintA; cx.drawImage(c, -f.w / 2, -f.h / 2, f.w, f.h); }
@@ -2336,7 +2349,7 @@
       alleBilleder().forEach(n => { const i = billede(n); if (!klar(i)) i.addEventListener("load", () => { if (alive && root && root.isConnected) placerPynt(); }, { once: true }); });
 
       if (dyb === "kiste") { nextGold = 1e9; later(() => golds.push({ x: W * .5, y: H * .62, r: S * .3, ph: 0, vy: -S * .1, x0: W * .5, t: 0 }), 300); }
-      if (dyb === "nat") { night = true; nightF = 1; const k = q(".ak-natknap"); k.textContent = "☀️"; k.classList.add("nat"); nextSelv = 1e9; }
+      if (dyb === "nat") { night = true; nightF = 1; hentSovBilleder(); fish.forEach(f => { if (!f.a.lys) f.sovA = 1; }); const k = q(".ak-natknap"); k.textContent = "☀️"; k.classList.add("nat"); nextSelv = 1e9; }
       if (dyb === "bog") later(aabnBog, 400);
       if (dyb === "fodre") {
         nextGold = 1e9;
