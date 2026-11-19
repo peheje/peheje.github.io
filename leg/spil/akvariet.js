@@ -1924,8 +1924,8 @@
       if (klar(u)) { const ar = u.naturalHeight / u.naturalWidth, uw = ar > 1 ? f.d / ar : f.d, uh = ar > 1 ? f.d : f.d * ar; cx.globalAlpha = 1 - p; cx.drawImage(u, -uw / 2, -uh / 2, uw, uh); }
       cx.globalAlpha = p;
     }
-    const sovImg = f.sovA > .02 && f.growT < 0 && !f.a.lys ? billede(navn + "-sov") : null;
-    if (klar(sovImg)) {
+    const sovImg = f.sovA > .02 && f.growT < 0 && !f.a.lys ? billede(navn + "-sov") : null, sov = klar(sovImg);
+    if (sov) {
       if (f.sovA > .98) cx.drawImage(sovImg, -f.w / 2, -f.h / 2, f.w, f.h);
       else {
         cx.drawImage(img, -f.w / 2, -f.h / 2, f.w, f.h);
@@ -1934,12 +1934,13 @@
         cx.globalAlpha = 1;
       }
     } else cx.drawImage(img, -f.w / 2, -f.h / 2, f.w, f.h);
+    const kilde = sov && f.sovA > .5 ? navn + "-sov" : navn;
     if (f.tintA > .02 && f.tint) {
-      const c = farvet(navn, BLAEK_FARVER[f.tint - 1]);
+      const c = farvet(kilde, BLAEK_FARVER[f.tint - 1]);
       if (c) { cx.globalAlpha = f.tintA; cx.drawImage(c, -f.w / 2, -f.h / 2, f.w, f.h); }
     }
     const fjern = f.scene ? 0 : clamp((.32 - f.z) / .3, 0, 1);
-    if (fjern > .03) { const c = farvet(navn, "#4aa6dc"); if (c) { cx.globalAlpha = fjern * .4; cx.drawImage(c, -f.w / 2, -f.h / 2, f.w, f.h); } }
+    if (fjern > .03) { const c = farvet(kilde, "#4aa6dc"); if (c) { cx.globalAlpha = fjern * .4; cx.drawImage(c, -f.w / 2, -f.h / 2, f.w, f.h); } }
     cx.restore();
     if (f.glow > .02 && f.a.lys) {
       // lampen eller klokken lyser
