@@ -41,7 +41,7 @@
   // Trin B: Pynt hovedet (zoom helt tæt på ansigt og hat) — 2 rækker á 6 store knapper
   const PYNT_HOVED = [
     { id: "vipper", kat: "ansigt", ikon: "🥰", tekst: "Lange øjenvipper og røde kinder!", lyd: "sne-vipper" },
-    { id: "briller", kat: "ansigt", ikon: "👓", tekst: "Flotte briller!", lyd: "sne-briller" },
+    { id: "briller", kat: "briller", ikon: "👓", tekst: "Flotte briller!", lyd: "sne-briller" },
     { id: "skaeg", kat: "ansigt", ikon: "🧔", tekst: "Et stort hvidt julemandsskæg!", lyd: "sne-skaeg" },
     { id: "gulerod", kat: "naese", ikon: "🥕", tekst: "En gulerodsnæse!", lyd: "sne-gulerod" },
     { id: "rudolf", kat: "naese", ikon: "🔴", tekst: "En rød næse, der lyser!", lyd: "sne-rudolf" },
@@ -57,7 +57,7 @@
 
   const NY_VALG = () => ({
     hals: null, toej: null, knap: null, arm: "grene", ting: null,
-    ansigt: null, naese: null, haar: null, hat: null
+    ansigt: null, briller: null, naese: null, haar: null, hat: null
   });
 
   const IKON = `<span class="sn-ik"><svg viewBox="0 0 100 100" aria-hidden="true">
@@ -114,6 +114,7 @@
   let T, root, alive, timers, raf, cv, renderer, scene, camera, ray, ndc, tidU, gradient, envTex;
   let himmelMat, hemiLys, solLys, juletraeLys, sneCanvas, sneTex, jordMesh, sneFnug, snePust;
   let juletraeGrp, juleLys = [], stjerneTop, kaninGrp, pladsRing, sneSkyGrp, sneSkyAnim = null;
+  let snedriverGrp, snedriver = [], himmelFarver = null;
   let aktivGrp, kugler = [], rulBold, rulR = .34, rulPos, rulMaal = null, hopAnim = null, kugleNr = 0, rulDist = 0;
   let pyntValg = NY_VALG(), pyntListe = PYNT_KROP, pyntHop = 0, snemandVug = 0;
   let haveGrp, haveSnemaend = [], dansere = [], vistSnemand = null;
@@ -280,15 +281,22 @@
     gradient.minFilter = gradient.magFilter = T.NearestFilter; gradient.needsUpdate = true; tex.push(gradient);
 
     // Vinterhimmel (med glidende skift mellem vinterdag og stjerneklar julenat)
+    himmelFarver = {
+      dagTop: srgb(DAG_TOP), natTop: srgb(NAT_TOP),
+      dagMidt: srgb(DAG_MIDT), natMidt: srgb(NAT_MIDT),
+      dagHor: srgb(DAG_HORISONT), natHor: srgb(NAT_HORISONT),
+      dagFog: new T.Color(DAG_HORISONT), natFog: new T.Color(NAT_HORISONT)
+    };
     himmelMat = new T.ShaderMaterial({
       side: T.BackSide, depthWrite: false, fog: false, toneMapped: false,
       uniforms: {
-        top: { value: srgb(DAG_TOP) }, midt: { value: srgb(DAG_MIDT) },
-        horisont: { value: srgb(DAG_HORISONT) }, nat: { value: 0 },
+        top: { value: himmelFarver.dagTop.clone() }, midt: { value: himmelFarver.dagMidt.clone() },
+        horisont: { value: himmelFarver.dagHor.clone() }, nat: { value: 0 },
+        uTid: tidU,
         solDir: { value: new T.Vector3(.45, .38, -.75).normalize() }
       },
       vertexShader: `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform vec3 top, midt, horisont, solDir; uniform float nat; varying vec3 vDir;
+      fragmentShader: `uniform vec3 top, midt, horisont, solDir; uniform float nat, uTid; varying vec3 vDir;
         void main(){
           vec3 d = normalize(vDir); float y = max(d.y, 0.0);
           vec3 c = mix(horisont, midt, smoothstep(0.0, 0.35, y));
@@ -299,7 +307,10 @@
           if (nat > 0.05 && y > 0.12) {
             vec2 p = floor(d.xz / (d.y + 0.3) * 55.0);
             float h = fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-            if (h > 0.965) c += vec3(1.0, 0.97, 0.85) * nat * smoothstep(0.12, 0.3, y);
+            if (h > 0.965) {
+              float blink = 0.65 + 0.35 * sin(uTid * (2.0 + fract(h * 97.0) * 3.0) + h * 120.0);
+              c += vec3(1.0, 0.97, 0.85) * nat * blink * smoothstep(0.12, 0.3, y);
+            }
           }
           gl_FragColor = vec4(c, 1.0);
         }`
@@ -329,6 +340,7 @@
 
     aktivGrp = new T.Group(); scene.add(aktivGrp);
     haveGrp = new T.Group(); scene.add(haveGrp);
+    snedriverGrp = new T.Group(); scene.add(snedriverGrp);
 
     // Ring på jorden i midten, hvor snemanden stables
     pladsRing = new T.Mesh(
@@ -425,10 +437,45 @@
     scene.add(sneSkyGrp);
   }
 
+  function rydSnedriver() {
+    if (!snedriverGrp) return;
+    while (snedriverGrp.children.length) {
+      const c = snedriverGrp.children[0];
+      c.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+      snedriverGrp.remove(c);
+    }
+    snedriver = [];
+  }
+
+  function fyldSnedriver(antal = 6) {
+    if (!snedriverGrp) return;
+    rydSnedriver();
+    const sneMat = toon("#ffffff", { emissive: "#e3f2ff", emissiveIntensity: .12 });
+    const pladser = [
+      [-3.2, 3.2], [3.5, 3.0], [-2.8, -1.6], [4.2, -.5],
+      [-2.4, -2.8], [2.9, -2.4], [0.2, 4.3], [-1.5, 3.8], [1.9, 3.9]
+    ];
+    Spil.shuffle(pladser).slice(0, antal).forEach(([bx, bz]) => {
+      const x = bx + (Math.random() - .5) * .65;
+      const z = bz + (Math.random() - .5) * .65;
+      const g = new T.Group();
+      g.position.set(x, haveHoejde(x, z), z);
+      const r = .52 + Math.random() * .16;
+      const hoved = medStreg(new T.SphereGeometry(r, 14, 10), sneMat, .03);
+      hoved.scale.set(1.25, .48, 1.05); hoved.position.y = r * .18; g.add(hoved);
+      const side = medStreg(new T.SphereGeometry(r * .72, 12, 8), sneMat, .025);
+      side.scale.set(1.15, .44, .95); side.position.set(r * .58, r * .12, r * .18); g.add(side);
+      g.rotation.y = Math.random() * Math.PI * 2;
+      g.scale.setScalar(.01);
+      snedriverGrp.add(g);
+      snedriver.push({ grp: g, x, z, r: r * 1.15, brugt: false, skal: .01 });
+    });
+  }
+
   function kaldSnesky() {
     sneByge = 5.5;
     sneSkyGrp.visible = true;
-    sneSkyAnim = { t: 0 };
+    sneSkyAnim = { t: 0, fyldt: false };
     juleKlokker([783.99, 987.77, 1174.66, 1567.98], .08);
     Spil.say("Se, en snesky! Nu kommer der frisk sne!", null, "sne-sner");
   }
@@ -510,6 +557,12 @@
     juleKlokker([523.25, 659.25, 783.99, 1046.5, 1318.5], .09);
     const p = skaermPunkt(new T.Vector3(0, 4.5, -6.8));
     if (!roligt()) Spil.burst(p.x, p.y, "⭐✨🎄🌟✨");
+    if (kaninGrp) kaninGrp.userData.hop = 1.3;
+    if (fase === "have") {
+      haveSnemaend.forEach(sm => {
+        if (!dansere.some(d => d.sm === sm)) dansere.push({ sm, t: 0 });
+      });
+    }
     if (snak) Spil.say("Se, juletræet lyser!", null, "sne-juletrae");
   }
 
@@ -529,13 +582,14 @@
     const hoved = new T.Group(); hoved.position.set(0, .95, .15); kaninGrp.add(hoved);
     hoved.add(medStreg(new T.SphereGeometry(.34, 16, 12), hvid, .035));
 
+    const oerer = [];
     for (const s of [-1, 1]) {
       const oje = new T.Mesh(new T.SphereGeometry(.055, 10, 8), sort);
       oje.position.set(s * .14, .06, .29); hoved.add(oje);
       const oere = new T.Group(); oere.position.set(s * .13, .28, -.04); oere.rotation.z = -s * .18;
       const ydre = medStreg(new T.CapsuleGeometry(.075, .36, 6, 10), hvid, .025); ydre.position.y = .2; oere.add(ydre);
       const indre = new T.Mesh(new T.CapsuleGeometry(.04, .26, 4, 8), lyseroed); indre.position.set(0, .2, .045); oere.add(indre);
-      hoved.add(oere);
+      hoved.add(oere); oerer.push(oere);
     }
     const snude = new T.Mesh(new T.SphereGeometry(.055, 8, 6), lyseroed);
     snude.position.set(0, -.01, .33); hoved.add(snude);
@@ -544,7 +598,7 @@
     hue.add(medStreg(new T.TorusGeometry(.22, .065, 8, 18), hvid, .02));
     const kegle = medStreg(new T.ConeGeometry(.21, .48, 12), roed, .025); kegle.position.y = .24; hue.add(kegle);
     const kvast = medStreg(new T.SphereGeometry(.085, 10, 8), hvid, .02); kvast.position.set(0, .49, -.04); hue.add(kvast);
-    kaninGrp.userData = { hoved, hop: 0 };
+    kaninGrp.userData = { hoved, oerer, hop: 0 };
   }
 
   function bygSnevejr() {
@@ -642,7 +696,7 @@
     }
     grp.userData.oejne = oejne;
 
-    if (valg.ansigt === "briller") {
+    if (valg.briller === "briller" || valg.ansigt === "briller") {
       const br = new T.Group(); br.position.set(0, y2 + r2 * .20, r2 * .97);
       const stelMat = toon("#d43b3b");
       for (const s of [-1, 1]) {
@@ -695,6 +749,8 @@
     } else if (valg.naese === "rudolf") {
       const n = medStreg(new T.SphereGeometry(r2 * .22, 16, 12), toon("#ff2a2a", { emissive: "#ff1a1a", emissiveIntensity: .85 }), .025);
       n.position.set(0, y2 + r2 * .03, r2 * .98);
+      const lys = new T.PointLight("#ff3333", .35, 2.4);
+      lys.position.set(0, 0, r2 * .42); n.add(lys);
       rod.add(n);
     } else if (valg.naese === "jordbaer") {
       const jb = medStreg(new T.ConeGeometry(r2 * .22, r2 * .45, 12), toon("#e83858"), .025);
@@ -923,9 +979,22 @@
     if (fase === "rul") {
       kamMaalMaal.set(0, 1.1, .7);
       kamPosMaal.set(0, smal ? 6.8 : 5.2, smal ? 12.2 : 9.4);
-    } else if (fase === "krop" || fase === "hoved" || fase === "fest") {
+    } else if (fase === "krop") {
+      const y1 = kugleStakY(radier, 1);
+      const top = y2 + r2 + 1.1;
+      const løft = smal ? 1.1 : .68;
+      kamMaalMaal.set(0, y1 - løft * .65, 0);
+      const afstand = (smal ? 8.6 : 6.1) * Math.max(.86, top / 4.2);
+      kamPosMaal.set(0, y1 + .35, afstand);
+    } else if (fase === "hoved") {
+      // Zoom tæt på hovedet og hatten, løftet op over pynteknapperne i bunden
+      const løft = smal ? .95 : .52;
+      kamMaalMaal.set(0, y2 + r2 * .25 - løft, 0);
+      const afstand = (smal ? 6.8 : 5.0) * Math.max(.85, r2 / .60);
+      kamPosMaal.set(0, y2 + r2 * .45, afstand);
+    } else if (fase === "fest") {
       const top = y2 + r2 + 1.15;
-      const løft = fase === "fest" ? (smal ? .35 : .15) : (smal ? 1.25 : .78);
+      const løft = smal ? .35 : .15;
       kamMaalMaal.set(0, top * .46 - løft, 0);
       const afstand = (smal ? 10.2 : 7.4) * Math.max(.88, top / 3.8);
       kamPosMaal.set(0, top * .50 + .55, afstand);
@@ -979,11 +1048,13 @@
     rydAktiv();
     aktivGrp.position.set(0, 0, 0); aktivGrp.rotation.set(0, 0, 0); aktivGrp.scale.setScalar(1);
     aktivGrp.visible = true; pladsRing.visible = true;
+    if (snedriverGrp) snedriverGrp.visible = true;
     pyntValg = NY_VALG();
     $(".sn-pynt").hidden = true;
     $(".sn-tilbage").hidden = true;
     $(".sn-haveknap").hidden = !hentGemte().length;
     nulstilSne();
+    fyldSnedriver();
     bygHaveSnemaend();
     kugleNr = 0;
     startNykugle(false);
@@ -1054,6 +1125,7 @@
   function tilPyntKrop(snak = true) {
     fase = "krop";
     pladsRing.visible = false;
+    if (snedriverGrp) snedriverGrp.visible = false;
     $(".sn-haveknap").hidden = true;
     $(".sn-tilbage").hidden = true;
     bygSnemandPynt(aktivGrp, kugler.map(k => k.r), pyntValg);
@@ -1116,7 +1188,8 @@
       r: kugler.map(k => Math.round(k.r * 100) / 100),
       valg: { ...pyntValg }
     });
-    later(() => { if (fase === "fest") visHave(true); }, 3400);
+    later(() => { if (fase === "fest") visKnap("⛄", true, true); }, 1800);
+    later(() => { if (fase === "fest") visHave(true); }, 4800);
   }
 
   function bygEnSnemandFraData(d) {
@@ -1168,6 +1241,7 @@
     fase = "have"; vistSnemand = null;
     rydAktiv();
     aktivGrp.visible = false; pladsRing.visible = false;
+    if (snedriverGrp) snedriverGrp.visible = false;
     $(".sn-pynt").hidden = true;
     $(".sn-tilbage").hidden = true;
     $(".sn-haveknap").hidden = true;
@@ -1243,6 +1317,14 @@
         snemandVug = .28; pyntHop = .7;
         juleKlokker([784, 987.77, 1174.66], .07);
       }
+    } else if (fase === "fest") {
+      if (ray.intersectObjects(aktivGrp.children, true).length) {
+        pyntHop = 1;
+        juleKlokker([523.25, 659.25, 783.99, 1046.5], .08);
+        const sp = skaermPunkt(new T.Vector3(0, 2.3, 0));
+        if (!roligt()) Spil.burst(sp.x, sp.y, "❄️⭐⛄✨🎄");
+        if (kaninGrp) kaninGrp.userData.hop = 1.2;
+      }
     } else if (fase === "have") {
       for (const sm of haveSnemaend) {
         if (ray.intersectObjects(sm.children, true).length) {
@@ -1306,6 +1388,25 @@
 
         // Vokser i et roligt tempo, så man kan rulle rundt i sneen et godt stykke tid
         rulR = Math.min(MAKS_R[kugleNr], rulR + skridt * .042);
+
+        // Rul hen over små snedriver på plænen for ekstra sne!
+        for (const d of snedriver) {
+          if (!d.brugt && Math.hypot(rulPos.x - d.x, rulPos.z - d.z) < rulR + d.r * .75) {
+            d.brugt = true;
+            rulR = Math.min(MAKS_R[kugleNr], rulR + .14);
+            pustSne(d.x, .25, d.z, 9);
+            Spil.sfx.pop();
+            Spil.tone([440, 620], .06, "triangle");
+          }
+        }
+
+        // Kaninen hopper glad, hvis snebolden ruller tæt forbi den
+        if (kaninGrp && kaninGrp.userData.hop <= 0 &&
+            Math.hypot(rulPos.x - kaninGrp.position.x, rulPos.z - kaninGrp.position.z) < 1.85) {
+          kaninGrp.userData.hop = 1.1;
+          Spil.tone([660, 990], .07, "sine");
+        }
+
         rulPos.y = rulR * .9;
         rulBold.position.copy(rulPos);
         rulBold.scale.setScalar(rulR);
@@ -1321,8 +1422,16 @@
           if ($(".sn-videre").hidden) {
             visKnap("✅", true, false);
             pladsRing.material.color.set("#ffcf3f");
+            if (!sagtMidt && kugleNr === 0 && !Spil.isTalking()) {
+              sagtMidt = true;
+              Spil.say("Rul snebolden hen til ringen i midten, når den har den rigtige størrelse!", null, "sne-midt");
+            }
           }
-          if (Math.hypot(rulPos.x, rulPos.z) < 1.15 || rulR >= MAAL_R[kugleNr] * 1.12) {
+          if (!sagtStor && rulR >= MAAL_R[kugleNr] * 1.05 && !Spil.isTalking()) {
+            sagtStor = true;
+            Spil.say("Se, hvor stor den blev! Rul den ind i midten, når du er klar.", null, "sne-stor");
+          }
+          if (Math.hypot(rulPos.x, rulPos.z) < 1.15 || rulR >= MAKS_R[kugleNr] - .01) {
             hopPaaPlads();
             return;
           }
@@ -1344,23 +1453,23 @@
     raf = requestAnimationFrame(loop);
     const dt = Math.min(.05, (nu - (sidstTid || nu)) / 1000); sidstTid = nu;
     const t = nu / 1000;
-    tidU.value = t;
+    tidU.value = roligt() ? 0 : t;
 
     // Glidende overgang mellem vinterdag og julenat
     const natMaal = erNat ? 1 : 0;
-    if (Math.abs(natBlanding - natMaal) > .002) {
+    if (Math.abs(natBlanding - natMaal) > .002 && himmelFarver) {
       natBlanding += (natMaal - natBlanding) * Math.min(1, dt * 2.8);
       himmelMat.uniforms.nat.value = natBlanding;
-      himmelMat.uniforms.top.value.lerpVectors(srgb(DAG_TOP), srgb(NAT_TOP), natBlanding);
-      himmelMat.uniforms.midt.value.lerpVectors(srgb(DAG_MIDT), srgb(NAT_MIDT), natBlanding);
-      himmelMat.uniforms.horisont.value.lerpVectors(srgb(DAG_HORISONT), srgb(NAT_HORISONT), natBlanding);
-      scene.fog.color.lerpColors(new T.Color(DAG_HORISONT), new T.Color(NAT_HORISONT), natBlanding);
+      himmelMat.uniforms.top.value.lerpVectors(himmelFarver.dagTop, himmelFarver.natTop, natBlanding);
+      himmelMat.uniforms.midt.value.lerpVectors(himmelFarver.dagMidt, himmelFarver.natMidt, natBlanding);
+      himmelMat.uniforms.horisont.value.lerpVectors(himmelFarver.dagHor, himmelFarver.natHor, natBlanding);
+      scene.fog.color.lerpColors(himmelFarver.dagFog, himmelFarver.natFog, natBlanding);
       hemiLys.intensity = 1.35 - natBlanding * .85;
       solLys.intensity = 2.0 - natBlanding * 1.55;
       if (juletraeLys) juletraeLys.intensity = natBlanding * 4.5;
     }
 
-    // 3D-snesky svæver hen over haven og ryster frisk sne ned
+    // 3D-snesky svæver hen over haven og ryster frisk sne + nye snedriver ned
     if (sneSkyAnim) {
       sneSkyAnim.t += dt;
       const k = sneSkyAnim.t / 4.8;
@@ -1368,15 +1477,32 @@
       sneSkyGrp.position.y = 6.2 + Math.sin(t * 4) * .25;
       drysFriskSne(dt * .28);
       if (Math.random() < .8) pustSne(sneSkyGrp.position.x + (Math.random() - .5) * 4, 4.5, (Math.random() - .5) * 4, 3);
+      if (k >= .45 && !sneSkyAnim.fyldt) {
+        sneSkyAnim.fyldt = true;
+        if (fase === "rul") fyldSnedriver();
+      }
       if (k >= 1) {
         sneSkyGrp.visible = false;
         sneSkyAnim = null;
       }
     }
 
+    // Små snedriver popper blødt frem (og forsvinder når man ruller over dem)
+    for (const d of snedriver) {
+      const maal = d.brugt ? 0 : 1;
+      if (Math.abs(d.skal - maal) > .01) {
+        d.skal += (maal - d.skal) * Math.min(1, dt * (d.brugt ? 12 : 6));
+        d.grp.scale.setScalar(Math.max(.001, d.skal));
+        d.grp.visible = d.skal > .02;
+      }
+    }
+
     if (fase === "rul") {
       rulTrin(dt);
-      pladsRing.scale.setScalar(1 + Math.sin(t * 3.5) * .06);
+      const klarRing = !$(".sn-videre").hidden;
+      const ringPuls = klarRing ? .11 : .06;
+      pladsRing.scale.setScalar(1 + Math.sin(t * (klarRing ? 5.2 : 3.5)) * ringPuls);
+      pladsRing.material.opacity = klarRing ? .78 : .58;
     } else {
       lydKnas(0);
     }
@@ -1447,6 +1573,10 @@
         kaninGrp.position.y = haveHoejde(-4.3, .8) + Math.abs(Math.sin(kd.hop * Math.PI * 2)) * .45;
       }
       kd.hoved.rotation.z = Math.sin(t * 2.1) * .08;
+      if (kd.oerer) {
+        const vip = kd.hop > 0 ? Math.sin(kd.hop * Math.PI * 6) * .28 : Math.sin(t * 3.2) * .05;
+        kd.oerer.forEach((o, i) => { o.rotation.z = (i === 0 ? 1 : -1) * (.18 + vip); });
+      }
     }
 
     if (sneByge > 0) sneByge = Math.max(0, sneByge - dt);
@@ -1495,6 +1625,7 @@
     if (fase === "rul") hopPaaPlads();
     else if (fase === "krop") tilPyntHoved(true);
     else if (fase === "hoved") startFest();
+    else if (fase === "fest") visHave(true);
     else if (fase === "have") {
       Spil.sfx.click();
       nySnemand(false);
@@ -1584,8 +1715,8 @@
         renderer.dispose();
         try { renderer.forceContextLoss(); } catch (e) {}
       }
-      renderer = scene = camera = rulBold = null;
-      tex = []; matCache = {}; juleLys = []; haveSnemaend = []; dansere = [];
+      renderer = scene = camera = rulBold = himmelFarver = null;
+      tex = []; matCache = {}; juleLys = []; haveSnemaend = []; dansere = []; snedriver = [];
     }
   });
 })();
