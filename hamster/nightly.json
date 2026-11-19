@@ -488,6 +488,31 @@
         "text": "Leave a small light where it can be found.",
         "source": "Unsigned"
       }
+    },
+    {
+      "date": "2026-11-19",
+      "text": "Three envelopes, all sealed with jam, and I can only bear to open one tonight. Shall it be the lamp drawing or the plain flap?",
+      "extras": [
+        "The moon is swollen on one side now, like a cheek full of seeds. I do not ask what it is saving.",
+        "Thursday has a patient sort of draught. I have stuffed a sock in it and we are both calmer.",
+        "I found a crumb on the windowsill that I did not put there. I have decided it is a gift.",
+        "The kettle takes a little longer these evenings. I think it likes the cold company.",
+        "Somewhere past the hedge a late blackbird is practising one line over and over. I am rooting for it."
+      ],
+      "choice": {
+        "options": [
+          {
+            "label": "The lamp drawing",
+            "reply": "The lamp drawing, then. I shall slit the jam with the butter knife, very gently, like a small surgeon.",
+            "later": "The lamp envelope held a pressed leaf and no words. I have set it by the lamp, which seems right."
+          },
+          {
+            "label": "The plain flap",
+            "reply": "The plain flap. It looks the shyest of the three, and I would like it to feel welcome.",
+            "later": "The plain flap held one line in careful pencil. I have read it twice and shall not say it aloud yet."
+          }
+        ]
+      }
     }
   ]
 }
