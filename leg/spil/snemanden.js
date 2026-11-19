@@ -60,22 +60,9 @@
     ansigt: null, briller: null, naese: null, haar: null, hat: null
   });
 
-  const IKON = `<span class="sn-ik"><svg viewBox="0 0 100 100" aria-hidden="true">
-    <g stroke="${STREG}" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">
-      <circle cx="50" cy="72" r="23" fill="#f5f9ff"/>
-      <circle cx="50" cy="43" r="17" fill="#ffffff"/>
-      <path d="M35 53 Q50 59 65 53" fill="none" stroke="#e53e38" stroke-width="7"/>
-      <path d="M58 55 L63 72" fill="none" stroke="#e53e38" stroke-width="6"/>
-      <circle cx="44" cy="39" r="2.6" fill="${STREG}"/><circle cx="56" cy="39" r="2.6" fill="${STREG}"/>
-      <path d="M50 42 L65 45 L50 47 Z" fill="#ff7f2a"/>
-      <path d="M34 31 C36 14 54 10 68 18 C58 22 60 28 65 31 Z" fill="#e53e38"/>
-      <ellipse cx="50" cy="31" rx="19" ry="5" fill="#ffffff"/>
-      <circle cx="71" cy="19" r="5.5" fill="#ffffff"/>
-    </g></svg></span>`;
+  const IKON = "☃️";
 
   Spil.css("css-snemanden", `
-    .sn-ik{position:relative;display:inline-block;width:1em;height:1em;vertical-align:top;line-height:1}
-    .sn-ik svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
     .sn{position:absolute;inset:0;overflow:hidden;background:linear-gradient(${DAG_TOP},${DAG_MIDT} 60%,${DAG_HORISONT})}
     .sn-cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
     .sn-vent{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(60px,14vh,140px);

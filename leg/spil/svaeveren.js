@@ -28,29 +28,9 @@
   const ROS = ["ros-0", "ros-1", "ros-2", "ros-3", "ros-4"];
   const roligt = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
 
-  const IKON = (() => {
-    const N = SKAERMFARVER.length, pt = (i, r, y0, k, w) => {
-      const a = (i / N * 2 - 1) * k;
-      return [50 + w * Math.sin(a), y0 - r * Math.cos(a)];
-    };
-    let stier = "", snore = "";
-    for (let i = 0; i < N; i++) {
-      const [x0, y0] = pt(i, 38, 43, 1.15, 46), [x1, y1] = pt(i + 1, 38, 43, 1.15, 46);
-      const [x2, y2] = pt(i + 1, 21, 46, 1.05, 40), [x3, y3] = pt(i, 21, 46, 1.05, 40);
-      const [mx, my] = pt(i + .5, 40.5, 43, 1.15, 46), [bx, by] = pt(i + .5, 23, 46, 1.05, 40);
-      stier += `<path d="M${x0.toFixed(1)},${y0.toFixed(1)}Q${mx.toFixed(1)},${my.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}L${x2.toFixed(1)},${y2.toFixed(1)}Q${bx.toFixed(1)},${by.toFixed(1)} ${x3.toFixed(1)},${y3.toFixed(1)}Z" fill="${SKAERMFARVER[i]}"/>`;
-    }
-    for (const i of [0, 1, 2, 5, 6, 7]) {
-      const [x, y] = pt(i, 21, 46, 1.05, 40), hx = i < 4 ? 41 : 59;
-      snore += `<line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${hx}" y2="66"/>`;
-    }
-    return `<span class="sv-ik"><svg viewBox="0 0 100 100" aria-hidden="true"><g stroke="${STREG}" stroke-width="2.4" stroke-linecap="round">${snore}</g><g stroke="${STREG}" stroke-width="2.6" stroke-linejoin="round">${stier}</g></svg><b>🦊</b></span>`;
-  })();
+  const IKON = "🦊";
 
   Spil.css("css-svaeveren", `
-    .sv-ik{position:relative;display:inline-block;width:1em;height:1em;vertical-align:top;line-height:1}
-    .sv-ik svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-    .sv-ik b{position:absolute;left:50%;bottom:-3%;transform:translateX(-50%);font-size:.56em;font-weight:400;line-height:1}
     .sv{position:absolute;inset:0;overflow:hidden;background:linear-gradient(#7cb8ee,#ffe4c8)}
     .sv-cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
     .sv-vent{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(60px,14vh,140px);
