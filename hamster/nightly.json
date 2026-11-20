@@ -513,6 +513,21 @@
           }
         ]
       }
+    },
+    {
+      "date": "2026-11-20",
+      "text": "The opened envelope rests beside the two still sealed with jam. None of us is in any hurry tonight.",
+      "extras": [
+        "The moon is three-quarters round and growing, like a loaf rising well in a warm tin.",
+        "Friday has wiped its boots on the mat and settled into the armchair by the stove.",
+        "I mended the left elbow of my woollen cloak. The stitches lean slightly, like hedges in wind.",
+        "The mole next door tapped twice on the shared wall to say goodnight, or perhaps to borrow salt.",
+        "A polite spider has claimed the top corner of the round window. We have agreed on boundaries."
+      ],
+      "note": {
+        "text": "An unhurried evening is its own kind of shelter.",
+        "source": "Found under the door"
+      }
     }
   ]
 }
