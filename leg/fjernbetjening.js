@@ -42,12 +42,17 @@
     if (window.Spil && Spil.stopTalking) Spil.stopTalking();
   }
 
-  function visSpisetidOverlay(barn) {
+  function visSpisetidOverlay(barn, type) {
     fjernPill();
     fjernOverlay();
     stopAktivtSpil();
+    const erSlut = type === "slut";
     if (window.Spil) {
-      Spil.say("Nu er det spisetid! Vi leger videre en anden gang!", null, "spis-nu-" + barn);
+      Spil.say(
+        erSlut ? "Så er spillet slut for nu! Vi leger videre en anden gang!" : "Nu er det spisetid! Vi leger videre en anden gang!",
+        null,
+        (erSlut ? "slut-nu-" : "spis-nu-") + barn
+      );
     }
     overlay = document.createElement("div");
     overlay.style.cssText =
@@ -55,8 +60,8 @@
       "display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;" +
       "padding:24px;font-family:system-ui,sans-serif;color:#7c2d12;user-select:none;";
     overlay.innerHTML =
-      '<div style="font-size:84px;line-height:1">🍽️</div>' +
-      '<h1 style="font-size:2.2rem;margin:16px 0 8px">Nu skal vi spise!</h1>' +
+      `<div style="font-size:84px;line-height:1">${erSlut ? "⏳" : "🍽️"}</div>` +
+      `<h1 style="font-size:2.2rem;margin:16px 0 8px">${erSlut ? "Spillet er slut for nu!" : "Nu skal vi spise!"}</h1>` +
       '<p style="font-size:1.2rem;margin:0 0 32px;opacity:.85">Vi leger videre en anden gang.</p>' +
       '<button id="lk-unlock" style="padding:10px 18px;border-radius:999px;border:1px solid #fdba74;' +
       'background:#fff;color:#9a3412;font-size:.9rem;opacity:.65;cursor:pointer">🔒 Voksen: lås op</button>' +
@@ -87,9 +92,12 @@
     aar.onkeydown = e => { if (e.key === "Enter") tjek(); };
   }
 
-  function startNedtælling(barn, minutter) {
+  function startNedtælling(barn, minutter, type) {
     clearInterval(timer);
     fjernOverlay();
+    const erSlut = type === "slut";
+    const ikon = erSlut ? "⏳" : "🍽️";
+    const etiket = erSlut ? "Slut om " : "Mad om ";
     sek = Math.max(1, Math.round((minutter || 5) * 60));
 
     if (!pill) {
@@ -100,10 +108,14 @@
         "box-shadow:0 4px 14px rgba(0,0,0,.12);pointer-events:none;";
       document.body.appendChild(pill);
     }
-    pill.textContent = "🍽️ Mad om " + fmt(sek);
+    pill.textContent = ikon + " " + etiket + fmt(sek);
 
     if (window.Spil) {
-      const sig = () => Spil.say("Hej! Nu er der fem minutter til du skal spise, og så slukker spillene!", null, "spis-5min-" + barn);
+      const tekst = erSlut
+        ? "Hej! Nu er spillet snart slut for nu."
+        : "Hej! Nu er der fem minutter til du skal spise, og så slukker spillene!";
+      const lyd = (erSlut ? "slut-snart-" : "spis-5min-") + barn;
+      const sig = () => Spil.say(tekst, null, lyd);
       sig();
       if (!roert) addEventListener("pointerdown", sig, { once: true, capture: true, passive: true });
     }
@@ -113,9 +125,9 @@
       if (sek <= 0) {
         clearInterval(timer);
         timer = null;
-        visSpisetidOverlay(barn);
+        visSpisetidOverlay(barn, type);
       } else if (pill) {
-        pill.textContent = "🍽️ Mad om " + fmt(sek);
+        pill.textContent = ikon + " " + etiket + fmt(sek);
       }
     }, 1000);
   }
@@ -132,8 +144,9 @@
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
     const barn = (msg.barn || "frida").toLowerCase().replace(/[^a-z0-9-]/g, "");
-    if (msg.cmd === "spis5") startNedtælling(barn, msg.minutter || 5);
-    else if (msg.cmd === "sluk") visSpisetidOverlay(barn);
+    if (msg.cmd === "spis5") startNedtælling(barn, msg.minutter || 5, "spis");
+    else if (msg.cmd === "snart") startNedtælling(barn, msg.minutter || 10, "slut");
+    else if (msg.cmd === "sluk") visSpisetidOverlay(barn, "spis");
     else if (msg.cmd === "annuller") annuller();
   };
 })();

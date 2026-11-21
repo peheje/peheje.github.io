@@ -26,6 +26,10 @@
 
 <div class="card">
   <button class="warn" onclick="send('spis5', 5)">🍽️ 5 min til mad (Frida)</button>
+  <div style="display:flex;gap:.5rem;margin-bottom:.65rem;align-items:stretch">
+    <input id="min" type="number" min="1" max="60" value="10" style="width:76px;margin:0;text-align:center;font-weight:700;font-size:1.05rem" aria-label="Minutter">
+    <button style="margin:0;flex:1;background:#6366f1;color:#fff" onclick="send('snart', Number($('min').value) || 10)">⏳ Snart slut (min)</button>
+  </div>
   <button class="stop" onclick="send('sluk')">🛑 Sluk spillene nu (Frida)</button>
   <button class="cancel" onclick="send('annuller')">↩️ Annuller nedtælling / lås op</button>
 </div>
