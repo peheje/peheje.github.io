@@ -23,7 +23,8 @@
   } catch (e) {}
   if (!serverUrl || !readToken) return;
 
-  let timer = null, sek = 0, pill = null, overlay = null;
+  let timer = null, sek = 0, pill = null, overlay = null, roert = false;
+  addEventListener("pointerdown", () => { roert = true; }, { once: true, capture: true, passive: true });
 
   const fmt = s => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 
@@ -93,7 +94,9 @@
     pill.textContent = "🍽️ Mad om " + fmt(sek);
 
     if (window.Spil) {
-      Spil.say("Hej! Nu er der fem minutter til du skal spise, og så slukker spillene!", null, "spis-5min-" + barn);
+      const sig = () => Spil.say("Hej! Nu er der fem minutter til du skal spise, og så slukker spillene!", null, "spis-5min-" + barn);
+      sig();
+      if (!roert) addEventListener("pointerdown", sig, { once: true, capture: true, passive: true });
     }
 
     timer = setInterval(() => {

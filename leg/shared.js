@@ -37,7 +37,7 @@
   function ctx() { actx = actx || new AC(); if (actx.state === "suspended") actx.resume(); return actx; }
   // Browseren starter lyden "på pause", indtil man har rørt siden. Åbnes et spil direkte (dybt link), eller rører
   // barnet kun et lærred, kaldes ctx() måske ikke i selve trykket, så lyden ville forblive slukket. Vågn ved hvert tryk.
-  const vaek = () => { if (actx && actx.state !== "running") { try { actx.resume(); } catch (e) {} } };
+  const vaek = () => { if (AC) { try { ctx(); } catch (e) {} } };
   ["pointerdown", "touchend", "keydown"].forEach(t => addEventListener(t, vaek, { capture: true, passive: true }));
   const clips = {};
   // Lyd-pakker: den udgivne artifact kan højst have ~500 filer, så dér samles lydene i én pakke pr. præfiks
