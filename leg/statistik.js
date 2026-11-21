@@ -128,6 +128,11 @@
           <button class="st-indsaet">📥 Hent fra indsat tekst</button></div>
         <textarea class="st-tekst" placeholder="Indsæt teksten her (eller den kopierede tekst vises her)" spellcheck="false"></textarea>
         <p class="st-besked" role="status"></p></div>
+      <div class="st-kort st-fjern"><h3>🍽️ Fjernbetjening (par tablet)</h3>
+        <p class="st-fjern-status" style="margin:0 0 10px;font:500 15px/1.4 system-ui,sans-serif;opacity:.8"></p>
+        <input class="st-fjern-in" placeholder="Indsæt parrings-link fra foraeldre.html" spellcheck="false" style="width:100%;box-sizing:border-box;padding:10px;border-radius:12px;border:2px solid rgba(31,58,95,.2);font:14px system-ui,sans-serif;margin-bottom:10px">
+        <div class="st-knapper"><button class="st-fjern-gem">🔗 Par denne enhed</button></div>
+        <p class="st-fjern-msg" role="status" style="min-height:1.2em;margin:6px 0 0;font:700 14px system-ui,sans-serif"></p></div>
       <button class="st-nul">Nulstil statistik</button></div>`;
     document.body.appendChild(el);
     const luk = () => { el.remove(); removeEventListener("keydown", tast); };
@@ -135,6 +140,7 @@
     addEventListener("keydown", tast);
     el.querySelector(".st-luk").onclick = luk;
     flyt(el);
+    parFjern(el);
     el.querySelector(".st-nul").onclick = () => {
       if (!confirm("Slet al statistik på denne enhed?")) return;
       data = { spil: {}, dage: {} }; gem(); luk(); vis();
@@ -180,6 +186,26 @@
     };
     q(".st-indsaet").onclick = () => hent(tekst.value);
     q(".st-fil").onchange = e => { const f = e.target.files[0]; if (f) f.text().then(hent, () => sig("Filen kunne ikke læses.", false)); };
+  }
+
+  function parFjern(el) {
+    const q = s => el.querySelector(s), st = q(".st-fjern-status"), inp = q(".st-fjern-in"), msg = q(".st-fjern-msg");
+    const har = () => !!(localStorage.getItem("lk-fjern-url") && localStorage.getItem("lk-fjern-token"));
+    st.textContent = har() ? "Status: Parret ✅ (lytter efter beskeder)" : "Status: Ikke parret endnu";
+    q(".st-fjern-gem").onclick = () => {
+      let v = (inp.value || "").trim();
+      const idx = v.indexOf("#fjern=");
+      if (idx !== -1) v = v.slice(idx + 7);
+      try { v = decodeURIComponent(v); } catch (e) {}
+      const [u, t] = v.split("|");
+      if (!u || !t || !/^https?:\/\//.test(u)) {
+        msg.textContent = "Ugyldigt parrings-link."; msg.style.color = "#b33"; return;
+      }
+      localStorage.setItem("lk-fjern-url", u.replace(/\/+$/, ""));
+      localStorage.setItem("lk-fjern-token", t.trim());
+      msg.textContent = "Parret! Genindlæser …"; msg.style.color = "#2a7a3a";
+      setTimeout(() => location.reload(), 600);
+    };
   }
 
   // Hold fingeren på overskriften i menuen i 1,5 sekund
