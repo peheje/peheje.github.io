@@ -1,5 +1,5 @@
 // Statistik for voksne: hvilke spil åbnes, og hvor længe leges der med dem?
-// Hold fingeren på overskriften "Hvad vil du spille?" i 1,5 sekund for at se den (på computer: skriv "stat").
+// Hold fingeren på overskriften "Hvad vil du spille?" i 1,5 sekund for at se den (på computer: skriv "voksen").
 // Tid tælles kun, mens siden er synlig, og der er trykket inden for de sidste 2 minutter
 // (så en iPad, der bare står tændt, ikke tæller med). Alt gemmes kun på enheden (lk-statistik).
 (function () {
@@ -117,7 +117,7 @@
         <div class="st-mere">Ikke prøvet endnu</div></div>`).join("");
     el.innerHTML = `<button class="st-luk" aria-label="Luk">✕</button><div class="st-in">
       <h2>Hvad leges der med?</h2>
-      <p class="st-note">Kun for voksne (åbnes ved at holde på overskriften eller skrive "stat"). Gemt på denne enhed. Tid tælles kun, mens der bliver trykket (pause efter 2 min uden tryk). I alt: ${tid(total)}.</p>
+      <p class="st-note">Kun for voksne (åbnes ved at holde på overskriften eller skrive "voksen"). Gemt på denne enhed. Tid tælles kun, mens der bliver trykket (pause efter 2 min uden tryk). I alt: ${tid(total)}.</p>
       <div class="st-kort"><h3>Sidste 7 dage</h3><div class="st-uge">${uge}</div></div>
       <div class="st-kort"><h3>Spillene</h3>${raekker}</div>
       <div class="st-kort st-flyt"><h3>Flyt fremskridt til en anden side eller enhed</h3>
@@ -133,7 +133,8 @@
         <input class="st-fjern-in" placeholder="Indsæt parrings-link fra foraeldre.html" spellcheck="false" style="width:100%;box-sizing:border-box;padding:10px;border-radius:12px;border:2px solid rgba(31,58,95,.2);font:14px system-ui,sans-serif;margin-bottom:10px">
         <div class="st-knapper"><button class="st-fjern-gem">🔗 Par denne enhed</button></div>
         <p class="st-fjern-msg" role="status" style="min-height:1.2em;margin:6px 0 0;font:700 14px system-ui,sans-serif"></p></div>
-      <button class="st-nul">Nulstil statistik</button></div>`;
+      <div class="st-knapper"><button class="st-opdater">🔄 Opdater app (tøm cache)</button>
+        <button class="st-nul" style="margin-top:0">Nulstil statistik</button></div></div>`;
     document.body.appendChild(el);
     const luk = () => { el.remove(); removeEventListener("keydown", tast); };
     const tast = e => { if (e.key === "Escape") luk(); };
@@ -141,6 +142,15 @@
     el.querySelector(".st-luk").onclick = luk;
     flyt(el);
     parFjern(el);
+    el.querySelector(".st-opdater").onclick = async () => {
+      try {
+        if ("caches" in window) {
+          const ks = await caches.keys();
+          await Promise.all(ks.map(k => caches.delete(k)));
+        }
+      } catch (e) {}
+      location.replace(location.pathname + "?v=" + Date.now());
+    };
     el.querySelector(".st-nul").onclick = () => {
       if (!confirm("Slet al statistik på denne enhed?")) return;
       data = { spil: {}, dage: {} }; gem(); luk(); vis();
@@ -216,16 +226,16 @@
     h1.addEventListener("pointerdown", () => { slip(); t = setTimeout(() => { Spil.sfx.click(); vis(); }, 1500); });
     ["pointerup", "pointerleave", "pointercancel"].forEach(ev => h1.addEventListener(ev, slip));
   }
-  // På computer: skriv "stat" på tastaturet, mens menuen er fremme (bogstaverne inden for 2 sekunder)
+  // På computer: skriv "voksen" på tastaturet, mens menuen er fremme (bogstaverne inden for 2 sekunder)
   let skrevet = "", sidstTast = 0;
   addEventListener("keydown", e => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
     const nu = Date.now();
     if (nu - sidstTast > 2000) skrevet = "";
     sidstTast = nu;
-    skrevet = (skrevet + e.key.toLowerCase()).slice(-4);
+    skrevet = (skrevet + e.key.toLowerCase()).slice(-6);
     const menu = document.getElementById("menu");
-    if (skrevet === "stat" && menu && !menu.hidden && !document.querySelector(".st")) { skrevet = ""; vis(); }
+    if (skrevet === "voksen" && menu && !menu.hidden && !document.querySelector(".st")) { skrevet = ""; vis(); }
   });
   Spil.visStatistik = vis; // til test
 })();
