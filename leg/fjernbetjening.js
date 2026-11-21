@@ -59,23 +59,32 @@
       '<h1 style="font-size:2.2rem;margin:16px 0 8px">Nu skal vi spise!</h1>' +
       '<p style="font-size:1.2rem;margin:0 0 32px;opacity:.85">Vi leger videre en anden gang.</p>' +
       '<button id="lk-unlock" style="padding:10px 18px;border-radius:999px;border:1px solid #fdba74;' +
-      'background:#fff;color:#9a3412;font-size:.9rem;opacity:.65;cursor:pointer">Voksen: hold 3 sek. for at låse op</button>';
+      'background:#fff;color:#9a3412;font-size:.9rem;opacity:.65;cursor:pointer">🔒 Voksen: lås op</button>' +
+      '<div id="lk-gate" hidden style="margin-top:14px;display:flex;gap:8px;align-items:center">' +
+      '<input id="lk-aar" type="number" inputmode="numeric" placeholder="Fødselsår (fx 1988)" style="width:160px;padding:10px 12px;border-radius:10px;border:1px solid #fdba74;font-size:1rem;text-align:center">' +
+      '<button id="lk-ok" style="padding:10px 16px;border-radius:10px;border:0;background:#ea580c;color:#fff;font-weight:700;font-size:.95rem;cursor:pointer">Lås op</button></div>' +
+      '<div id="lk-fejl" style="min-height:1.2em;margin-top:6px;font-size:.85rem;color:#b91c1c"></div>';
     document.body.appendChild(overlay);
 
     const btn = overlay.querySelector("#lk-unlock");
-    let hold = null;
-    const start = () => {
-      btn.style.opacity = "1";
-      hold = setTimeout(() => { fjernOverlay(); }, 3000);
+    const gate = overlay.querySelector("#lk-gate");
+    const aar = overlay.querySelector("#lk-aar");
+    const fejl = overlay.querySelector("#lk-fejl");
+    gate.style.display = "none";
+    btn.onclick = () => {
+      btn.hidden = true;
+      gate.hidden = false;
+      gate.style.display = "flex";
+      aar.focus();
     };
-    const cancel = () => {
-      clearTimeout(hold);
-      if (btn) btn.style.opacity = ".65";
+    const tjek = () => {
+      const y = Number(aar.value);
+      const max = new Date().getFullYear() - 18;
+      if (y >= 1900 && y <= max) fjernOverlay();
+      else { fejl.textContent = "Det ligner ikke et voksen-fødselsår."; aar.value = ""; }
     };
-    btn.addEventListener("pointerdown", start);
-    btn.addEventListener("pointerup", cancel);
-    btn.addEventListener("pointerleave", cancel);
-    btn.addEventListener("pointercancel", cancel);
+    overlay.querySelector("#lk-ok").onclick = tjek;
+    aar.onkeydown = e => { if (e.key === "Enter") tjek(); };
   }
 
   function startNedtælling(barn, minutter) {
