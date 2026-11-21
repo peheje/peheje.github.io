@@ -97,18 +97,33 @@
     fjernOverlay();
     const erSlut = type === "slut";
     const ikon = erSlut ? "⏳" : "🍽️";
-    const etiket = erSlut ? "Slut om " : "Mad om ";
-    sek = Math.max(1, Math.round((minutter || 5) * 60));
+    const total = Math.max(1, Math.round((minutter || 5) * 60));
+    sek = total;
 
     if (!pill) {
       pill = document.createElement("div");
       pill.style.cssText =
         "position:fixed;top:14px;right:14px;z-index:99998;background:#fff7ed;color:#9a3412;" +
-        "border:2px solid #fb923c;border-radius:999px;padding:8px 16px;font:700 1.05rem system-ui,sans-serif;" +
-        "box-shadow:0 4px 14px rgba(0,0,0,.12);pointer-events:none;";
+        "border:2px solid #fb923c;border-radius:999px;padding:7px 14px;font:700 .9rem system-ui,sans-serif;" +
+        "box-shadow:0 4px 14px rgba(0,0,0,.12);pointer-events:none;display:flex;align-items:center;gap:8px;";
+      pill.innerHTML =
+        '<span class="lk-ic" style="font-size:1.15rem;line-height:1"></span>' +
+        '<span style="width:96px;height:12px;border-radius:999px;background:#fed7aa;overflow:hidden;display:inline-block">' +
+        '<i class="lk-bar" style="display:block;height:100%;width:100%;border-radius:999px;background:#f97316;transition:width .9s linear,background .4s"></i></span>' +
+        '<span class="lk-tid" style="font-variant-numeric:tabular-nums;opacity:.75"></span>';
       document.body.appendChild(pill);
     }
-    pill.textContent = ikon + " " + etiket + fmt(sek);
+    const icEl = pill.querySelector(".lk-ic");
+    const barEl = pill.querySelector(".lk-bar");
+    const tidEl = pill.querySelector(".lk-tid");
+    const opdaterPill = () => {
+      const pct = Math.max(0, Math.min(100, (sek / total) * 100));
+      icEl.textContent = ikon;
+      barEl.style.width = pct + "%";
+      barEl.style.background = pct <= 20 ? "#ef4444" : "#f97316";
+      tidEl.textContent = fmt(sek);
+    };
+    opdaterPill();
 
     if (window.Spil) {
       const tekst = erSlut
@@ -127,7 +142,7 @@
         timer = null;
         visSpisetidOverlay(barn, type);
       } else if (pill) {
-        pill.textContent = ikon + " " + etiket + fmt(sek);
+        opdaterPill();
       }
     }, 1000);
   }
