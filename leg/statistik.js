@@ -164,11 +164,14 @@
     flyt(el);
     parFjern(el);
     el.querySelector(".st-opdater").onclick = async () => {
+      const btn = el.querySelector(".st-opdater");
+      btn.textContent = "⏳ Opdaterer …";
       try {
         if ("caches" in window) {
           const ks = await caches.keys();
           await Promise.all(ks.map(k => caches.delete(k)));
         }
+        await Promise.all(["./", "shared.js", "statistik.js", "fjernbetjening.js"].map(u => fetch(u, { cache: "reload" })));
       } catch (e) {}
       location.replace(location.pathname + "?v=" + Date.now());
     };
