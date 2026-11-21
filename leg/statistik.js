@@ -52,7 +52,15 @@
       border-radius:50%;background:var(--card);box-shadow:0 5px 0 rgba(31,58,95,.25);font-size:26px}
     .st-kort{background:var(--card);border-radius:22px;padding:16px clamp(14px,3vw,24px);box-shadow:0 6px 0 rgba(31,58,95,.12);margin-bottom:16px}
     .st-kort h3{margin:0 0 12px;font-size:20px;font-weight:800}
+    .st-uge-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .st-uge-top h3{margin:0}
+    .st-faner{display:flex;gap:6px}
+    .st-faner button{padding:6px 12px;border-radius:10px;background:rgba(31,58,95,.08);font:700 13px system-ui,sans-serif;color:var(--ink)}
+    .st-faner button.aktiv{background:#4d96ff;color:#fff}
     .st-uge{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;height:130px}
+    .st-uge.lang{gap:2px}
+    .st-uge.lang b{width:100%;border-radius:4px 4px 2px 2px}
+    .st-uge.lang small{display:none}
     .st-dag{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px;font:600 13px system-ui,sans-serif}
     .st-dag b{display:block;width:70%;min-height:3px;border-radius:8px 8px 3px 3px;background:#7cc6f2}
     .st-dag.idag b{background:#4d96ff}
@@ -89,19 +97,28 @@
     return d <= 0 ? "i dag" : d === 1 ? "i går" : `for ${d} dage siden`;
   }
 
-  function vis() {
+  function vis(antalDage = 7) {
     data = hent();
     const el = document.createElement("div");
     el.className = "st";
-    // Sidste 7 dage
-    const dage = Array.from({ length: 7 }, (_, i) => new Date(Date.now() - (6 - i) * 864e5));
-    const maxDag = Math.max(60, ...dage.map(d => data.dage[dagNoegle(d)] || 0));
-    const uge = dage.map((d, i) => {
-      const s = data.dage[dagNoegle(d)] || 0;
-      const navn = i === 6 ? "i dag" : d.toLocaleDateString("da-DK", { weekday: "short" }).replace(".", "");
-      return `<div class="st-dag${i === 6 ? " idag" : ""}"><small>${s ? tid(s).replace("under 1 min", "<1 min") : ""}</small>
-        <b style="height:${Math.round(s / maxDag * 100)}%"></b>${navn}</div>`;
-    }).join("");
+    const tegnUge = n => {
+      const dage = Array.from({ length: n }, (_, i) => new Date(Date.now() - (n - 1 - i) * 864e5));
+      const maxDag = Math.max(60, ...dage.map(d => data.dage[dagNoegle(d)] || 0));
+      const sum = dage.reduce((s, d) => s + (data.dage[dagNoegle(d)] || 0), 0);
+      const ugeEl = el.querySelector(".st-uge");
+      ugeEl.style.gridTemplateColumns = `repeat(${n},1fr)`;
+      ugeEl.classList.toggle("lang", n > 7);
+      ugeEl.innerHTML = dage.map((d, i) => {
+        const s = data.dage[dagNoegle(d)] || 0;
+        const lbl = n <= 7
+          ? (i === n - 1 ? "i dag" : d.toLocaleDateString("da-DK", { weekday: "short" }).replace(".", ""))
+          : (i === n - 1 ? "i dag" : (i % Math.ceil(n / 6) === 0 ? `${d.getDate()}/${d.getMonth() + 1}` : ""));
+        return `<div class="st-dag${i === n - 1 ? " idag" : ""}" title="${dagNoegle(d)}: ${tid(s)}"><small>${s ? tid(s).replace("under 1 min", "<1 min") : ""}</small>
+          <b style="height:${Math.round(s / maxDag * 100)}%"></b>${lbl}</div>`;
+      }).join("");
+      el.querySelector(".st-uge-titel").textContent = `Sidste ${n} dage (${tid(sum)})`;
+      el.querySelectorAll(".st-faner button").forEach(b => b.classList.toggle("aktiv", Number(b.dataset.n) === n));
+    };
     // Spillene, mest brugte først
     const spil = Spil.games.map(g => ({ g, p: data.spil[g.id] || { aabnet: 0, sek: 0, sidst: 0 } }))
       .sort((a, b) => b.p.sek - a.p.sek || b.p.aabnet - a.p.aabnet);
@@ -118,7 +135,9 @@
     el.innerHTML = `<button class="st-luk" aria-label="Luk">✕</button><div class="st-in">
       <h2>Hvad leges der med?</h2>
       <p class="st-note">Kun for voksne (åbnes ved at holde på overskriften eller skrive "voksen"). Gemt på denne enhed. Tid tælles kun, mens der bliver trykket (pause efter 2 min uden tryk). I alt: ${tid(total)}.</p>
-      <div class="st-kort"><h3>Sidste 7 dage</h3><div class="st-uge">${uge}</div></div>
+      <div class="st-kort"><div class="st-uge-top"><h3 class="st-uge-titel"></h3>
+        <div class="st-faner"><button data-n="7">7 dage</button><button data-n="30">30 dage</button><button data-n="60">60 dage</button></div></div>
+        <div class="st-uge"></div></div>
       <div class="st-kort"><h3>Spillene</h3>${raekker}</div>
       <div class="st-kort st-flyt"><h3>Flyt fremskridt til en anden side eller enhed</h3>
         <p>Alt hvad der er låst op (dinoer, akvariet, monstre, tegninger, larven osv.) gemmes kun på denne side i denne browser.
@@ -140,6 +159,8 @@
     const tast = e => { if (e.key === "Escape") luk(); };
     addEventListener("keydown", tast);
     el.querySelector(".st-luk").onclick = luk;
+    tegnUge(antalDage);
+    el.querySelectorAll(".st-faner button").forEach(b => { b.onclick = () => tegnUge(Number(b.dataset.n)); });
     flyt(el);
     parFjern(el);
     el.querySelector(".st-opdater").onclick = async () => {
