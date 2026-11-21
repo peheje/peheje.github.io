@@ -37,15 +37,18 @@
 </div>
 
 <details class="card">
-  <summary style="cursor:pointer;font-weight:600">Opsætning</summary>
+  <summary style="cursor:pointer;font-weight:600">Opsætning &amp; gemte nøgler</summary>
   <div style="margin-top:.75rem">
+    <p style="font-size:.82rem;margin:0 0 .75rem">Gemmes kun lokalt i denne browsers <code>localStorage</code> (<code>lk-adm-url</code>, <code>lk-adm-api</code>, <code>lk-adm-tok</code>).</p>
     <label>Server URL</label>
     <input id="url" placeholder="https://...run.app">
     <label>API Key (til at sende)</label>
-    <input id="api" type="password">
+    <input id="api" type="text" autocomplete="off" spellcheck="false">
     <label>Read Token (til tabletten)</label>
-    <input id="tok" type="password">
-    <button class="cancel" onclick="gem()">Gem opsætning</button>
+    <input id="tok" type="text" autocomplete="off" spellcheck="false">
+    <button class="cancel" onclick="gem()">💾 Gem opsætning</button>
+    <button class="stop" style="margin-top:.25rem" onclick="ryd()">🗑️ Slet gemte nøgler herfra</button>
+    <p style="font-size:.8rem;margin:.6rem 0 0"><strong>Revoke på serveren:</strong> Skift <code>API_KEY</code> / <code>READ_TOKEN</code> i Cloud Run (<code>legekassen-fjernbetjening</code> → Miljøvariabler), så bliver gamle nøgler ugyldige med det samme.</p>
   </div>
 </details>
 
@@ -70,6 +73,16 @@ function gem() {
   localStorage.setItem(K_API, $("api").value.trim());
   localStorage.setItem(K_TOK, $("tok").value.trim());
   $("status").textContent = "Opsætning gemt!";
+}
+
+function ryd() {
+  localStorage.removeItem(K_URL);
+  localStorage.removeItem(K_API);
+  localStorage.removeItem(K_TOK);
+  $("url").value = "";
+  $("api").value = "";
+  $("tok").value = "";
+  $("status").textContent = "Gemte nøgler slettet fra denne enhed.";
 }
 
 async function send(cmd, minutter) {
