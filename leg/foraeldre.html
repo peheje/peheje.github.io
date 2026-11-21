@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Legekassen — Forældre-fjernbetjening</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 440px; margin: 2rem auto; padding: 0 1rem; background: #f8fafc; color: #0f172a; }
+  h1 { font-size: 1.4rem; margin-bottom: .25rem; }
+  p { color: #475569; font-size: .95rem; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1rem; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+  button { width: 100%; padding: 16px; border: 0; border-radius: 12px; font-size: 1.05rem; font-weight: 700; cursor: pointer; margin-bottom: .65rem; }
+  button:last-child { margin-bottom: 0; }
+  .warn { background: #f97316; color: #fff; }
+  .stop { background: #dc2626; color: #fff; }
+  .cancel { background: #e2e8f0; color: #1e293b; }
+  .link { background: #0ea5e9; color: #fff; font-size: .95rem; padding: 12px; }
+  input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; margin: .35rem 0 .75rem; font-size: .9rem; }
+  label { font-size: .85rem; font-weight: 600; color: #334155; }
+  #status { min-height: 1.4em; font-weight: 600; color: #0369a1; text-align: center; }
+</style>
+</head>
+<body>
+<h1>🍽️ Legekassen fjernbetjening</h1>
+<p>Send besked til tabletten med Frida.</p>
+
+<div class="card">
+  <button class="warn" onclick="send('spis5', 5)">🍽️ 5 min til mad (Frida)</button>
+  <button class="stop" onclick="send('sluk')">🛑 Sluk spillene nu (Frida)</button>
+  <button class="cancel" onclick="send('annuller')">↩️ Annuller nedtælling / lås op</button>
+</div>
+
+<div id="status"></div>
+
+<div class="card">
+  <button class="link" onclick="kopierTabletLink()">📱 Kopier parrings-link til tabletten</button>
+</div>
+
+<details class="card">
+  <summary style="cursor:pointer;font-weight:600">Opsætning</summary>
+  <div style="margin-top:.75rem">
+    <label>Server URL</label>
+    <input id="url" placeholder="https://...run.app">
+    <label>API Key (til at sende)</label>
+    <input id="api" type="password">
+    <label>Read Token (til tabletten)</label>
+    <input id="tok" type="password">
+    <button class="cancel" onclick="gem()">Gem opsætning</button>
+  </div>
+</details>
+
+<script>
+const K_URL = "lk-adm-url", K_API = "lk-adm-api", K_TOK = "lk-adm-tok";
+
+if (location.hash.startsWith("#setup=")) {
+  const [u, a, t] = decodeURIComponent(location.hash.slice(7)).split("|");
+  if (u) localStorage.setItem(K_URL, u.replace(/\/+$/, ""));
+  if (a) localStorage.setItem(K_API, a.trim());
+  if (t) localStorage.setItem(K_TOK, t.trim());
+  history.replaceState(null, "", location.pathname);
+}
+
+const $ = id => document.getElementById(id);
+$("url").value = localStorage.getItem(K_URL) || "";
+$("api").value = localStorage.getItem(K_API) || "";
+$("tok").value = localStorage.getItem(K_TOK) || "";
+
+function gem() {
+  localStorage.setItem(K_URL, $("url").value.trim().replace(/\/+$/, ""));
+  localStorage.setItem(K_API, $("api").value.trim());
+  localStorage.setItem(K_TOK, $("tok").value.trim());
+  $("status").textContent = "Opsætning gemt!";
+}
+
+async function send(cmd, minutter) {
+  const url = localStorage.getItem(K_URL);
+  const api = localStorage.getItem(K_API);
+  if (!url || !api) { $("status").textContent = "Mangler opsætning!"; return; }
+  $("status").textContent = "Sender...";
+  try {
+    const r = await fetch(url + "/trigger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + api },
+      body: JSON.stringify({ cmd, barn: "frida", minutter })
+    });
+    const d = await r.json();
+    $("status").textContent = r.ok ? `Sendt! (${d.clients} tablet forbundet)` : `Fejl: ${d.error || r.status}`;
+  } catch (e) {
+    $("status").textContent = "Netværksfejl: " + e.message;
+  }
+}
+
+async function kopierTabletLink() {
+  const url = localStorage.getItem(K_URL);
+  const tok = localStorage.getItem(K_TOK);
+  if (!url || !tok) { $("status").textContent = "Mangler opsætning!"; return; }
+  const link = location.origin + location.pathname.replace(/foraeldre\.html$/, "") + "#fjern=" + encodeURIComponent(url + "|" + tok);
+  try {
+    await navigator.clipboard.writeText(link);
+    $("status").textContent = "Tablet-link kopieret! Åbn det én gang på tabletten.";
+  } catch {
+    prompt("Kopiér dette link og åbn det på tabletten:", link);
+  }
+}
+</script>
+</body>
+</html>
