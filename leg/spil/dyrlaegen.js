@@ -98,7 +98,7 @@
   const OPGAVE_INFO = {
     splint: {
       ikon: "🩹",
-      startKey: "dyrl-splint", startTekst: "Åh, av! Der sidder en lille splint i poten! Brug pincetten først, og træk den ud!",
+      startKey: "dyrl-splint", startTekst: "Uha! Der sidder en lille splint i poten! Brug pincetten først, og træk den ud!",
       trin2Key: "dyrl-splint-ud", trin2Tekst: "Svup! Splinten er ude! Nu skal der et fint plaster på!",
       okKey: "dyrl-plaster-ok", okTekst: "Så kom der et fint plaster på!"
     },
