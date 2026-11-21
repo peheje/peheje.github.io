@@ -387,11 +387,15 @@
     } else {
       // Frugt i lag nedefra, så skålen fyldes, og til sidst en lille bunke over kanten
       const fr = Math.max(.14, Math.min(.3, mund * .3)), pos = [];
+      const halvB = fr * (id === "citron" ? 1.48 : 1.12); // bredde inkl. tilfældig skala (citroner er aflange)
       let y = yb + fr * .95, lag = 0;
       while (pos.length < 22) {
         const sidste = lag > 0 && y > hh - fr * .4;
         const inde = Math.max(.02, rVed(rr, hh, Math.min(y, hh)) - VAEG);
-        const ring = sidste ? Math.min(inde * .4, fr * 1.2) : inde - fr * 1.05;
+        // Tjek krukkens smalleste ydre radius over frugtens højde, så frugter ikke stikker ud gennem en spids bund
+        const rMin = Math.min(rVed(rr, hh, Math.min(y, hh)), rVed(rr, hh, Math.max(0, Math.min(y - fr, hh))));
+        if (!sidste && y <= hh - fr * .4 && rMin - .04 < halvB) { y += fr * .5; continue; }
+        const ring = sidste ? Math.min(inde * .4, fr * 1.2) : Math.min(inde - fr * 1.05, rMin - .04 - halvB);
         if (ring < fr * .6) pos.push([0, y, 0]);
         else {
           const n = Math.max(2, Math.floor(Math.PI * 2 * ring / (fr * 2.1))), skift = lag * .6 + rnd();
