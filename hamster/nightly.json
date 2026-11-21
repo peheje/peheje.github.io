@@ -528,6 +528,25 @@
         "text": "An unhurried evening is its own kind of shelter.",
         "source": "Found under the door"
       }
+    },
+    {
+      "date": "2026-11-21",
+      "text": "A keen draught is slipping under the green door, and my good wool socks are already on. Would you check the weather out there for me?",
+      "extras": [
+        "The moon is nearly round tonight, plump and bright behind the hedge, with only one thin shadow left to fill.",
+        "Saturday settles early in November; the lane goes dark before the soup has properly thought about simmering.",
+        "The spider in the top corner of the round window has tucked its legs in for the evening. I have kept my side of the glass.",
+        "The opened envelope still lies beside its two jam-sealed neighbours on the shelf, all three looking very patient.",
+        "I hung the mended woollen cloak by the door in case of callers, though only the kettle seems likely to speak tonight."
+      ],
+      "quest": {
+        "kind": "weather",
+        "done": "Thank you. I shall pass the word on to the kettle and the cloak, which both take an interest in the lane.",
+        "keepsake": {
+          "name": "A silvered hedge leaf",
+          "description": "A small hawthorn leaf edged with evening damp, blown onto the mat while the door stood ajar."
+        }
+      }
     }
   ]
 }
