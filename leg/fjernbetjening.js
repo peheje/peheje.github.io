@@ -154,14 +154,21 @@
     fjernOverlay();
   }
 
-  const es = new EventSource(serverUrl + "/events?token=" + encodeURIComponent(readToken));
-  es.onmessage = ev => {
-    let msg;
-    try { msg = JSON.parse(ev.data); } catch { return; }
-    const barn = (msg.barn || "frida").toLowerCase().replace(/[^a-z0-9-]/g, "");
-    if (msg.cmd === "spis5") startNedtælling(barn, msg.minutter || 5, "spis");
-    else if (msg.cmd === "snart") startNedtælling(barn, msg.minutter || 10, "slut");
-    else if (msg.cmd === "sluk") visSpisetidOverlay(barn, "spis");
-    else if (msg.cmd === "annuller") annuller();
-  };
+  let es = null;
+  function forbind() {
+    if (es) es.close();
+    es = new EventSource(serverUrl + "/events?token=" + encodeURIComponent(readToken));
+    es.onmessage = ev => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+      const barn = (msg.barn || "frida").toLowerCase().replace(/[^a-z0-9-]/g, "");
+      if (msg.cmd === "spis5") startNedtælling(barn, msg.minutter || 5, "spis");
+      else if (msg.cmd === "snart") startNedtælling(barn, msg.minutter || 10, "slut");
+      else if (msg.cmd === "sluk") visSpisetidOverlay(barn, "spis");
+      else if (msg.cmd === "annuller") annuller();
+    };
+  }
+  forbind();
+  addEventListener("pagehide", () => { if (es) { es.close(); es = null; } });
+  addEventListener("pageshow", e => { if (e.persisted && !es) forbind(); });
 })();
