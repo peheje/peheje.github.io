@@ -36,6 +36,11 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
   box-shadow:0 10px 0 rgba(31,58,95,.25);transition:transform .15s}
 .tile:active{transform:translateY(6px);box-shadow:0 4px 0 rgba(31,58,95,.25)}
 .tile .ic{font-size:clamp(56px,12vmin,120px);line-height:1}
+.tile .ic{height:1.3em;display:flex;align-items:center;justify-content:center}
+.tile .ic img{display:block;width:1.3em;height:1.3em;object-fit:contain;pointer-events:none;-webkit-user-select:none;user-select:none}
+/* Hylden med de senest spillede: samme fliser, men på en lys hylde, så de står for sig selv */
+.tiles.senest{padding:clamp(8px,1.4vh,14px) clamp(14px,2vw,28px);border-radius:44px;background:rgba(255,255,255,.45);box-shadow:inset 0 -6px 0 rgba(31,58,95,.08)}
+.tiles.senest[hidden]{display:none}
 .tile .nm{font-weight:800;font-size:clamp(15px,3.6vmin,34px)}
 
 .stage{position:fixed;inset:0}
@@ -57,6 +62,7 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 
 <div class="menu" id="menu">
   <h1>Hvad vil du spille?</h1>
+  <div class="tiles senest" id="senest" hidden></div>
   <div class="tiles" id="tiles"></div>
 </div>
 <div class="stage" id="stage" hidden></div>
@@ -93,15 +99,35 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
   const $=id=>document.getElementById(id);
   let running=null;
 
-  $("tiles").innerHTML="";
-  Spil.games.forEach(g=>{
+  // Menuen: forældre kan skjule spil (lk-menu-skjult, sættes i voksen-panelet i statistik.js),
+  // og de 3 senest spillede står øverst på en hylde (lk-menu-senest), så yndlingsspillet er ét tryk væk.
+  const laes=k=>{try{const v=JSON.parse(localStorage.getItem(k));return Array.isArray(v)?v:[]}catch(e){return[]}};
+  const skriv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+  function flise(g){
     const b=document.createElement("button");b.className="tile";b.style.background=g.farve;
-    b.innerHTML=`<span class="ic">${g.ikon}</span><span class="nm">${g.navn}</span>`;
-    b.onclick=()=>open(g);$("tiles").appendChild(b);
-  });
+    // Tegning fra billeder/menu/<id>.webp; mangler den, bruges spillets emoji
+    b.innerHTML=`<span class="ic"><img src="billeder/menu/${g.id}.webp" alt="" draggable="false"></span><span class="nm">${g.navn}</span>`;
+    b.querySelector("img").onerror=function(){this.parentNode.textContent=g.ikon};
+    b.onclick=()=>open(g);return b;
+  }
+  function tegnMenu(){
+    const skjult=laes("lk-menu-skjult");
+    let synlige=Spil.games.filter(g=>!skjult.includes(g.id));
+    if(!synlige.length)synlige=Spil.games; // alle skjult ved en fejl: vis alle hellere end en tom menu
+    const senest=synlige.length>6?laes("lk-menu-senest").map(id=>synlige.find(g=>g.id===id)).filter(Boolean).slice(0,innerWidth<520?2:3):[]; // telefon: 2 pr. række, så hylden fylder én række
+    $("senest").innerHTML="";$("senest").hidden=!senest.length;
+    senest.forEach(g=>$("senest").appendChild(flise(g)));
+    $("tiles").innerHTML="";
+    synlige.filter(g=>!senest.includes(g)).forEach(g=>$("tiles").appendChild(flise(g)));
+  }
+  Spil.tegnMenu=tegnMenu;
+  tegnMenu();
+  let smal=innerWidth<520;
+  addEventListener("resize",()=>{if((innerWidth<520)!==smal){smal=!smal;if(!running)tegnMenu()}});
 
   function open(g){
     Spil.sfx.click();
+    skriv("lk-menu-senest",[g.id,...laes("lk-menu-senest").filter(id=>id!==g.id)].slice(0,3));
     $("menu").hidden=true;$("stage").hidden=false;$("home").hidden=false;
     running=g;g.start($("stage"));
     try{history.replaceState(null,"","#"+g.id)}catch(e){}
@@ -110,7 +136,7 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
     if(running){running.stop();running=null}
     Spil.dyb="";
     Spil.stopTalking();
-    $("stage").innerHTML="";$("stage").hidden=true;$("home").hidden=true;$("menu").hidden=false;
+    $("stage").innerHTML="";$("stage").hidden=true;$("home").hidden=true;tegnMenu();$("menu").hidden=false;
     try{history.replaceState(null,"",location.pathname)}catch(e){}
     Spil.say("Hvad vil du spille?",null,"hvad-vil-du");
   }

@@ -79,6 +79,11 @@
     .st-knapper button,.st-knapper label{padding:12px 16px;border-radius:14px;background:#fff;box-shadow:0 3px 0 rgba(31,58,95,.18);
       font:700 16px system-ui,sans-serif;color:var(--ink);cursor:pointer;min-height:48px;box-sizing:border-box;display:inline-flex;align-items:center}
     .st-knapper input[type=file]{display:none}
+    .st-menuvalg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+    .st-menuvalg button{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:14px;background:#fff;text-align:left;
+      box-shadow:0 3px 0 rgba(31,58,95,.18);font:700 15px system-ui,sans-serif;color:var(--ink)}
+    .st-menuvalg button span{font-size:22px}
+    .st-menuvalg button.fra{opacity:.4;box-shadow:none;text-decoration:line-through;background:rgba(255,255,255,.5)}
     .st-flyt textarea{width:100%;box-sizing:border-box;height:110px;border-radius:12px;border:2px solid rgba(31,58,95,.2);padding:10px;
       font:13px ui-monospace,Menlo,Consolas,monospace;background:#fff;color:var(--ink)}
     .st-besked{min-height:1.2em;margin:8px 0 0;font:700 15px system-ui,sans-serif}
@@ -138,6 +143,9 @@
       <div class="st-kort"><div class="st-uge-top"><h3 class="st-uge-titel"></h3>
         <div class="st-faner"><button data-n="7">7 dage</button><button data-n="30">30 dage</button><button data-n="60">60 dage</button></div></div>
         <div class="st-uge"></div></div>
+      <div class="st-kort st-menu"><h3>Spil i menuen</h3>
+        <p class="st-note" style="margin:0 0 10px">Tryk for at skjule eller vise et spil i barnets menu (gemt på denne enhed).</p>
+        <div class="st-menuvalg">${Spil.games.map(g => `<button data-id="${g.id}"><span>${g.ikon}</span>${g.navn}</button>`).join("")}</div></div>
       <div class="st-kort"><h3>Spillene</h3>${raekker}</div>
       <div class="st-kort st-flyt"><h3>Flyt fremskridt til en anden side eller enhed</h3>
         <p>Alt hvad der er låst op (dinoer, akvariet, monstre, tegninger, larven osv.) gemmes kun på denne side i denne browser.
@@ -163,6 +171,7 @@
     el.querySelectorAll(".st-faner button").forEach(b => { b.onclick = () => tegnUge(Number(b.dataset.n)); });
     flyt(el);
     parFjern(el);
+    menuValg(el);
     el.querySelector(".st-opdater").onclick = async () => {
       const btn = el.querySelector(".st-opdater");
       btn.textContent = "⏳ Opdaterer …";
@@ -220,6 +229,24 @@
     };
     q(".st-indsaet").onclick = () => hent(tekst.value);
     q(".st-fil").onchange = e => { const f = e.target.files[0]; if (f) f.text().then(hent, () => sig("Filen kunne ikke læses.", false)); };
+  }
+
+  /* ---------- Skjul/vis spil i menuen (lk-menu-skjult, læses af menuen i index.html) ---------- */
+  function menuValg(el) {
+    const laes = () => { try { const v = JSON.parse(localStorage.getItem("lk-menu-skjult")); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+    const knapper = el.querySelectorAll(".st-menuvalg button");
+    const tegn = () => { const s = laes(); knapper.forEach(b => b.classList.toggle("fra", s.includes(b.dataset.id))); };
+    knapper.forEach(b => {
+      b.onclick = () => {
+        const s = laes(), id = b.dataset.id;
+        const ny = s.includes(id) ? s.filter(x => x !== id) : [...s, id];
+        if (ny.length >= Spil.games.length) return; // mindst ét spil skal være synligt
+        try { localStorage.setItem("lk-menu-skjult", JSON.stringify(ny)); } catch (e) {}
+        tegn();
+        if (Spil.tegnMenu) Spil.tegnMenu();
+      };
+    });
+    tegn();
   }
 
   function parFjern(el) {
