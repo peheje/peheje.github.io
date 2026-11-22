@@ -99,8 +99,8 @@
   `);
 
   let T, root, alive, timers, raf, cv, renderer, scene, camera, ray, ndc, tidU, gradient, envTex;
-  let himmelMat, hemiLys, solLys, juletraeLys, sneCanvas, sneTex, jordMesh, sneFnug, snePust;
-  let juletraeGrp, juleLys = [], stjerneTop, kaninGrp, pladsRing, sneSkyGrp, sneSkyAnim = null;
+  let himmelMat, hemiLys, solLys, juletraeLys, juleFodLys, sneCanvas, sneTex, jordMesh, sneFnug, snePust;
+  let juletraeGrp, juleLys = [], feLys = [], gaverListe = [], stjerneTop, stjerneHalo, kaninGrp, pladsRing, sneSkyGrp, sneSkyAnim = null;
   let snedriverGrp, snedriver = [], himmelFarver = null;
   let aktivGrp, kugler = [], rulBold, rulR = .34, rulPos, rulMaal = null, hopAnim = null, kugleNr = 0, rulDist = 0;
   let pyntValg = NY_VALG(), pyntListe = PYNT_KROP, pyntHop = 0, snemandVug = 0;
@@ -479,10 +479,27 @@
     );
   }
 
+  function lavGloedeTex() {
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const ctx = c.getContext("2d");
+    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(255,255,255,0.8)");
+    g.addColorStop(0.24, "rgba(255,255,255,0.48)");
+    g.addColorStop(0.58, "rgba(255,255,255,0.14)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    const t = new T.CanvasTexture(c);
+    tex.push(t);
+    return t;
+  }
+
   function bygJuletrae() {
     juletraeGrp = new T.Group();
     juletraeGrp.position.set(0, haveHoejde(0, -6.8), -6.8);
     scene.add(juletraeGrp);
+    const gloedeTex = lavGloedeTex();
 
     const stamme = medStreg(new T.CylinderGeometry(.32, .45, 1.4, 10), toon("#7c4e38"), .05);
     stamme.position.y = .7; juletraeGrp.add(stamme);
@@ -503,14 +520,49 @@
     }
     const stjGeo = new T.ExtrudeGeometry(s, { depth: .18, bevelEnabled: true, bevelThickness: .06, bevelSize: .05, bevelSegments: 1 });
     stjGeo.center();
-    stjerneTop = medStreg(stjGeo, toon("#ffd84a", { emissive: "#ffae00", emissiveIntensity: .75 }), .04);
+    stjerneTop = medStreg(stjGeo, toon("#ffd84a", { emissive: "#ffae00", emissiveIntensity: .85 }), .04);
     stjerneTop.position.y = 6.05;
     juletraeGrp.add(stjerneTop);
 
-    // Varmt julelys der oplyser haven om natten
-    juletraeLys = new T.PointLight("#ffcf70", 0, 18);
-    juletraeLys.position.set(0, 3.6, 1.2);
+    const stjMat = new T.SpriteMaterial({
+      map: gloedeTex, color: "#ffe066", blending: T.AdditiveBlending,
+      transparent: true, opacity: .72, depthWrite: false
+    });
+    stjerneHalo = new T.Sprite(stjMat);
+    stjerneHalo.position.y = 6.05;
+    stjerneHalo.scale.setScalar(2.6);
+    juletraeGrp.add(stjerneHalo);
+
+    // Varmt julelys der oplyser træet, gaverne og sneen om natten
+    juletraeLys = new T.PointLight("#ffcf70", 0, 22);
+    juletraeLys.position.set(0, 3.4, 2.2);
     juletraeGrp.add(juletraeLys);
+    juleFodLys = new T.PointLight("#ffb347", 0, 10);
+    juleFodLys.position.set(0, 1.0, 1.4);
+    juletraeGrp.add(juleFodLys);
+
+    // Snoet lyskæde med små glitrende fe-lys rundt om træet
+    feLys = [];
+    const kaedePkt = [];
+    const kaedeTrin = 42;
+    for (let i = 0; i <= kaedeTrin; i++) {
+      const t = i / kaedeTrin, y = 1.25 + t * 4.3, r = (1 - t * .78) * 2.22, a = t * Math.PI * 7.5;
+      kaedePkt.push(new T.Vector3(Math.sin(a) * r, y, Math.cos(a) * r));
+    }
+    const kaedeGeo = new T.TubeGeometry(new T.CatmullRomCurve3(kaedePkt), 48, .022, 5, false);
+    juletraeGrp.add(new T.Mesh(kaedeGeo, toon("#1f5a45")));
+    for (let i = 0; i <= kaedeTrin; i++) {
+      const pt = kaedePkt[i];
+      const fMat = new T.SpriteMaterial({
+        map: gloedeTex, color: i % 2 ? "#fff4c2" : "#ffd27d",
+        blending: T.AdditiveBlending, transparent: true, opacity: .65, depthWrite: false
+      });
+      const sp = new T.Sprite(fMat);
+      sp.position.copy(pt);
+      sp.scale.setScalar(.36);
+      juletraeGrp.add(sp);
+      feLys.push({ sprite: sp, mat: fMat, i });
+    }
 
     juleLys = [];
     const kugleGeo = new T.SphereGeometry(.17, 12, 10);
@@ -518,13 +570,24 @@
     for (let i = 0; i < 22; i++) {
       const t = i / 21, y = 1.35 + t * 4.15, r = (1 - t * .76) * 2.1, a = i * 1.15;
       const f = farver[i % farver.length];
-      const mat = new T.MeshToonMaterial({ color: f, emissive: f, emissiveIntensity: .6, gradientMap: gradient });
+      const mat = new T.MeshToonMaterial({ color: f, emissive: f, emissiveIntensity: .65, gradientMap: gradient });
       const k = medStreg(kugleGeo, mat, .025, false);
       k.position.set(Math.sin(a) * r, y, Math.cos(a) * r);
       juletraeGrp.add(k);
-      juleLys.push({ mesh: k, mat, i });
+
+      const haloMat = new T.SpriteMaterial({
+        map: gloedeTex, color: f, blending: T.AdditiveBlending,
+        transparent: true, opacity: .65, depthWrite: false
+      });
+      const halo = new T.Sprite(haloMat);
+      halo.position.copy(k.position);
+      halo.scale.setScalar(1.05);
+      juletraeGrp.add(halo);
+
+      juleLys.push({ mesh: k, mat, halo, haloMat, basisFarve: new T.Color(f), i });
     }
 
+    gaverListe = [];
     const gaver = [
       [-1.35, .42, .95, "#e5483f", "#ffd23f", .55, .2],
       [1.4, .36, .85, "#3b82e6", "#ffffff", .48, -.35],
@@ -536,11 +599,12 @@
       g.add(new T.Mesh(new T.BoxGeometry(str * 1.04, str * 1.04, str * .22), toon(f2)));
       g.add(new T.Mesh(new T.BoxGeometry(str * .22, str * 1.04, str * 1.04), toon(f2)));
       juletraeGrp.add(g);
+      gaverListe.push({ grp: g, basisY: y, basisRot: rot, hop: 0 });
     });
   }
 
   function skiftJuletraeLys(snak = true) {
-    lysTema = (lysTema + 1) % 3;
+    lysTema = (lysTema + 1) % 4;
     juleKlokker([523.25, 659.25, 783.99, 1046.5, 1318.5], .09);
     const p = skaermPunkt(new T.Vector3(0, 4.5, -6.8));
     if (!roligt()) Spil.burst(p.x, p.y, "⭐✨🎄🌟✨");
@@ -1269,6 +1333,14 @@
     ray.setFromCamera(ndc, camera);
     sidstRoert = performance.now();
 
+    const gaveHit = gaverListe.find(g => ray.intersectObjects(g.grp.children, true).length);
+    if (gaveHit) {
+      gaveHit.hop = 1;
+      juleKlokker([659.25, 783.99, 1046.5, 1318.5], .09);
+      const p = skaermPunkt(gaveHit.grp.getWorldPosition(new T.Vector3()));
+      if (!roligt()) Spil.burst(p.x, p.y, "🎁✨🎀⭐");
+      return;
+    }
     if (juletraeGrp && ray.intersectObjects(juletraeGrp.children, true).length) {
       skiftJuletraeLys(true);
       return;
@@ -1453,7 +1525,8 @@
       scene.fog.color.lerpColors(himmelFarver.dagFog, himmelFarver.natFog, natBlanding);
       hemiLys.intensity = 1.35 - natBlanding * .85;
       solLys.intensity = 2.0 - natBlanding * 1.55;
-      if (juletraeLys) juletraeLys.intensity = natBlanding * 4.5;
+      if (juletraeLys) juletraeLys.intensity = natBlanding * 3.8;
+      if (juleFodLys) juleFodLys.intensity = natBlanding * 2.4;
     }
 
     // 3D-snesky svæver hen over haven og ryster frisk sne + nye snedriver ned
@@ -1543,14 +1616,48 @@
     }
 
     if (stjerneTop) stjerneTop.rotation.z = Math.sin(t * 1.8) * .08;
-    const natGlød = 1 + natBlanding * .7;
-    juleLys.forEach(({ mat, i }) => {
+    if (stjerneHalo) {
+      const sPuls = 1 + .12 * Math.sin(t * 2.6);
+      stjerneHalo.scale.setScalar((2.1 + natBlanding * 1.15) * sPuls);
+      stjerneHalo.material.opacity = .32 + natBlanding * .52;
+    }
+    const natGlød = .65 + natBlanding * .45;
+    juleLys.forEach(({ mat, halo, haloMat, basisFarve, i }) => {
       const puls = lysTema === 0
-        ? .45 + .45 * Math.sin(t * 3.2 + i * .7)
+        ? .48 + .48 * Math.sin(t * 3.2 + i * .7)
         : lysTema === 1
-          ? ((Math.floor(t * 4) + i) % 2 ? .95 : .18)
-          : .6 + .35 * Math.sin(t * 6 + i * .3);
+          ? ((Math.floor(t * 4) + i) % 2 ? .98 : .18)
+          : lysTema === 2
+            ? .6 + .38 * Math.sin(t * 6 + i * .3)
+            : .72 + .28 * Math.sin(t * 4.2 + i * .45);
+      if (lysTema === 3) {
+        const hue = ((t * .22 + i * .06) % 1 + 1) % 1;
+        mat.color.setHSL(hue, .9, .58);
+        mat.emissive.setHSL(hue, .95, .52);
+        haloMat.color.setHSL(hue, 1, .62);
+      } else {
+        mat.color.copy(basisFarve);
+        mat.emissive.copy(basisFarve);
+        haloMat.color.copy(basisFarve);
+      }
       mat.emissiveIntensity = puls * natGlød;
+      haloMat.opacity = (.16 + natBlanding * .4) * (.45 + puls * .55);
+      halo.scale.setScalar((.82 + natBlanding * .42) * (.85 + puls * .45));
+    });
+    feLys.forEach(({ sprite, mat, i }) => {
+      const glimt = .45 + .55 * Math.sin(t * 4.5 + i * 1.3);
+      mat.opacity = (.15 + natBlanding * .68) * glimt;
+      sprite.scale.setScalar((.26 + natBlanding * .18) * (.8 + glimt * .4));
+    });
+    gaverListe.forEach(g => {
+      if (g.hop > 0) {
+        g.hop = Math.max(0, g.hop - dt * 2.2);
+        g.grp.position.y = g.basisY + Math.abs(Math.sin(g.hop * Math.PI * 2)) * .32;
+        g.grp.rotation.z = Math.sin(g.hop * Math.PI * 6) * .16 * g.hop;
+      } else {
+        g.grp.position.y = g.basisY;
+        g.grp.rotation.z = 0;
+      }
     });
 
     if (kaninGrp) {
@@ -1703,7 +1810,8 @@
         try { renderer.forceContextLoss(); } catch (e) {}
       }
       renderer = scene = camera = rulBold = himmelFarver = null;
-      tex = []; matCache = {}; juleLys = []; haveSnemaend = []; dansere = []; snedriver = [];
+      juletraeLys = juleFodLys = stjerneHalo = null;
+      tex = []; matCache = {}; juleLys = []; feLys = []; gaverListe = []; haveSnemaend = []; dansere = []; snedriver = [];
     }
   });
 })();
