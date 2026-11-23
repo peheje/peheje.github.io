@@ -562,6 +562,31 @@
         "text": "Two things are enough for a Sunday: a dry doormat and nowhere you are obliged to be.",
         "source": "Found under the door"
       }
+    },
+    {
+      "date": "2026-11-23",
+      "text": "Moonlight pours through the round window so brightly I scarcely need the lamp. Shall I turn the flame low tonight, or keep it burning as usual?",
+      "extras": [
+        "The moon is all but round tonight, missing scarcely a thread of shadow along its rim.",
+        "Monday arrived with wet cobbles and a brisk wind that hurried the last dry leaves past the gate.",
+        "The two unopened jam-sealed envelopes sit quietly behind the teacup, keeping their own counsel.",
+        "The hedgehog down the lane has tucked in properly now; only a tidy mound of leaves marks the spot.",
+        "I brushed the worn doormat twice before dusk, out of respect for a fresh week."
+      ],
+      "choice": {
+        "options": [
+          {
+            "label": "Turn it low",
+            "reply": "Low it is. The room has turned silver and quiet, as if the hedge outside stepped indoors to sit by the stove.",
+            "later": "I let the moonlight keep watch last night, and slept better for the pale quiet. The lamp seemed glad of the rest."
+          },
+          {
+            "label": "Keep it burning",
+            "reply": "Best keep our own small warm colour indoors, whatever the sky is doing. The lampshade agrees, softly.",
+            "later": "The lamp burned steadily against the bright window all evening. Two sorts of light made a very civil room."
+          }
+        ]
+      }
     }
   ]
 }
