@@ -31,13 +31,24 @@
     .bp-hill.far{bottom:0;height:42%;border-radius:50% 50% 0 0/31% 31% 0 0;background:linear-gradient(#bfe6a8,#9fd486 62%)}
     .bp-hill.near{bottom:0;height:22%;left:-25%;right:-5%;background:linear-gradient(#95d775,#5fae4a);border-radius:60% 40% 0 0/100% 100% 0 0}
     .bp-tree{position:absolute;bottom:17%;width:clamp(10px,1.6vh,18px);height:clamp(40px,9vh,90px);background:#8a592e;border-radius:6px;pointer-events:none}
+    .bp-tree::after{content:"";position:absolute;left:50%;bottom:-5px;width:clamp(46px,9vh,96px);height:clamp(10px,2vh,18px);transform:translateX(-50%);
+      border-radius:50%;background:radial-gradient(closest-side,rgba(40,85,30,.28),rgba(40,85,30,0))}
     .bp-tree::before{content:"";position:absolute;left:50%;bottom:70%;width:clamp(50px,11vh,110px);aspect-ratio:1;transform:translateX(-50%);border-radius:50%;
+      transform-origin:50% 95%;animation:bp-tree-sway 5.5s ease-in-out infinite alternate;
       background:radial-gradient(circle at 32% 30%,#a6df92 0 14%,transparent 15%),radial-gradient(circle at 50% 60%,#5aa94f,#3d7f3a 75%)}
+    .bp-tree:nth-of-type(even)::before{animation-delay:-2.6s}
+    @keyframes bp-tree-sway{from{transform:translateX(-50%) rotate(-2deg)}to{transform:translateX(-50%) rotate(2deg)}}
     /* Blomst: gul midte, fem kronblade (skygger af midten), stilk og et blad */
     .bp-flower{position:absolute;font-size:clamp(8px,1.5vh,13px);width:1em;height:1em;border-radius:50%;pointer-events:none;background:#ffd84a;
+      transform-origin:50% 3.6em;animation:bp-flower-sway 4.2s ease-in-out infinite alternate;
       box-shadow:0 -.78em 0 .08em var(--f),.74em -.24em 0 .08em var(--f),.46em .63em 0 .08em var(--f),-.46em .63em 0 .08em var(--f),-.74em -.24em 0 .08em var(--f)}
+    .bp-flower:nth-of-type(2n){animation-duration:5s;animation-delay:-1.5s}
+    .bp-flower:nth-of-type(3n){animation-duration:3.7s;animation-delay:-2.8s}
+    @keyframes bp-flower-sway{from{transform:rotate(-5deg)}to{transform:rotate(5deg)}}
     .bp-flower::before{content:"";position:absolute;left:50%;top:1.2em;width:.24em;height:2.4em;margin-left:-.12em;background:#3d7f3a;border-radius:.12em}
     .bp-flower::after{content:"";position:absolute;left:.5em;top:2em;width:1.15em;height:.55em;background:#4f9a43;border-radius:0 100% 0 100%;transform:rotate(-20deg)}
+    .bp-tuft{position:absolute;width:clamp(22px,3.6vh,38px);height:clamp(14px,2.4vh,26px);pointer-events:none;transform-origin:50% 100%;
+      animation:bp-flower-sway 4.6s ease-in-out infinite alternate}
     .bp-count{position:absolute;top:calc(2vh + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);
       background:var(--card);border-radius:999px;padding:.2em .8em;font-weight:800;font-size:clamp(26px,5vh,48px);
       box-shadow:0 5px 0 #8fc3e0;z-index:3;font-variant-numeric:tabular-nums;pointer-events:none}
@@ -77,15 +88,19 @@
     .bp-word{position:absolute;font-weight:800;font-size:clamp(30px,6vh,56px);color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.25);
       pointer-events:none;z-index:4;animation:bp-word 1s ease-out forwards}
     @keyframes bp-word{from{transform:translate(-50%,-50%) scale(.6)}30%{transform:translate(-50%,-70%) scale(1.15)}to{transform:translate(-50%,-140%);opacity:0}}
-    /* Dyr på engen */
+    /* #7 Dyr på engen: blød skygge på græsset + rolig vejrtrækning */
     .bp-pet{position:absolute;bottom:calc(3vh + env(safe-area-inset-bottom,0px));font-size:clamp(46px,9vh,84px);line-height:1;padding:0;background:none;z-index:3;
-      transform:translateX(-50%);transition:opacity .4s}
+      transform:translateX(-50%);transition:opacity .4s;transform-origin:50% 90%;animation:bp-pet-idle 3s ease-in-out infinite}
+    .bp-pet::after{content:"";position:absolute;left:12%;right:12%;bottom:-4px;height:14%;border-radius:50%;z-index:-1;
+      background:radial-gradient(closest-side,rgba(35,75,28,.3),rgba(35,75,28,0))}
+    .bp-pet:nth-of-type(even){animation-delay:-1.4s}
+    @keyframes bp-pet-idle{0%,100%{transform:translateX(-50%) scale(1,1)}50%{transform:translateX(-50%) scale(.97,1.04) translateY(-2px)}}
     .bp-pet.fald{animation:bp-fald var(--t) cubic-bezier(.5,0,.8,.6) forwards}
     @keyframes bp-fald{from{transform:translate(-50%,var(--fra)) rotate(-20deg)}75%{transform:translate(-50%,0) rotate(5deg)}88%{transform:translate(-50%,-14%)}to{transform:translate(-50%,0)}}
     .bp-pet.hop{animation:bp-hop .55s}
     @keyframes bp-hop{40%{transform:translate(-50%,-30%) scale(1.1)}}
     .bp-pet.vaek{opacity:0}
-    @media (prefers-reduced-motion:reduce){.bp-sun,.bp-cloud,.bp-bit,.bp-pet.fald,.bp-pet.hop{animation:none}.bp .balloon.kaempe{animation:none;transform:translateY(-58vh)}}
+    @media (prefers-reduced-motion:reduce){.bp-sun,.bp-cloud,.bp-tree::before,.bp-flower,.bp-tuft,.bp-bit,.bp-pet,.bp-pet.fald,.bp-pet.hop{animation:none}.bp .balloon.kaempe{animation:none;transform:translateY(-58vh)}}
   `);
 
   let root, field, pops, alive, timers, spawner, sinceDyr, giant, pets, ros = false, ventDyr = null;
@@ -239,13 +254,15 @@
       root = r; pops = 0; alive = true; timers = []; sinceDyr = 3; giant = null; pets = [];
       const flowers = [["#ff7fbf", 8, 8], ["#fff", 22, 5], ["#ff5c5c", 40, 9], ["#b57dff", 58, 6], ["#fff", 74, 10], ["#ff9f43", 90, 7]]
         .map(([f, x, y]) => `<i class="bp-flower" style="--f:${f};left:${x}%;bottom:${y}%"></i>`).join("");
+      const tufts = [[15, 4], [32, 11], [49, 4], [66, 9], [83, 5]]
+        .map(([x, y], i) => `<svg class="bp-tuft" style="left:${x}%;bottom:${y}%;animation-delay:-${i * .9}s" viewBox="0 0 36 22" aria-hidden="true"><path d="M6 21 Q2 10 9 4 Q12 12 16 20 M16 21 Q17 7 22 2 Q22 12 22 21 M23 21 Q28 11 33 6 Q30 14 27 21" fill="none" stroke="#4f9a43" stroke-width="3.2" stroke-linecap="round"/></svg>`).join("");
       root.innerHTML = `<div class="bp">
         <div class="bp-sun"></div>
         <div class="bp-cloud" style="top:12%;width:clamp(90px,16vw,170px);animation-duration:60s;animation-delay:-10s"></div>
         <div class="bp-cloud" style="top:28%;width:clamp(70px,12vw,130px);animation-duration:85s;animation-delay:-50s"></div>
         <div class="bp-hill far"></div>
         <div class="bp-tree" style="left:10%"></div><div class="bp-tree" style="right:14%;bottom:18%"></div>
-        <div class="bp-hill near"></div>${flowers}
+        <div class="bp-hill near"></div>${tufts}${flowers}
         <div class="bp-count">🎈 0</div></div>`;
       field = q(".bp");
       Spil.preload([...COLORS.map(c => "farve-" + Spil.key(c[1])), ...PRAISE.map((_, i) => "ros-" + i), ...DYR.flatMap(d => Spil.jaDyr(d[1])),

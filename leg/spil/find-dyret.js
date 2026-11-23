@@ -65,23 +65,36 @@
     .fd{height:100%;display:flex;flex-direction:column;gap:2vh;box-sizing:border-box;padding-block:2vh 3vh;
       padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
       position:relative;overflow:hidden;
-      background:radial-gradient(120% 60% at 50% 110%,var(--meadow-deep) 0 45%,transparent 46%),linear-gradient(#bfe6fb,var(--meadow) 38%)}
-    .fd::after{content:"🌼  🌷  🌼  🌸  🌼";position:absolute;left:0;right:0;bottom:1.5vh;text-align:center;white-space:pre;font-size:clamp(18px,min(4vh,7vw),36px);
-      letter-spacing:.3em;opacity:.9;pointer-events:none}
-    .fd-top{display:flex;align-items:center;justify-content:center;gap:12px;min-height:clamp(56px,9vh,84px)}
-    .fd-stars{display:flex;gap:6px;font-size:clamp(22px,min(4.5vh,6vw),44px)}
-    .fd-stars span{opacity:.75;filter:grayscale(1) brightness(1.9) drop-shadow(0 2px 0 rgba(31,58,95,.25));transition:transform .3s,opacity .3s,filter .3s}
-    .fd-stars span.on{opacity:1;filter:drop-shadow(0 2px 0 rgba(150,100,0,.35));transform:scale(1.15)}
-    .fd-speak{position:absolute;top:calc(2vh + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));
-      width:clamp(56px,9vh,84px);aspect-ratio:1;border-radius:50%;background:var(--sun);box-shadow:0 6px 0 #d9a21a;font-size:clamp(26px,4.5vh,40px)}
-    .fd-speak:active{transform:translateY(4px);box-shadow:0 2px 0 #d9a21a}
-    .fd-prompt{text-align:center;font-weight:800;font-size:clamp(34px,min(7vh,13vw),72px);line-height:1.05;text-wrap:balance;min-height:1.1em;position:relative;z-index:1}
-    /* Himmel med to skyer, en bakke bagved og en græsbakke foran (erstatter den flade baggrund i .fd ovenfor) */
-    .fd{background:radial-gradient(circle 20px at calc(10% + -30px) calc(24% + 6px),#fffc 97%,transparent 100%),radial-gradient(circle 28px at calc(10% + -4px) calc(24% + -6px),#fffc 97%,transparent 100%),radial-gradient(circle 21px at calc(10% + 26px) calc(24% + 6px),#fffc 97%,transparent 100%),radial-gradient(58px 16px at 10% calc(24% + 14px),#fffc 97%,transparent 100%),
-        radial-gradient(circle 16px at calc(90% + -24px) calc(30% + 5px),#fffc 97%,transparent 100%),radial-gradient(circle 22px at calc(90% + -3px) calc(30% + -5px),#fffc 97%,transparent 100%),radial-gradient(circle 17px at calc(90% + 21px) calc(30% + 5px),#fffc 97%,transparent 100%),radial-gradient(46px 13px at 90% calc(30% + 11px),#fffc 97%,transparent 100%),
+      background:
         radial-gradient(120% 60% at 50% 110%,var(--meadow-deep) 0 45%,transparent 46%),
         radial-gradient(70% 34% at 8% 84%,#cdebb4 0 60%,transparent 61%),radial-gradient(70% 30% at 95% 86%,#cdebb4 0 60%,transparent 61%),
         linear-gradient(#a9dcf7,#d4eefb 30%,var(--meadow) 52%)}
+    /* #1 Drivende skyer i to lag (fjern og nær) */
+    .fd-cloud{position:absolute;height:clamp(24px,4.6vh,44px);border-radius:99px;background:#fff;opacity:.88;pointer-events:none;z-index:0;
+      filter:drop-shadow(0 4px 6px rgba(31,58,95,.08));animation:fd-drift linear infinite}
+    .fd-cloud::before,.fd-cloud::after{content:"";position:absolute;background:#fff;border-radius:50%}
+    .fd-cloud::before{width:46%;aspect-ratio:1;left:14%;bottom:30%}
+    .fd-cloud::after{width:34%;aspect-ratio:1;right:16%;bottom:36%}
+    .fd-cloud.far{opacity:.62;transform:scale(.82)}
+    @keyframes fd-drift{from{translate:-32vw 0}to{translate:132vw 0}}
+    /* #2 Svajende blomster og græstotter langs engen */
+    .fd-flora{position:absolute;left:0;right:0;bottom:1.1vh;display:flex;justify-content:space-evenly;align-items:flex-end;
+      pointer-events:none;z-index:0;padding-inline:4vw}
+    .fd-fl{display:inline-block;font-size:clamp(18px,min(4vh,7vw),36px);transform-origin:50% 90%;
+      animation:fd-sway 4.4s ease-in-out infinite alternate}
+    .fd-fl:nth-child(2n){animation-duration:5.2s;animation-delay:-1.7s}
+    .fd-fl:nth-child(3n){animation-duration:3.8s;animation-delay:-2.9s}
+    .fd-tuft{width:clamp(18px,3.2vh,32px);height:clamp(12px,2.2vh,22px);transform-origin:50% 100%;
+      animation:fd-sway 4s ease-in-out infinite alternate}
+    @keyframes fd-sway{from{transform:rotate(-5deg)}to{transform:rotate(5deg)}}
+    .fd-top{display:flex;align-items:center;justify-content:center;gap:12px;min-height:clamp(56px,9vh,84px);position:relative;z-index:1}
+    .fd-stars{display:flex;gap:6px;font-size:clamp(22px,min(4.5vh,6vw),44px)}
+    .fd-stars span{opacity:.75;filter:grayscale(1) brightness(1.9) drop-shadow(0 2px 0 rgba(31,58,95,.25));transition:transform .3s,opacity .3s,filter .3s}
+    .fd-stars span.on{opacity:1;filter:drop-shadow(0 2px 0 rgba(150,100,0,.35));transform:scale(1.15)}
+    .fd-speak{position:absolute;top:calc(2vh + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));z-index:2;
+      width:clamp(56px,9vh,84px);aspect-ratio:1;border-radius:50%;background:var(--sun);box-shadow:0 6px 0 #d9a21a,0 10px 16px rgba(31,58,95,.14);font-size:clamp(26px,4.5vh,40px)}
+    .fd-speak:active{transform:translateY(4px);box-shadow:0 2px 0 #d9a21a}
+    .fd-prompt{text-align:center;font-weight:800;font-size:clamp(34px,min(7vh,13vw),72px);line-height:1.05;text-wrap:balance;min-height:1.1em;position:relative;z-index:1}
     .fd-grid{position:relative;z-index:1;flex:1;min-height:0;display:grid;gap:clamp(12px,2.5vh,28px);align-content:center;justify-content:center}
     .fd-card{background:var(--card);border-radius:28px;box-shadow:0 8px 0 var(--shadow);display:grid;place-items:center;
       font-size:clamp(70px,16vh,170px);line-height:1.3;aspect-ratio:1;width:100%;max-width:100%;transition:transform .15s,opacity .3s;
@@ -95,13 +108,11 @@
     .fd-card.dim{opacity:.35}
     @keyframes fd-shake{20%,60%{transform:translateX(-12px) rotate(-4deg)}40%,80%{transform:translateX(12px) rotate(4deg)}}
     @keyframes fd-hop{30%{transform:translateY(-30px) scale(1.12)}60%{transform:translateY(0) scale(.96)}}
-    .fd-party{position:fixed;inset:0;background:var(--sky);overflow:hidden;z-index:5;display:flex;align-items:center;justify-content:center;text-align:center}
+    .fd-party{position:fixed;inset:0;background:linear-gradient(var(--sky),#bfe6fb);overflow:hidden;z-index:5;display:flex;align-items:center;justify-content:center;text-align:center}
     /* Ballonerne: glans, en lille knude og snoren hænger fra knuden (resten står i index.html) */
-    .fd-party{background:radial-gradient(circle 24px at calc(20% + -34px) calc(20% + 8px),#fff 97%,transparent 100%),radial-gradient(circle 34px at calc(20% + -4px) calc(20% + -6px),#fff 97%,transparent 100%),radial-gradient(circle 26px at calc(20% + 30px) calc(20% + 6px),#fff 97%,transparent 100%),radial-gradient(70px 20px at 20% calc(20% + 16px),#fff 97%,transparent 100%),
-      radial-gradient(circle 24px at calc(80% + -34px) calc(13% + 8px),#fff 97%,transparent 100%),radial-gradient(circle 34px at calc(80% + -4px) calc(13% + -6px),#fff 97%,transparent 100%),radial-gradient(circle 26px at calc(80% + 30px) calc(13% + 6px),#fff 97%,transparent 100%),radial-gradient(70px 20px at 80% calc(13% + 16px),#fff 97%,transparent 100%),
-      linear-gradient(var(--sky),#bfe6fb)}
     .fd-party .balloon{background-image:radial-gradient(circle at 32% 28%,rgba(255,255,255,.75) 0 9%,rgba(255,255,255,0) 22%),
-      radial-gradient(circle at 60% 70%,rgba(0,0,0,0) 45%,rgba(0,0,0,.14) 75%)!important;border-radius:50% 50% 48% 48%/56% 56% 44% 44%}
+      radial-gradient(circle at 60% 70%,rgba(0,0,0,0) 45%,rgba(0,0,0,.14) 75%)!important;border-radius:50% 50% 48% 48%/56% 56% 44% 44%;
+      filter:drop-shadow(0 8px 10px rgba(31,58,95,.16))}
     .fd-party .balloon::before{content:"";position:absolute;left:50%;top:99%;width:14%;aspect-ratio:1.2;transform:translateX(-50%);
       background:inherit;background-image:none!important;clip-path:polygon(50% 0,100% 100%,0 100%);filter:brightness(.85)}
     .fd-party .balloon::after{top:calc(100% + 6%);height:9vh;width:2px;background:rgba(255,255,255,.85)}
@@ -110,6 +121,11 @@
     .fd-card.gem{position:relative;overflow:hidden}
     .fd-a{display:block;line-height:1;transition:clip-path .45s ease-out}
     .fd-hide{position:absolute;transition:transform .5s ease-in,opacity .25s ease-in .25s;filter:drop-shadow(0 6px 8px rgba(31,58,95,.2))}
+    /* #4 Levende skjul: busk og træ rasler blidt, skyen svæver let */
+    .fd-hide.busk,.fd-hide.trae{animation:fd-rustle 4.2s ease-in-out infinite alternate;transform-origin:50% 90%}
+    .fd-hide.sky{animation:fd-float 3.6s ease-in-out infinite alternate}
+    @keyframes fd-rustle{from{transform:rotate(-1.2deg)}to{transform:rotate(1.2deg)}}
+    @keyframes fd-float{from{transform:translateY(-2px)}to{transform:translateY(2px)}}
     .v-top .fd-a{clip-path:inset(0 0 50% 0)}
     .v-top .fd-hide{top:44%;left:-4%;right:-4%;bottom:-6%}
     .v-bottom .fd-a{clip-path:inset(50% 0 0 0)}
@@ -120,8 +136,8 @@
     .v-right .fd-hide{top:-4%;bottom:-4%;left:-6%;right:44%}
     .fd-hide svg{display:block;width:100%;height:100%;overflow:visible}
     .fd-card.reveal .fd-a{clip-path:inset(0 0 0 0)}
-    .fd-card.reveal .fd-hide{transform:translateY(90%) rotate(-12deg) scale(.7);opacity:0}
-    @media (prefers-reduced-motion:reduce){.fd-card,.fd-card.right,.fd-card.wrong{animation:none}.fd-a,.fd-hide{transition:none}}
+    .fd-card.reveal .fd-hide{transform:translateY(90%) rotate(-12deg) scale(.7);opacity:0;animation:none}
+    @media (prefers-reduced-motion:reduce){.fd-card,.fd-card.right,.fd-card.wrong,.fd-cloud,.fd-fl,.fd-tuft,.fd-hide.busk,.fd-hide.trae,.fd-hide.sky{animation:none}.fd-a,.fd-hide{transition:none}}
   `);
 
   let root, score, target, busy, last, alive, timers, rounds, warned, skjulTest;
@@ -176,7 +192,10 @@
   }
 
   function party() {
-    const p = document.createElement("div"); p.className = "fd-party"; p.innerHTML = "<p>Pop ballonerne!</p>";
+    const p = document.createElement("div"); p.className = "fd-party";
+    p.innerHTML = `<div class="fd-cloud far" style="top:16%;width:clamp(80px,14vw,150px);animation-duration:72s;animation-delay:-18s"></div>
+      <div class="fd-cloud" style="top:11%;width:clamp(100px,18vw,190px);animation-duration:54s;animation-delay:-35s"></div>
+      <p>Pop ballonerne!</p>`;
     root.appendChild(p);
     Spil.sfx.fanfare(); Spil.say("Super flot! Pop ballonerne!", null, "super-pop");
     const cols = ["#ff6b6b", "#ffc93c", "#6bcb77", "#4d96ff", "#c77dff", "#ff9f43"]; let left = 12;
@@ -222,7 +241,13 @@
       if (dyb === "fire") score = 10;
       if (dyb.startsWith("gem")) { score = 15; rounds = 1; skjulTest = ["busk", "kasse", "sky", "trae"].find(k => dyb === "gem-" + k) || ""; }
       if (dyb === "fest") score = 5;
+      const tuft = `<svg class="fd-tuft" viewBox="0 0 36 22" aria-hidden="true"><path d="M6 21 Q2 10 9 4 Q12 12 16 20 M16 21 Q17 7 22 2 Q22 12 22 21 M23 21 Q28 11 33 6 Q30 14 27 21" fill="none" stroke="#5aa94f" stroke-width="3.2" stroke-linecap="round"/></svg>`;
       root.innerHTML = `<div class="fd">
+        <div class="fd-cloud far" style="top:14%;width:clamp(76px,13vw,140px);animation-duration:76s;animation-delay:-22s"></div>
+        <div class="fd-cloud" style="top:23%;width:clamp(92px,16vw,175px);animation-duration:56s;animation-delay:-40s"></div>
+        <div class="fd-flora" aria-hidden="true">
+          ${tuft}<span class="fd-fl">🌼</span>${tuft}<span class="fd-fl">🌷</span><span class="fd-fl">🌼</span>${tuft}<span class="fd-fl">🌸</span><span class="fd-fl">🌼</span>${tuft}
+        </div>
         <div class="fd-top"><div class="fd-stars" aria-label="Stjerner"></div></div>
         <button class="fd-speak" aria-label="Sig det igen">🔊</button>
         <div class="fd-prompt"></div>

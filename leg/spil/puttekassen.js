@@ -84,7 +84,11 @@
     }
 
     /* ---------- Kassen i træ (front-set, med et lidt tykt låg) ---------- */
+    /* #9 Blød gulvskygge under kassen */
     .pk-kasse{position:relative;display:flex;flex-direction:column;align-items:stretch}
+    .pk-gulvskygge{position:absolute;left:-6%;right:-6%;bottom:-18px;height:28px;border-radius:50%;z-index:0;pointer-events:none;
+      background:radial-gradient(closest-side,rgba(90,58,25,.3),rgba(90,58,25,0));transition:transform .25s,opacity .25s}
+    .pk-kasse.rasl .pk-gulvskygge{transform:scale(.94);opacity:.78}
     .pk-laag-zone{position:relative;z-index:4}
     .pk-laag{position:relative;box-sizing:border-box;padding:calc(var(--hul) * .10);
       border-radius:20px 20px 12px 12px;transform-origin:50% 100%;
@@ -167,11 +171,13 @@
     .pk-spring{position:absolute;left:50%;bottom:6%;z-index:6;display:flex;flex-direction:column;align-items:center;
       opacity:0;pointer-events:none;transform:translate(-50%,34%) scale(.2);transform-origin:50% 100%;
       transition:transform .6s cubic-bezier(.3,1.6,.5,1),opacity .2s}
+    .pk-spring::after{content:"";width:72%;height:14px;margin-top:-6px;border-radius:50%;
+      background:radial-gradient(closest-side,rgba(45,25,8,.38),rgba(45,25,8,0));pointer-events:none}
     .pk-spring.oppe{opacity:1;pointer-events:auto;transform:translate(-50%,0) scale(1)}
     .pk-figur{font-size:calc(var(--hul) * .85);line-height:1;filter:drop-shadow(0 6px 6px rgba(90,60,25,.32));
-      animation:pk-figur-hop 1.9s ease-in-out infinite}
+      transform-origin:50% 85%;animation:pk-figur-hop 1.9s ease-in-out infinite}
     .pk-spring.hop .pk-figur{animation:pk-luft .7s cubic-bezier(.3,1.5,.5,1)}
-    @keyframes pk-figur-hop{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-6px) rotate(2deg)}}
+    @keyframes pk-figur-hop{0%,100%{transform:translateY(0) rotate(-2deg) scale(1,1)}50%{transform:translateY(-6px) rotate(2deg) scale(.97,1.04)}}
     @keyframes pk-luft{0%{transform:translateY(0) scale(1)}35%{transform:translateY(-38%) scale(1.12)}
       70%{transform:translateY(0) scale(.96)}100%{transform:translateY(0) scale(1)}}
 
@@ -601,6 +607,7 @@
         <div class="pk-scene">
           <div class="pk-midt">
             <div class="pk-kasse">
+              <div class="pk-gulvskygge" aria-hidden="true"></div>
               <div class="pk-laag-zone">
                 <div class="pk-indre"></div>
                 <div class="pk-laag"><div class="pk-huller"></div></div>
