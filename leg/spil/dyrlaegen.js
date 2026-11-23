@@ -128,6 +128,7 @@
   Spil.css("css-dyrlaegen", `
     .dl{position:relative;height:100%;overflow:hidden;touch-action:none;
       background:linear-gradient(180deg,#dff6ee 0%,#eefaf5 58%,#f8f2e4 58%,#eedfc5 100%)}
+    .dl *{touch-action:none}
 
     /* Klinik-baggrund: vindue, rødt kors og undersøgelsesbord */
     .dl-vindue{position:absolute;left:max(18px,6%);top:clamp(74px,12vh,118px);
