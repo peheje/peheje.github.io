@@ -1,0 +1,25 @@
+{
+  "name": "Legekassen",
+  "short_name": "Legekassen",
+  "description": "Små spil på dansk til børn på 1–5 år",
+  "lang": "da",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#d9f0d3",
+  "theme_color": "#d9f0d3",
+  "icons": [
+    {
+      "src": "billeder/ikon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "billeder/ikon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

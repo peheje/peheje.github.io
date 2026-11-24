@@ -176,6 +176,10 @@
       const btn = el.querySelector(".st-opdater");
       btn.textContent = "⏳ Opdaterer …";
       try {
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister()));
+        }
         if ("caches" in window) {
           const ks = await caches.keys();
           await Promise.all(ks.map(k => caches.delete(k)));

@@ -25,6 +25,14 @@
   const STREG = "#3d2b3d";         // omrids-farven (blomme)
   const HORISONT = "#ffe4c8";
   const GEM = "lk-svaev-stjerner";
+  const BESOEGT = "lk-svaev-besoegt";
+  const VARTEGN_DEF = [
+    { id: "fyrtaarn",   krav: 5,  x: 52,   z: 118, radius: 28, nyKey: "svaev-ny-fyrtaarn",   nyTekst: "Se! Der er kommet et fyrtårn på øen!",        landKey: "svaev-ved-fyrtaarn",   landTekst: "Hej fyrtårn! Du landede lige ved fyrtårnet!", emoji: "✨⭐🌊✨⭐" },
+    { id: "lejrbaal",   krav: 10, x: -50,  z: 58,  radius: 28, nyKey: "svaev-ny-lejrbaal",   nyTekst: "Se! Der er kommet et lejrbål på øen!",        landKey: "svaev-ved-lejrbaal",   landTekst: "Hej lejrbål! Her er dejligt varmt!",          emoji: "🔥✨⭐🔥✨" },
+    { id: "vindmoelle", krav: 15, x: 75,   z: 57,  radius: 28, nyKey: "svaev-ny-vindmoelle", nyTekst: "Se! Der er kommet en vindmølle på bakken!",   landKey: "svaev-ved-vindmoelle", landTekst: "Hej vindmølle! Se hvor hurtigt den drejer!",  emoji: "🌬️✨🌼⭐✨" },
+    { id: "luftballon", krav: 20, x: 76,   z: -80, radius: 28, nyKey: "svaev-ny-luftballon", nyTekst: "Se! Der er kommet en stor luftballon på øen!", landKey: "svaev-ved-luftballon", landTekst: "Hej luftballon! Den hopper af glæde!",        emoji: "🎈✨⭐🎈✨" },
+    { id: "sejlbaad",   krav: 25, x: -128, z: 52,  radius: 30, nyKey: "svaev-ny-sejlbaad",   nyTekst: "Se! Der er kommet en sejlbåd ved stranden!",  landKey: "svaev-ved-sejlbaad",   landTekst: "Hej sejlbåd! God vind på vandet!",            emoji: "⛵💧✨⭐🌊" }
+  ];
   const ROS = ["ros-0", "ros-1", "ros-2", "ros-3", "ros-4"];
   const roligt = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
 
@@ -59,13 +67,13 @@
 
   let T, root, alive, timers, raf, cv, renderer, scene, camera, envTex, sol, himmel, tidU, gradient;
   let raev, rig, indre, raevPivot, krop, hoved, oejne = [], oerer = [], ben = [], hale, halePivot, toerklaede;
-  let skaermGeo, skaermMesh, snorGeo, spor, striber, vindPunkter, vindData, hvirvelPunkter, skyGrp, fugle, stjerner;
+  let skaermGeo, skaermMesh, snorGeo, spor, striber, vindPunkter, vindData, hvirvelPunkter, skyGrp, fugle, stjerner, vartegn = [];
   let tex = [], matCache = {};
   let fase, p, yaw, yawFart, vy, fart, bank, faseTid, sidstTid, landetI, landetVed = 0, kamPos, kamSe, kamRul, fov, fovKick;
   let kol = 1, svR = { x: 0, v: 0 }, svP = { x: 0, v: 0 }, haleS = { x: 0, v: 0 }, iVind = false, blink = 0, naesteBlink = 3;
   let finger = null, taster = { v: false, h: false, n: false, o: false }, styr = 0, styrTid = 0, flyveTid = 0;
   let laen = 0, kropLaen = 0, kropHop = 0;   // læn frem (+) / tilbage (-)
-  let sagt = {}, antalOp = 0, antalStj = 0, ventLyd = 0, naesteForan = 0;
+  let sagt = {}, antalOp = 0, antalStj = 0, ventLyd = 0, naesteForan = 0, besoegt = new Set();
   let lyd = null, musikTil = true;
   const MUSIK = "lk-svaev-musik";
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
@@ -312,7 +320,7 @@
     Object.assign(sol.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 10, far: 320 });
     scene.add(sol, sol.target);
 
-    bygTerraen(); bygVand(); bygFjerneOeer(); bygPlanter(); bygSkyer(); bygVinde(); bygStjerner(); bygFugle(); bygFlag();
+    bygTerraen(); bygVand(); bygFjerneOeer(); bygPlanter(); bygSkyer(); bygVinde(); bygStjerner(); bygFugle(); bygFlag(); bygVartegn();
     bygRaev(); bygSkaerm(); bygSpor(); bygStriber();  }
 
   function bygTerraen() {
@@ -428,7 +436,7 @@
       col.set(farve).offsetHSL((Math.random() - .5) * .03, 0, (Math.random() - .5) * v); m.setColorAt(m.count, col);
       m.count++;
     };
-    const vedTop = (x, z) => Math.hypot(x - TOP.x, z - TOP.z) < 16;
+    const vedTop = (x, z) => Math.hypot(x - TOP.x, z - TOP.z) < 16 || VARTEGN_DEF.some(v => Math.hypot(x - v.x, z - v.z) < 15);
     const kroner = ["#7cc96b", "#7cc96b", "#9bd46a", "#62b56c", "#f7a8c4", "#f2c45a"];
     for (let i = 0; i < 16000; i++) {
       const x = (Math.random() * 2 - 1) * R * 1.05, z = (Math.random() * 2 - 1) * R * 1.05, h = hoejde(x, z);
@@ -560,6 +568,345 @@
     const fg = new T.PlaneGeometry(1.9, 1.1, 10, 4); fg.translate(.95, 0, 0);
     const flag = new T.Mesh(fg, stil(new T.MeshToonMaterial({ color: "#ff6f61", gradientMap: gradient, side: T.DoubleSide }), { flag: true }));
     flag.position.set(TOP.x + 3.05, h + 3.4, TOP.z - 2); flag.castShadow = true; scene.add(flag);
+  }
+
+  /* ---------- Vartegn på øen (låses op for hver 5. stjerne) ---------- */
+  function gemBesoegt() {
+    try { localStorage.setItem(BESOEGT, JSON.stringify([...besoegt])); } catch (e) {}
+  }
+  function vartegnLyd(id) {
+    try {
+      const ac = Spil.audio(), nu = ac.currentTime;
+      const tone = (f, t0, dur, type = "sine", vol = .12, fSlut = null) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = type; o.frequency.setValueAtTime(f, t0);
+        if (fSlut) o.frequency.exponentialRampToValueAtTime(fSlut, t0 + dur);
+        g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + .03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + dur + .05);
+      };
+      if (id === "fyrtaarn") {
+        // Venligt tågehorn + lys klokke
+        for (const [f, t0, d] of [[146.8, nu, .65], [196, nu + .5, .75]]) {
+          const o = ac.createOscillator(), fl = ac.createBiquadFilter(), g = ac.createGain();
+          o.type = "triangle"; o.frequency.value = f; fl.type = "lowpass"; fl.frequency.value = 420;
+          g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(.18, t0 + .08);
+          g.gain.setValueAtTime(.16, t0 + d - .15); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+          o.connect(fl).connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + d + .05);
+        }
+        tone(587.3, nu + .9, .45, "sine", .09); tone(880, nu + 1.05, .6, "sine", .09);
+      } else if (id === "lejrbaal") {
+        // Knitren + varm akkord
+        for (let i = 0; i < 6; i++) tone(900 + Math.random() * 1100, nu + i * .07, .06, "triangle", .05, 450);
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, nu + .15 + i * .09, .5, "sine", .09));
+      } else if (id === "vindmoelle") {
+        // Glad træ-marimba
+        [392, 493.88, 587.33, 783.99, 987.77].forEach((f, i) => tone(f, nu + i * .08, .35, "triangle", .11));
+      } else if (id === "luftballon") {
+        // Brænder-sus + stigende glade toner
+        const n = Math.floor(ac.sampleRate * .6), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1);
+        const s = ac.createBufferSource(), fl = ac.createBiquadFilter(), g = ac.createGain();
+        s.buffer = buf; fl.type = "bandpass"; fl.frequency.value = 340; fl.Q.value = .8;
+        g.gain.setValueAtTime(0.0001, nu); g.gain.linearRampToValueAtTime(.16, nu + .15); g.gain.exponentialRampToValueAtTime(0.0001, nu + .58);
+        s.connect(fl).connect(g).connect(ac.destination); s.start(nu); s.stop(nu + .6);
+        [440, 554.37, 659.25, 880].forEach((f, i) => tone(f, nu + .12 + i * .1, .45, "sine", .1));
+      } else if (id === "sejlbaad") {
+        // Skibsklokke: ding-ding!
+        for (const t0 of [nu, nu + .32]) {
+          tone(880, t0, .75, "sine", .12); tone(1760, t0, .45, "sine", .06); tone(2349, t0, .28, "sine", .04);
+        }
+      }
+    } catch (e) {}
+  }
+
+  function bygVartegn() {
+    vartegn = [];
+    const pTex = prikTex();
+    const del = (til, geo, farve, x, y, z, o = {}) => {
+      const m = new T.Mesh(geo, toon(farve, o.mat || {}));
+      m.position.set(x, y, z);
+      if (o.r) m.rotation.set(...o.r);
+      if (o.s) m.scale.set(...o.s);
+      m.castShadow = o.skygge !== false; m.receiveShadow = true;
+      if (o.streg !== false) m.add(new T.Mesh(geo, streg(o.tyk || .09)));
+      til.add(m); return m;
+    };
+
+    for (const def of VARTEGN_DEF) {
+      const grp = new T.Group();
+      const y0 = def.id === "sejlbaad" ? 0 : hoejde(def.x, def.z);
+      grp.position.set(def.x, y0, def.z);
+      const indhold = new T.Group();
+      grp.add(indhold);
+      const v = { def, grp, indhold, oplaast: antalStj >= def.krav, popTid: 1, fejrTid: 0, ekstra: {} };
+
+      // Gylden glød-ring + lysglimt for ubesøgte oplåste vartegn, så de er lette at få øje på fra luften
+      const ringMat = new T.MeshBasicMaterial({ color: "#ffe57f", transparent: true, opacity: .65, depthWrite: false, blending: T.AdditiveBlending });
+      const ring = new T.Mesh(new T.TorusGeometry(9.5, .42, 8, 36), ringMat);
+      ring.rotation.x = Math.PI / 2; ring.position.y = def.id === "sejlbaad" ? .6 : .55;
+      grp.add(ring);
+      const glimtMat = new T.SpriteMaterial({ map: pTex, color: "#fff2a8", transparent: true, opacity: .82, depthWrite: false, blending: T.AdditiveBlending });
+      const glimt = new T.Sprite(glimtMat);
+      glimt.scale.setScalar(18);
+      grp.add(glimt);
+      v.ring = ring; v.glimt = glimt; v.glimtH = 19;
+
+      if (def.id === "fyrtaarn") {
+        // Rød- og hvidstribet kystfyrtårn med roterende lysstråle
+        del(indhold, new T.CylinderGeometry(3.4, 4.1, 2.6, 12), "#c3b3d6", 0, .5, 0, { tyk: .11 });
+        const striberF = ["#e85d56", "#fff6ea", "#e85d56", "#fff6ea", "#e85d56"];
+        for (let i = 0; i < 5; i++) {
+          const rB = 2.85 - i * .24, rT = 2.85 - (i + 1) * .24;
+          del(indhold, new T.CylinderGeometry(rT, rB, 2.7, 14), striberF[i], 0, 2.9 + i * 2.65, 0, { tyk: .1 });
+        }
+        del(indhold, new T.CylinderGeometry(2.35, 2.05, .7, 14), "#4a354a", 0, 15.1, 0, { tyk: .08 });
+        const lanterneMat = new T.MeshBasicMaterial({ color: "#fff2a8" });
+        const lanterne = new T.Mesh(new T.CylinderGeometry(1.45, 1.45, 2.1, 12), lanterneMat);
+        lanterne.position.y = 16.4; indhold.add(lanterne);
+        del(indhold, new T.ConeGeometry(2.15, 2.2, 14), "#e85d56", 0, 18.4, 0, { tyk: .1 });
+        del(indhold, new T.SphereGeometry(.42, 10, 8), "#ffd23f", 0, 19.6, 0, { tyk: .06 });
+        // Roterende lysstråle (to modsatte kegler)
+        const straale = new T.Group(); straale.position.y = 16.4; indhold.add(straale);
+        const sMat = new T.MeshBasicMaterial({ color: "#fff099", transparent: true, opacity: .34, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide });
+        const sGeo = new T.ConeGeometry(3.4, 28, 14, 1, true); sGeo.translate(0, -14, 0); sGeo.rotateZ(Math.PI / 2);
+        const s1 = new T.Mesh(sGeo, sMat), s2 = new T.Mesh(sGeo, sMat); s2.rotation.y = Math.PI;
+        straale.add(s1, s2);
+        v.glimtH = 23;
+        v.ekstra = { straale, sMat, lanterneMat };
+      } else if (def.id === "lejrbaal") {
+        // Hyggeligt tipitelt + glødende bål med stigende røgskyer og gnister
+        const tipi = new T.Group(); tipi.position.set(-4.2, -.2, -2.2); tipi.rotation.y = .5; indhold.add(tipi);
+        del(tipi, new T.ConeGeometry(4.1, 7.6, 12), "#fff0d8", 0, 3.8, 0, { tyk: .11 });
+        del(tipi, new T.CylinderGeometry(2.95, 3.55, 1.1, 12, 1, true), "#ff8a7a", 0, 1.6, 0, { streg: false, mat: { side: T.DoubleSide } });
+        del(tipi, new T.CylinderGeometry(1.75, 2.2, .9, 12, 1, true), "#7cc8f2", 0, 4.1, 0, { streg: false, mat: { side: T.DoubleSide } });
+        del(tipi, new T.ConeGeometry(1.15, 2.7, 3), "#4a354a", 0, 1.35, 3.05, { r: [-.22, 0, 0], streg: false });
+        for (let i = 0; i < 4; i++) {
+          const a = i * Math.PI / 2 + .4;
+          del(tipi, new T.CylinderGeometry(.1, .14, 9.2, 6), "#8b5e4a", Math.cos(a) * .35, 4.5, Math.sin(a) * .35, { r: [Math.sin(a) * .22, 0, -Math.cos(a) * .22], tyk: .04 });
+        }
+        // Bålplads
+        const baal = new T.Group(); baal.position.set(2.8, 0, 1.8); indhold.add(baal);
+        const stenGeo = new T.DodecahedronGeometry(.62, 0);
+        for (let i = 0; i < 8; i++) {
+          const a = i / 8 * Math.PI * 2;
+          del(baal, stenGeo, "#b5a4c7", Math.cos(a) * 2.1, .25, Math.sin(a) * 2.1, { s: [1, .65, 1], tyk: .05 });
+        }
+        for (let i = 0; i < 3; i++) del(baal, new T.CylinderGeometry(.22, .25, 2.9, 6), "#7a4f38", 0, .35, 0, { r: [Math.PI / 2 - .22, i * Math.PI / 3, 0], tyk: .04 });
+        const flamme = new T.Group(); baal.add(flamme);
+        const f1 = new T.Mesh(new T.ConeGeometry(1.15, 2.8, 8), new T.MeshBasicMaterial({ color: "#ff7a2f" })); f1.position.y = 1.45;
+        const f2 = new T.Mesh(new T.ConeGeometry(.75, 2.1, 8), new T.MeshBasicMaterial({ color: "#ffd23f" })); f2.position.y = 1.2;
+        const f3 = new T.Mesh(new T.ConeGeometry(.42, 1.3, 6), new T.MeshBasicMaterial({ color: "#fff6b8" })); f3.position.y = .9;
+        flamme.add(f1, f2, f3);
+        const baalGloed = new T.Sprite(new T.SpriteMaterial({ map: pTex, color: "#ffaa44", transparent: true, opacity: .6, depthWrite: false, blending: T.AdditiveBlending }));
+        baalGloed.position.y = 1.8; baalGloed.scale.setScalar(8); baal.add(baalGloed);
+        // Stigende røgskyer (synlige højt fra luften)
+        const roeg = [];
+        const roegGeo = new T.SphereGeometry(.85, 10, 8);
+        for (let i = 0; i < 7; i++) {
+          const rm = new T.MeshBasicMaterial({ color: "#fff6ee", transparent: true, opacity: .55, depthWrite: false });
+          const m = new T.Mesh(roegGeo, rm); baal.add(m);
+          roeg.push({ m, rm, f: i / 7 });
+        }
+        // Gyldne gnister ved landing
+        const gnister = [];
+        const gnistGeo = new T.SphereGeometry(.26, 6, 6);
+        const gnistMat = new T.MeshBasicMaterial({ color: "#ffe566" });
+        for (let i = 0; i < 16; i++) {
+          const m = new T.Mesh(gnistGeo, gnistMat); m.visible = false; baal.add(m);
+          gnister.push({ m, a: Math.random() * Math.PI * 2, r: .6 + Math.random() * 2.8, f: Math.random() });
+        }
+        v.glimtH = 16;
+        v.ekstra = { flamme, roeg, gnister };
+      } else if (def.id === "vindmoelle") {
+        // Eventyr-vindmølle på bakketoppen med drejende vinger
+        indhold.rotation.y = Math.atan2(-def.x, -def.z);
+        del(indhold, new T.CylinderGeometry(3.8, 4.4, 2.2, 12), "#c3b3d6", 0, .4, 0, { tyk: .11 });
+        del(indhold, new T.CylinderGeometry(2.15, 3.55, 12.6, 14), "#fff4e0", 0, 7.6, 0, { tyk: .11 });
+        del(indhold, new T.SphereGeometry(2.35, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), "#d95f5b", 0, 13.7, 0, { s: [1, 1.35, 1], tyk: .1 });
+        del(indhold, new T.BoxGeometry(1.5, 2.5, .5), "#8b5e4a", 0, 2.5, 3.35, { tyk: .06 });
+        del(indhold, new T.CylinderGeometry(.55, .55, .4, 10), "#7cc8f2", 0, 7.5, 2.75, { r: [Math.PI / 2, 0, 0], tyk: .05 });
+        const nav = new T.Group(); nav.position.set(0, 12.1, 2.55); indhold.add(nav);
+        del(nav, new T.CylinderGeometry(.65, .65, 1.3, 10), "#8b5e4a", 0, 0, 0, { r: [Math.PI / 2, 0, 0], tyk: .07 });
+        const vFarver = ["#ffe07a", "#7cc8f2", "#ff8a7a", "#9ee39a"];
+        for (let i = 0; i < 4; i++) {
+          const arm = new T.Group(); arm.rotation.z = i * Math.PI / 2; nav.add(arm);
+          del(arm, new T.BoxGeometry(.38, 8.8, .28), "#8b5e4a", 0, 4.4, .25, { tyk: .05 });
+          del(arm, new T.BoxGeometry(2.05, 6.8, .14), vFarver[i], 1.15, 5.2, .12, { tyk: .06 });
+        }
+        v.glimtH = 22;
+        v.ekstra = { nav, fart: .7 };
+      } else if (def.id === "luftballon") {
+        // Stribet regnbue-luftballon med kurv og glødende brænder
+        for (const sx of [-2.8, 2.8]) del(indhold, new T.CylinderGeometry(.18, .22, 1.8, 6), "#8b5e4a", sx, .6, 0, { tyk: .04 });
+        const kurvGrp = new T.Group(); indhold.add(kurvGrp);
+        del(kurvGrp, new T.BoxGeometry(2.6, 2.1, 2.6), "#c98c53", 0, 1.3, 0, { tyk: .09 });
+        del(kurvGrp, new T.BoxGeometry(2.9, .38, 2.9), "#8b5e4a", 0, 2.4, 0, { tyk: .07 });
+        for (const sx of [-1.1, 1.1]) for (const sz of [-1.1, 1.1]) {
+          del(kurvGrp, new T.CylinderGeometry(.06, .06, 3.8, 5), "#7a5236", sx, 4.3, sz, { streg: false });
+        }
+        const braenderMat = new T.MeshBasicMaterial({ color: "#ffaa33" });
+        const braender = new T.Mesh(new T.SphereGeometry(.65, 10, 8), braenderMat);
+        braender.position.y = 5.4; kurvGrp.add(braender);
+        const braenderGloed = new T.Sprite(new T.SpriteMaterial({ map: pTex, color: "#ffbb44", transparent: true, opacity: .45, depthWrite: false, blending: T.AdditiveBlending }));
+        braenderGloed.position.y = 5.5; braenderGloed.scale.setScalar(6); kurvGrp.add(braenderGloed);
+        // Ballonens form med farvede lodrette striber
+        const prof = [];
+        for (let i = 0; i <= 16; i++) {
+          const u = i / 16;
+          const r = i === 16 ? 0 : (1.35 + 4.75 * Math.pow(Math.sin(Math.pow(u, .75) * Math.PI), .85));
+          prof.push(new T.Vector2(r, 6.0 + u * 13.5));
+        }
+        const bGeo = new T.LatheGeometry(prof, 28);
+        const bp = bGeo.attributes.position, bc = new Float32Array(bp.count * 3), cTmp = new T.Color();
+        for (let i = 0; i < bp.count; i++) {
+          const ang = (Math.atan2(bp.getZ(i), bp.getX(i)) + Math.PI) / (Math.PI * 2);
+          const stribe = Math.floor(ang * SKAERMFARVER.length * 2) % SKAERMFARVER.length;
+          cTmp.set(SKAERMFARVER[stribe]); bc[i * 3] = cTmp.r; bc[i * 3 + 1] = cTmp.g; bc[i * 3 + 2] = cTmp.b;
+        }
+        bGeo.setAttribute("color", new T.BufferAttribute(bc, 3));
+        const bMesh = new T.Mesh(bGeo, toon("#ffffff", { vc: true })); bMesh.castShadow = true; bMesh.receiveShadow = true;
+        bMesh.add(new T.Mesh(bGeo, streg(.14))); kurvGrp.add(bMesh);
+        v.glimtH = 24;
+        v.ekstra = { kurvGrp, braender, braenderGloed };
+      } else if (def.id === "sejlbaad") {
+        // Lille træbro ud i vandet + sød sejlbåd med vimpel
+        indhold.rotation.y = Math.atan2(-.92, .39);
+        del(indhold, new T.BoxGeometry(3.3, .38, 15.5), "#b88354", 0, 1.15, 3.2, { tyk: .07 });
+        for (const pz of [-3, 1, 5, 9.5]) for (const px of [-1.25, 1.25]) {
+          del(indhold, new T.CylinderGeometry(.24, .26, 5.2, 7), "#7a5236", px, -1.1, pz, { tyk: .05 });
+        }
+        del(indhold, new T.CylinderGeometry(.26, .3, .9, 8), "#e85d56", 1.2, 1.7, 9.8, { tyk: .05 });
+        const baad = new T.Group(); baad.position.set(-4.3, 0, 10.6); baad.rotation.y = .35; indhold.add(baad);
+        const skrog = new T.SphereGeometry(2.6, 14, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+        skrog.scale(1, .68, 2.05);
+        del(baad, skrog, "#e85d56", 0, 1.05, 0, { tyk: .09 });
+        del(baad, new T.CylinderGeometry(2.55, 2.55, .36, 14), "#fff6ea", 0, 1.15, 0, { s: [1, 1, 2.0], tyk: .07 });
+        del(baad, new T.CylinderGeometry(2.2, 2.2, .16, 14), "#c98c53", 0, 1.32, 0, { s: [1, 1, 1.9], streg: false });
+        del(baad, new T.CylinderGeometry(.15, .2, 11.8, 8), "#7a5236", 0, 7.0, .2, { tyk: .05 });
+        // Storsejl + fok
+        const s1Shape = new T.Shape(); s1Shape.moveTo(0, 0); s1Shape.lineTo(0, 9.2); s1Shape.lineTo(-4.6, .6); s1Shape.closePath();
+        const s1Geo = new T.ExtrudeGeometry(s1Shape, { depth: .16, bevelEnabled: false }); s1Geo.rotateY(Math.PI / 2);
+        const storsejl = del(baad, s1Geo, "#fff8eb", -.08, 2.4, .05, { tyk: .06 });
+        const s2Shape = new T.Shape(); s2Shape.moveTo(0, 0); s2Shape.lineTo(0, 7.2); s2Shape.lineTo(3.4, .4); s2Shape.closePath();
+        const s2Geo = new T.ExtrudeGeometry(s2Shape, { depth: .14, bevelEnabled: false }); s2Geo.rotateY(Math.PI / 2);
+        const fok = del(baad, s2Geo, "#7cc8f2", -.07, 2.4, .45, { tyk: .05 });
+        // Flagrende vimpel i mastetoppen
+        const vg = new T.PlaneGeometry(2.4, .95, 10, 4); vg.translate(1.2, 0, 0);
+        const vimpel = new T.Mesh(vg, stil(new T.MeshToonMaterial({ color: "#ff6f61", gradientMap: gradient, side: T.DoubleSide }), { flag: true }));
+        vimpel.position.set(0, 12.4, .2); vimpel.castShadow = true; baad.add(vimpel);
+        v.glimtH = 16;
+        v.ekstra = { baad, storsejl, fok };
+      }
+
+      glimt.position.y = v.glimtH;
+      grp.visible = v.oplaast;
+      scene.add(grp);
+      vartegn.push(v);
+    }
+  }
+
+  function laasOpVartegn(v) {
+    if (v.oplaast) return;
+    v.oplaast = true; v.grp.visible = true;
+    v.popTid = roligt() ? 1 : 0;
+    v.indhold.scale.setScalar(roligt() ? 1 : .01);
+    Spil.tone([523.25, 659.25, 783.99, 1046.5, 1318.5], .09, "sine");
+    const stjEl = $(".sv-stj");
+    if (stjEl && !roligt()) Spil.burstAt(stjEl, "✨🌟⭐🎉✨");
+    Spil.say(v.def.nyTekst, null, v.def.nyKey);
+  }
+
+  function naerVartegn(x, z) {
+    let bedst = null, bedstD = 1e9;
+    for (const v of vartegn) {
+      if (!v.oplaast) continue;
+      const d = Math.hypot(x - v.def.x, z - v.def.z);
+      if (d <= v.def.radius && d < bedstD) { bedst = v; bedstD = d; }
+    }
+    return bedst;
+  }
+
+  function fejrVartegn(v, sp) {
+    v.fejrTid = 4.6;
+    if (!besoegt.has(v.def.id)) { besoegt.add(v.def.id); gemBesoegt(); }
+    vartegnLyd(v.def.id);
+    if (!roligt()) {
+      Spil.burst(sp.x, sp.y, v.def.emoji);
+      later(() => Spil.burst(sp.x, sp.y - 30, "⭐✨🎉✨⭐"), 280);
+    }
+    later(() => Spil.say(v.def.landTekst, null, v.def.landKey), 260);
+  }
+
+  function vartegnTrin(dt, t) {
+    const red = roligt();
+    for (const v of vartegn) {
+      if (!v.oplaast) continue;
+      // Pop-up animation når vartegnet låses op
+      if (v.popTid < 1) {
+        v.popTid = Math.min(1, v.popTid + dt * 1.35);
+        const u = v.popTid, s = u < .7 ? (u / .7) * 1.18 : 1.18 - ((u - .7) / .3) * .18;
+        v.indhold.scale.setScalar(Math.max(.01, s));
+      }
+      if (v.fejrTid > 0) v.fejrTid = Math.max(0, v.fejrTid - dt);
+      const fejr = v.fejrTid > 0 ? Math.min(1, v.fejrTid / 1.2) : 0;
+
+      // Gylden glød på ubesøgte vartegn
+      const ubesoegt = !besoegt.has(v.def.id);
+      v.ring.visible = v.glimt.visible = ubesoegt;
+      if (ubesoegt) {
+        const puls = red ? 1 : (.88 + Math.sin(t * 2.6 + v.def.krav) * .14);
+        v.ring.scale.setScalar(puls);
+        v.ring.material.opacity = red ? .5 : (.45 + Math.sin(t * 2.6 + v.def.krav) * .22);
+        v.glimt.position.y = v.glimtH + (red ? 0 : Math.sin(t * 2.0 + v.def.krav) * 1.2);
+        v.glimt.material.opacity = red ? .65 : (.55 + Math.sin(t * 3.1 + v.def.krav) * .25);
+      }
+
+      const ex = v.ekstra;
+      if (v.def.id === "fyrtaarn") {
+        if (!red) ex.straale.rotation.y += dt * (1.1 + fejr * 3.4);
+        const blinkLys = fejr > 0 && !red ? (.5 + .5 * Math.sin(t * 16)) : 0;
+        ex.sMat.opacity = .32 + fejr * (.35 + blinkLys * .22);
+        ex.lanterneMat.color.setHex(fejr > 0 && blinkLys > .5 ? 0xffffff : 0xfff2a8);
+      } else if (v.def.id === "lejrbaal") {
+        const fs = 1 + (red ? 0 : Math.sin(t * 9) * .08) + fejr * .55;
+        ex.flamme.scale.set(1 + fejr * .28, fs, 1 + fejr * .28);
+        for (const r of ex.roeg) {
+          r.f = (r.f + dt * (red ? .04 : .16 + fejr * .12)) % 1;
+          r.m.position.set(Math.sin(t * 1.2 + r.f * 6) * (1.2 * r.f), 2.2 + r.f * 21, Math.cos(t * .9 + r.f * 5) * (.9 * r.f));
+          r.m.scale.setScalar(.55 + r.f * 2.1);
+          r.rm.opacity = (1 - r.f) * .45;
+        }
+        for (const g of ex.gnister) {
+          g.m.visible = fejr > 0 && !red;
+          if (g.m.visible) {
+            g.f = (g.f + dt * .85) % 1;
+            const rad = g.r * (.4 + g.f * 1.6);
+            g.m.position.set(Math.cos(g.a + t * 2.5) * rad, 1.5 + g.f * 14, Math.sin(g.a + t * 2.5) * rad);
+            g.m.scale.setScalar(Math.max(.1, 1 - g.f));
+          }
+        }
+      } else if (v.def.id === "vindmoelle") {
+        const maalFart = red ? .2 : (.7 + fejr * 4.2);
+        ex.fart += (maalFart - ex.fart) * Math.min(1, dt * 3);
+        ex.nav.rotation.z -= dt * ex.fart;
+      } else if (v.def.id === "luftballon") {
+        const loeft = fejr * (red ? 3.5 : (5.5 + Math.sin(t * 4.5) * .9));
+        const bob = red ? 0 : Math.sin(t * 1.4) * .75;
+        ex.kurvGrp.position.y = bob + loeft;
+        ex.braender.scale.setScalar(1 + fejr * .95);
+        ex.braenderGloed.scale.setScalar(6 + fejr * 7);
+        ex.braenderGloed.material.opacity = .4 + fejr * .5;
+      } else if (v.def.id === "sejlbaad") {
+        const vug = red ? 0 : (1 + fejr * 1.4);
+        ex.baad.position.y = Math.sin(t * 1.8) * .25 * vug;
+        ex.baad.rotation.z = Math.sin(t * 1.5) * .08 * vug;
+        ex.baad.rotation.x = Math.cos(t * 1.2) * .05 * vug;
+        const pust = 1 + fejr * (red ? .25 : (.35 + Math.sin(t * 7) * .12));
+        ex.storsejl.scale.set(pust, 1, 1 + fejr * .12);
+        ex.fok.scale.set(pust, 1, 1 + fejr * .12);
+      }
+    }
   }
 
   /* ---------- Ræven ---------- */
@@ -816,12 +1163,17 @@
   function land(vand) {
     saetFase("landet"); landetI = vand ? "vand" : "jord"; landetVed = performance.now();
     p.y = vand ? -.35 : hoejde(p.x, p.z); vy = 0; fart = 0;
-    Spil.tone(vand ? [300, 200, 140] : [220, 170], .1, "triangle");
     const sp = skaermPunkt(p);
-    if (!roligt()) Spil.burst(sp.x, sp.y, vand ? "💧💦💧💦💧" : "🍃🌼🍃✨🍃");
+    const v = naerVartegn(p.x, p.z);
+    if (v) {
+      fejrVartegn(v, sp);
+    } else {
+      Spil.tone(vand ? [300, 200, 140] : [220, 170], .1, "triangle");
+      if (!roligt()) Spil.burst(sp.x, sp.y, vand ? "💧💦💧💦💧" : "🍃🌼🍃✨🍃");
+      if (vand && !sagt.plask) { sagt.plask = true; later(() => Spil.say("Plask! Ræven landede i vandet.", null, "svaev-plask"), 300); }
+      else if (!sagt.landet) { sagt.landet = true; later(() => Spil.say("Du er landet! Tryk, så løfter vinden dig op igen.", null, "svaev-landet"), 400); }
+    }
     later(() => fase === "landet" && visKnap("🌀"), 700);
-    if (vand && !sagt.plask) { sagt.plask = true; later(() => Spil.say("Plask! Ræven landede i vandet.", null, "svaev-plask"), 300); }
-    else if (!sagt.landet) { sagt.landet = true; later(() => Spil.say("Du er landet! Tryk, så løfter vinden dig op igen.", null, "svaev-landet"), 400); }
     ventLyd = 0;
   }
   function opIgen() {
@@ -1006,7 +1358,9 @@
         const el = $(".sv-stj"); el.querySelector("b").textContent = antalStj; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
         Spil.tone([1047, 1319, 1568, 2093], .07, "sine");
         const sp = skaermPunkt(s.position.clone().setY(s.position.y - 1.2)); if (!roligt()) Spil.burst(sp.x, sp.y, "⭐✨🌟✨");
-        if (!sagt.stjerne) { sagt.stjerne = true; Spil.say("Du fangede en stjerne!", null, "svaev-stjerne"); }
+        const nytVartegn = vartegn.find(v => !v.oplaast && antalStj >= v.def.krav);
+        if (nytVartegn) { laasOpVartegn(nytVartegn); }
+        else if (!sagt.stjerne) { sagt.stjerne = true; Spil.say("Du fangede en stjerne!", null, "svaev-stjerne"); }
         else if (antalStj % 5 === 0) Spil.say("", null, ROS[Math.floor(Math.random() * ROS.length)]);
       }
     }
@@ -1059,6 +1413,7 @@
     stjerneTrin(dt, t);
     vindTrin(dt);
     fugleTrin(dt, t);
+    vartegnTrin(dt, t);
     skyGrp.rotation.y += dt * .004;
     kameraTrin(dt);
     renderer.render(scene, camera);
@@ -1079,7 +1434,10 @@
       oejne = []; oerer = []; ben = []; kamRul = 0; fov = 60; fovKick = 0; iVind = false;
       svR = { x: 0, v: 0 }; svP = { x: 0, v: 0 }; haleS = { x: 0, v: 0 };
       try { antalStj = parseInt(localStorage.getItem(GEM) || "0", 10) || 0; } catch (e) { antalStj = 0; }
-      Spil.preload(["svaev-hej", "svaev-styr", "svaev-vind", "svaev-landet", "svaev-plask", "svaev-op", "svaev-stjerne", ...ROS]);
+      besoegt = new Set();
+      try { const raw = JSON.parse(localStorage.getItem(BESOEGT) || "[]"); if (Array.isArray(raw)) raw.forEach(x => besoegt.add(x)); } catch (e) {}
+      Spil.preload(["svaev-hej", "svaev-styr", "svaev-vind", "svaev-landet", "svaev-plask", "svaev-op", "svaev-stjerne",
+        ...VARTEGN_DEF.flatMap(v => [v.nyKey, v.landKey]), ...ROS]);
       rt.innerHTML = `<div class="sv"><canvas class="sv-cv"></canvas><div class="sv-vent">${IKON}</div>
         <div class="sv-stj">⭐ <b>${antalStj}</b></div>
         <button class="sv-musik" aria-label="Musik">🎵</button>
@@ -1102,6 +1460,20 @@
         if (dyb === "flyv" || dyb === "landet") {
           kol = 0; p.set(40, 45, -20); yaw = friRetning(p.x, p.z, p.y); fart = FART; flyv();
           if (dyb === "landet") { p.set(60, 0, 110); p.y = hoejde(p.x, p.z); land(p.y < 0); }
+        } else if (dyb === "vartegn" || dyb.startsWith("landet-vartegn")) {
+          // Vis alle 5 vartegn til test
+          for (const v of vartegn) { v.oplaast = true; v.popTid = 1; v.grp.visible = true; v.indhold.scale.setScalar(1); }
+          if (dyb === "vartegn") {
+            kol = 0; p.set(22, 48, 45); yaw = Math.atan2(52 - 22, 118 - 45); fart = FART; flyv();
+          } else {
+            const oensketId = dyb.replace(/^landet-vartegn-?/, "") || "fyrtaarn";
+            const v = vartegn.find(x => x.def.id === oensketId) || vartegn[0];
+            const ang = v.def.id === "sejlbaad" ? Math.atan2(.92, -.39) : Math.atan2(-v.def.x, -v.def.z);
+            const lx = v.def.x + Math.sin(ang) * 16, lz = v.def.z + Math.cos(ang) * 16;
+            const ly = hoejde(lx, lz);
+            p.set(lx, Math.max(0, ly), lz); yaw = Math.atan2(v.def.x - lx, v.def.z - lz);
+            land(ly < 0);
+          }
         } else later(() => Spil.say("Tryk på skærmen, så hopper ræven ud og flyver!", null, "svaev-hej"), 700);
         const f = new T.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
         kamPos = new T.Vector3(p.x - f.x * 8.5, p.y + 3.4, p.z - f.z * 8.5); kamSe = new T.Vector3(p.x + f.x * 7, p.y + 1.4, p.z + f.z * 7);
@@ -1117,7 +1489,7 @@
         tex.forEach(t => t.dispose()); if (envTex) envTex.dispose();
         renderer.dispose(); try { renderer.forceContextLoss(); } catch (e) {}
       }
-      renderer = scene = camera = null; tex = []; matCache = {}; finger = null;
+      renderer = scene = camera = null; tex = []; matCache = {}; vartegn = []; finger = null;
     }
   });
 })();

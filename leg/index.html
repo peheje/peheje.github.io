@@ -1,9 +1,19 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Legekassen</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#d9f0d3">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Legekassen">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="billeder/ikon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grandstander:wght@600;800&display=swap">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <style>
 /* Layout: one fixed screen. Menu = big picture tiles (no reading needed); each game fills the screen with a small home button in the corner. Single bright meadow look on purpose. */
 :root{
@@ -56,6 +66,8 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 @keyframes fly{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
 @media (prefers-reduced-motion:reduce){.confetti{animation:none}.balloon{animation-duration:30s!important}}
 </style>
+</head>
+<body>
 
 <div class="menu" id="menu">
   <h1>Hvad vil du spille?</h1>
@@ -90,6 +102,7 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 <script src="spil/svaeveren.js"></script>
 <script src="spil/snemanden.js"></script>
 <script src="spil/dyrlaegen.js"></script>
+<script src="spil/lommelygten.js"></script>
 <script>
 (function(){
   const $=id=>document.getElementById(id);
@@ -143,6 +156,10 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
     const id = qs.get("spil") || h[0], g = Spil.games.find(x => x.id === id);
     if (g){ Spil.dyb = qs.get("dyb") || h.slice(1).join("/") || ""; open(g); }
   }catch(e){}
+  // Service Worker til offline-brug (fejler stille på file:// eller hvis ikke understøttet)
+  if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  }
 })();
 </script>
 <!-- Statistik for voksne: hold fingeren på overskriften i menuen -->
