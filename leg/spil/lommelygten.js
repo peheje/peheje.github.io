@@ -8,53 +8,104 @@
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const lerp = (a, b, t) => a + (b - a) * t;
   const smooth = t => t * t * (3 - 2 * t);
-  const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
-  function rrect(ctx, x, y, w, h, r) {
-    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); return; }
-    const rr = Math.min(r, w / 2, h / 2);
-    ctx.beginPath(); ctx.moveTo(x + rr, y);
-    ctx.arcTo(x + w, y, x + w, y + h, rr); ctx.arcTo(x + w, y + h, x, y + h, rr);
-    ctx.arcTo(x, y + h, x, y, rr); ctx.arcTo(x, y, x + w, y, rr); ctx.closePath();
-  }
   const STORAGE_KEY = "lk-lommelygten";
   const FIND_TIME = 0.45; // sekunder med lys på et dyr før det kommer frem
   const PENTATONIC = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66];
+  const BG_W = 2880, BG_H = 1920;
 
-  // Alle 8 skovvenner med fast habitat (landskab + portræt) og lydnøgler
-  const DYR_DATA = [
-    {
-      id: "ugle", navn: "uglen", replik: "Se, det er uglen!", lyd: ["lommelygt-ugle", "dyr-ugle"],
-      posL: [0.22, 0.35], posP: [0.26, 0.27], eyeOff: [0, -0.18], spot: "hule",
+  // 3 natte-scener i 4K billedbogsstil med egne dyr, forgrunds-indfletning og små natur-fakta
+  const SCENER = {
+    skov: {
+      id: "skov", navn: "Natteskoven", ikon: "🌲",
+      bg: "billeder/lommelygten/skov-bg.webp",
+      intro: ["Nu er vi i natteskoven! Hvem gemmer sig her?", "lommelygt-scene-skov"],
+      moon: [0.415, 0.210],
+      dyr: [
+        { id: "ugle", navn: "uglen", replik: "Se, det er uglen!", lyd: ["lommelygt-ugle", "dyr-ugle"], pos: [0.172, 0.282], sc: 0.78, eyeY: 0.312, tuck: 0.24, fakta: ["Uglen er vågen om natten, og den kan se rigtig godt i mørke.", "lommelygt-fakta-ugle"] },
+        { id: "froe", navn: "frøen", replik: "Se, det er frøen!", lyd: ["lommelygt-froe", "dyr-froe"], pos: [0.715, 0.835], sc: 0.76, eyeY: 0.212, tuck: 0.08, fakta: ["Frøen kan både svømme under vand og hoppe højt på land.", "lommelygt-fakta-froe"] },
+        { id: "mus", navn: "musen", replik: "Se, det er den lille mus!", lyd: ["lommelygt-mus", "dyr-mus"], pos: [0.272, 0.782], sc: 0.70, eyeY: 0.352, tuck: 0.22 },
+        { id: "bjoern", navn: "bjørnen", replik: "Se, det er bjørnen!", lyd: "lommelygt-bjoern", pos: [0.245, 0.515], sc: 0.90, eyeY: 0.37, tuck: 0.26 },
+        { id: "raev", navn: "ræven", replik: "Se, det er ræven!", lyd: "lommelygt-raev", pos: [0.848, 0.612], sc: 0.88, eyeY: 0.329, tuck: 0.22 },
+        { id: "pindsvin", navn: "pindsvinet", replik: "Se, det er pindsvinet!", lyd: "lommelygt-pindsvin", pos: [0.435, 0.842], sc: 0.74, eyeY: 0.549, tuck: 0.16, fakta: ["Pindsvinet kan rulle sig sammen til en lille kugle med pigge.", "lommelygt-fakta-pindsvin"] },
+        { id: "raadyr", navn: "rådyret", replik: "Se, det er rådyret!", lyd: "lommelygt-raadyr", pos: [0.635, 0.555], sc: 1.00, eyeY: 0.36, tuck: 0.12 },
+        { id: "kanin", navn: "kaninen", replik: "Se, det er kaninen!", lyd: "lommelygt-kanin", pos: [0.465, 0.632], sc: 0.80, eyeY: 0.499, tuck: 0.24 },
+      ],
+      hemmeligheder: [
+        { nx: 0.725, ny: 0.415, r: 0.090, col: "#ffd46b", kind: "lantern", baseGlow: 0.34 },
+        { nx: 0.375, ny: 0.795, r: 0.065, col: "#ffe28a", kind: "lantern", baseGlow: 0.42 },
+        { nx: 0.555, ny: 0.895, r: 0.085, col: "#6ef7e2", kind: "glow",    baseGlow: 0.40, fakta: ["Nogle svampe i skoven kan faktisk lyse helt selv i mørket!", "lommelygt-fakta-svampe"] },
+        { nx: 0.795, ny: 0.800, r: 0.085, col: "#fff0a8", kind: "ripple",  baseGlow: 0.28, fakta: ["Se! Stille vand virker ligesom et spejl for månen.", "lommelygt-fakta-dam"] },
+        { nx: 0.095, ny: 0.815, r: 0.070, col: "#ff9b70", kind: "glow",    baseGlow: 0.14 },
+        { nx: 0.775, ny: 0.125, r: 0.080, col: "#d6ecff", kind: "star",    baseGlow: 0.18, fakta: ["Se stjernerne! De er kæmpestore sole, der er helt vildt langt væk.", "lommelygt-fakta-stjerner"] },
+      ],
     },
-    {
-      id: "froe", navn: "frøen", replik: "Se, det er frøen!", lyd: ["lommelygt-froe", "dyr-froe"],
-      posL: [0.72, 0.79], posP: [0.68, 0.76], eyeOff: [0, -0.22], spot: "dam",
+    bondegaard: {
+      id: "bondegaard", navn: "Bondegården", ikon: "🚜",
+      bg: "billeder/lommelygten/bondegaard-bg.webp",
+      intro: ["Nu er vi på bondegården om natten! Hvem gemmer sig her?", "lommelygt-scene-bondegaard"],
+      moon: [0.568, 0.145],
+      dyr: [
+        { id: "kat", navn: "katten", replik: "Se, det er katten!", lyd: ["lommelygt-kat", "dyr-kat"], pos: [0.215, 0.258], sc: 0.78, eyeY: 0.278, tuck: 0.26, fakta: ["Katten bruger sine knurhår til at mærke sig frem i mørket.", "lommelygt-fakta-kat"] },
+        { id: "hund", navn: "hunden", replik: "Se, det er hunden!", lyd: ["lommelygt-hund", "dyr-hund"], pos: [0.165, 0.560], sc: 0.84, eyeY: 0.275, tuck: 0.20 },
+        { id: "gris", navn: "grisen", replik: "Se, det er grisen!", lyd: ["lommelygt-gris", "dyr-gris"], pos: [0.455, 0.820], sc: 0.80, eyeY: 0.320, tuck: 0.24 },
+        { id: "ko", navn: "koen", replik: "Se, det er koen!", lyd: ["lommelygt-ko", "dyr-ko"], pos: [0.635, 0.535], sc: 0.96, eyeY: 0.345, tuck: 0.22 },
+        { id: "hest", navn: "hesten", replik: "Se, det er hesten!", lyd: ["lommelygt-hest", "dyr-hest"], pos: [0.790, 0.505], sc: 0.96, eyeY: 0.307, tuck: 0.24 },
+        { id: "faar", navn: "fåret", replik: "Se, det er fåret!", lyd: ["lommelygt-faar", "dyr-faar"], pos: [0.115, 0.790], sc: 0.84, eyeY: 0.335, tuck: 0.26, fakta: ["Fåret har tyk, varm uld, som man kan strikke en trøje af.", "lommelygt-fakta-faar"] },
+        { id: "hoene", navn: "hønen", replik: "Se, det er hønen!", lyd: ["lommelygt-hoene", "dyr-hoene"], pos: [0.930, 0.558], sc: 0.74, eyeY: 0.283, tuck: 0.22, fakta: ["Hønen lægger æg inde i hønsehuset!", "lommelygt-fakta-hoene"] },
+        { id: "and", navn: "anden", replik: "Se, det er anden!", lyd: ["lommelygt-and", "dyr-and"], pos: [0.715, 0.795], sc: 0.76, eyeY: 0.270, tuck: 0.14 },
+      ],
+      hemmeligheder: [
+        { nx: 0.400, ny: 0.555, r: 0.110, col: "#ffe680", kind: "lantern", baseGlow: 0.30, fakta: ["Traktoren har store hjul, så den kan køre ude på mudrede marker.", "lommelygt-fakta-traktor"] },
+        { nx: 0.118, ny: 0.415, r: 0.075, col: "#ffd46b", kind: "lantern", baseGlow: 0.38 },
+        { nx: 0.812, ny: 0.655, r: 0.060, col: "#ffe28a", kind: "lantern", baseGlow: 0.36 },
+        { nx: 0.785, ny: 0.785, r: 0.085, col: "#fff0a8", kind: "ripple",  baseGlow: 0.28, fakta: ["Se! Stille vand virker ligesom et spejl for månen.", "lommelygt-fakta-dam"] },
+        { nx: 0.825, ny: 0.220, r: 0.080, col: "#ff9b7a", kind: "glow",    baseGlow: 0.14 },
+        { nx: 0.385, ny: 0.125, r: 0.080, col: "#d6ecff", kind: "star",    baseGlow: 0.18, fakta: ["Se stjernerne! De er kæmpestore sole, der er helt vildt langt væk.", "lommelygt-fakta-stjerner"] },
+      ],
     },
-    {
-      id: "mus", navn: "musen", replik: "Se, det er den lille mus!", lyd: ["lommelygt-mus", "dyr-mus"],
-      posL: [0.22, 0.81], posP: [0.25, 0.75], eyeOff: [0.05, -0.1], spot: "stamme",
+    jungle: {
+      id: "jungle", navn: "Nattejunglen", ikon: "🌿",
+      bg: "billeder/lommelygten/jungle-bg.webp",
+      intro: ["Nu er vi i nattejunglen! Hvem gemmer sig her?", "lommelygt-scene-jungle"],
+      moon: [0.440, 0.220],
+      dyr: [
+        { id: "abe", navn: "aben", replik: "Se, det er aben!", lyd: ["lommelygt-abe", "dyr-abe"], pos: [0.225, 0.260], sc: 0.80, eyeY: 0.350, tuck: 0.20 },
+        { id: "papegoeje", navn: "papegøjen", replik: "Se, det er papegøjen!", lyd: "lommelygt-papegoeje", pos: [0.715, 0.255], sc: 0.78, eyeY: 0.238, tuck: 0.16 },
+        { id: "dovendyr", navn: "dovendyret", replik: "Se, det er dovendyret!", lyd: "lommelygt-dovendyr", pos: [0.875, 0.205], sc: 0.82, eyeY: 0.271, tuck: 0.20, fakta: ["Dovendyret hænger på hovedet og bevæger sig helt vildt langsomt.", "lommelygt-fakta-dovendyr"] },
+        { id: "tiger", navn: "tigeren", replik: "Se, det er tigeren!", lyd: "lommelygt-tiger", pos: [0.255, 0.585], sc: 0.88, eyeY: 0.362, tuck: 0.26, fakta: ["Ingen tigre har helt ens striber — hver tiger har sit eget mønster!", "lommelygt-fakta-tiger"] },
+        { id: "tukan", navn: "tukanen", replik: "Se, det er tukanen!", lyd: "lommelygt-tukan", pos: [0.585, 0.435], sc: 0.78, eyeY: 0.275, tuck: 0.20 },
+        { id: "slange", navn: "slangen", replik: "Se, det er slangen!", lyd: ["lommelygt-slange", "dyr-slange"], pos: [0.165, 0.815], sc: 0.78, eyeY: 0.212, tuck: 0.18 },
+        { id: "kamaeleon", navn: "kamæleonen", replik: "Se, det er kamæleonen!", lyd: "lommelygt-kamaeleon", pos: [0.435, 0.810], sc: 0.78, eyeY: 0.338, tuck: 0.22, fakta: ["Kamæleonen kan skifte farve, så den gemmer sig mellem bladene!", "lommelygt-fakta-kamaeleon"] },
+        { id: "panter", navn: "panteren", replik: "Se, det er panteren!", lyd: "lommelygt-panter", pos: [0.885, 0.655], sc: 0.86, eyeY: 0.318, tuck: 0.24 },
+      ],
+      hemmeligheder: [
+        { nx: 0.590, ny: 0.635, r: 0.085, col: "#ffe066", kind: "lantern", baseGlow: 0.40 },
+        { nx: 0.790, ny: 0.460, r: 0.100, col: "#8cf5ff", kind: "ripple",  baseGlow: 0.32, fakta: ["Et vandfald er en flod, der falder ud over en høj klippe.", "lommelygt-fakta-vandfald"] },
+        { nx: 0.680, ny: 0.835, r: 0.085, col: "#80fff4", kind: "ripple",  baseGlow: 0.28 },
+        { nx: 0.460, ny: 0.780, r: 0.080, col: "#ff7ee2", kind: "glow",    baseGlow: 0.34 },
+        { nx: 0.325, ny: 0.170, r: 0.075, col: "#d29eff", kind: "glow",    baseGlow: 0.22 },
+        { nx: 0.565, ny: 0.135, r: 0.080, col: "#d6ecff", kind: "star",    baseGlow: 0.18, fakta: ["Se stjernerne! De er kæmpestore sole, der er helt vildt langt væk.", "lommelygt-fakta-stjerner"] },
+      ],
     },
-    {
-      id: "bjoern", navn: "bjørnen", replik: "Se, det er bjørnen!", lyd: "lommelygt-bjoern",
-      posL: [0.14, 0.61], posP: [0.23, 0.54], eyeOff: [0, -0.24], spot: "busk",
-    },
-    {
-      id: "raev", navn: "ræven", replik: "Se, det er ræven!", lyd: "lommelygt-raev",
-      posL: [0.85, 0.62], posP: [0.77, 0.53], eyeOff: [-0.08, -0.16], spot: "gran",
-    },
-    {
-      id: "pindsvin", navn: "pindsvinet", replik: "Se, det er pindsvinet!", lyd: "lommelygt-pindsvin",
-      posL: [0.47, 0.86], posP: [0.45, 0.86], eyeOff: [0.16, -0.08], spot: "graes",
-    },
-    {
-      id: "raadyr", navn: "rådyret", replik: "Se, det er rådyret!", lyd: "lommelygt-raadyr",
-      posL: [0.61, 0.53], posP: [0.73, 0.36], eyeOff: [-0.08, -0.34], spot: "lysning",
-    },
-    {
-      id: "kanin", navn: "kaninen", replik: "Se, det er kaninen!", lyd: "lommelygt-kanin",
-      posL: [0.39, 0.66], posP: [0.27, 0.40], eyeOff: [0, -0.16], spot: "bregne",
-    },
-  ];
+  };
+  const SCENE_LIST = [SCENER.skov, SCENER.bondegaard, SCENER.jungle];
+  let curScene = SCENER.skov;
+  const sprites = {};
+  const bgImgs = {};
+  function loadSceneAssets(sc) {
+    if (!bgImgs[sc.id]) {
+      const im = new Image();
+      im.src = sc.bg;
+      bgImgs[sc.id] = im;
+    }
+    sc.dyr.forEach(d => {
+      if (sprites[d.id]) return;
+      const full = new Image(), eyes = new Image();
+      full.src = `billeder/lommelygten/${d.id}.webp`;
+      eyes.src = `billeder/lommelygten/${d.id}-oejne.webp`;
+      sprites[d.id] = { full, eyes };
+    });
+  }
 
   Spil.css("css-lommelygten", `
     .ll{position:absolute;inset:0;overflow:hidden;background:#080d22;touch-action:none}
@@ -87,15 +138,25 @@
       transition:transform .5s cubic-bezier(.22,1.35,.36,1),opacity .45s ease}
     .ll-again.show{opacity:1;pointer-events:auto;transform:translateX(-50%) scale(1)}
     .ll-again:active{transform:translateX(-50%) translateY(5px) scale(.96)}
-    @media (prefers-reduced-motion:reduce){.ll-jar,.ll-dots i,.ll-hint,.ll-again{transition:none}}
+    .ll-scenes{position:absolute;z-index:7;bottom:calc(2.4vh + env(safe-area-inset-bottom,0px));left:max(16px,env(safe-area-inset-left,0px));
+      display:flex;gap:clamp(8px,1.2vmin,12px);padding:6px;border-radius:999px;
+      background:rgba(16,24,54,.64);box-shadow:inset 0 0 0 2px rgba(255,232,150,.28),0 8px 22px rgba(0,0,0,.4);
+      -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+    .ll-scenes button{width:clamp(56px,7.8vh,72px);aspect-ratio:1;border-radius:50%;
+      background:rgba(255,255,255,.10);font-size:clamp(26px,4vh,36px);display:grid;place-items:center;
+      transition:transform .16s,background .2s,box-shadow .2s}
+    .ll-scenes button.on{background:radial-gradient(circle at 35% 30%,#fff6c8,#ffd25a 65%,#e4a628);
+      box-shadow:0 4px 0 #9f6d10,0 0 18px rgba(255,216,100,.55);transform:scale(1.06)}
+    .ll-scenes button:active{transform:scale(.94)}
+    @media (prefers-reduced-motion:reduce){.ll-jar,.ll-dots i,.ll-hint,.ll-again,.ll-scenes button{transition:none}}
   `);
 
-  let root, cv, g, darkCv, dg, jarEl, dotsEl, hintBtn, againBtn;
-  let alive, raf, timers, W, H, S, dpr, last, time, portrait;
+  let root, cv, g, darkCv, dg, jarEl, dotsEl, hintBtn, againBtn, scenesEl;
+  let alive, raf, timers, W, H, S, dpr, last, time, portrait, panX;
   let beam, holding, pointerId, pointerActive, idleAfter;
-  let stars, trees, mushrooms, fireflies, particles, animals, activeRound;
+  let secrets, fireflies, particles, shootingStars, ripples, animals;
   let moon, celebrate, celebrateT, canRestart, darkAlpha, autoHintT, lastRustleT;
-  let nightsDone, audio, revealAll;
+  let nightsDone, audio, revealAll, saidFacts, lastFactT;
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
 
   /* ---------- Gemt tilstand ---------- */
@@ -216,7 +277,19 @@
     notes.forEach((f, i) => chime(f, 0.11, 1.6, i * 0.28));
   }
 
-  /* ---------- Opsætning af scene & runde ---------- */
+  /* ---------- Opsætning af scene, kamera & runde ---------- */
+  function bgBox() {
+    const scale = Math.max(W / BG_W, H / BG_H);
+    const bw = BG_W * scale, bh = BG_H * scale;
+    const ox = -(bw - W) * panX;
+    const oy = -(bh - H) * 0.5;
+    return { ox, oy, bw, bh, scale };
+  }
+  function toScreen(nx, ny) {
+    const b = bgBox();
+    return { x: b.ox + nx * b.bw, y: b.oy + ny * b.bh };
+  }
+
   function resize() {
     W = innerWidth; H = innerHeight; dpr = Math.min(2, devicePixelRatio || 1);
     S = Math.min(W, H);
@@ -229,63 +302,51 @@
     darkCv.height = Math.max(1, Math.round(H * dScale));
     dg.setTransform(dScale, 0, 0, dScale, 0, 0);
     if (beam) {
-      beam.r = clamp(S * 0.23, 105, 195);
+      beam.r = clamp(S * 0.185, 88, 152);
       beam.x = clamp(beam.x, 0, W); beam.y = clamp(beam.y, 0, H);
       beam.tx = clamp(beam.tx, 0, W); beam.ty = clamp(beam.ty, 0, H);
     }
-    placeMoon();
-    layoutAnimals();
+    syncScenePositions();
   }
 
-  function placeMoon() {
+  function syncScenePositions() {
     moon = moon || { smile: 0, glow: 0, lastTalk: -99 };
-    moon.x = portrait ? W * 0.50 : W * 0.34;
-    moon.y = portrait ? H * 0.13 : H * 0.15;
-    moon.r = clamp(S * 0.058, 24, 44);
-  }
-
-  function layoutAnimals() {
+    const mp = toScreen(curScene.moon[0], curScene.moon[1]);
+    moon.x = mp.x; moon.y = mp.y;
+    moon.r = clamp(S * 0.052, 22, 42);
     if (!animals) return;
+    const baseSz = clamp(S * 0.092, 46, 76);
     animals.forEach(a => {
-      const [nx, ny] = portrait ? a.data.posP : a.data.posL;
-      a.x = nx * W; a.y = ny * H;
-      a.sz = clamp(S * (portrait ? 0.13 : 0.115), 50, 96);
+      const p = toScreen(a.data.pos[0], a.data.pos[1]);
+      a.x = p.x; a.y = p.y;
+      a.sz = baseSz * (a.data.sc || 1);
     });
   }
 
   function buildScenery() {
-    stars = Array.from({ length: 85 }, (_, i) => ({
-      x: hash(i * 3 + 1), y: hash(i * 3 + 2) * 0.52,
-      r: 0.7 + hash(i * 3 + 3) * 1.7,
-      a: 0.35 + hash(i * 5 + 7) * 0.65,
-      ph: hash(i * 7 + 4) * TAU, sp: 0.9 + hash(i * 11 + 2) * 1.8,
+    secrets = curScene.hemmeligheder.map((h, i) => ({
+      ...h, glow: h.baseGlow, lit: 0, cooldown: 0, ph: i * 1.7,
     }));
-    // Baggrunds- og mellemgrundstræer
-    trees = [
-      { nx: 0.06, ny: 0.57, h: 0.24, layer: 0 }, { nx: 0.16, ny: 0.54, h: 0.27, layer: 0 },
-      { nx: 0.31, ny: 0.53, h: 0.22, layer: 0 }, { nx: 0.46, ny: 0.51, h: 0.26, layer: 0 },
-      { nx: 0.55, ny: 0.54, h: 0.23, layer: 0 }, { nx: 0.70, ny: 0.52, h: 0.28, layer: 0 },
-      { nx: 0.82, ny: 0.54, h: 0.25, layer: 0 }, { nx: 0.94, ny: 0.57, h: 0.26, layer: 0 },
-      { nx: 0.05, ny: 0.69, h: 0.28, layer: 1 }, { nx: 0.35, ny: 0.62, h: 0.25, layer: 1 },
-      { nx: 0.52, ny: 0.61, h: 0.27, layer: 1 }, { nx: 0.78, ny: 0.62, h: 0.29, layer: 1 },
-      { nx: 0.93, ny: 0.68, h: 0.27, layer: 1 },
-    ];
-    // Selvlysende svampe spredt i skovbunden
-    const mSpots = [
-      [0.11, 0.74, "#6ef5d5"], [0.34, 0.78, "#a68cff"],
-      [0.60, 0.74, "#7df2ff"], [0.89, 0.74, "#ffd479"],
-    ];
-    mushrooms = mSpots.map(([nx, ny, col], i) => ({
-      nx, ny, col, glow: 0.25, lit: 0, cooldown: 0, ph: i * 1.7,
-    }));
-    // Ildfluer der svæver roligt i natten
     fireflies = Array.from({ length: still ? 7 : 14 }, (_, i) => makeFirefly(i));
+    shootingStars = [];
+    ripples = [];
+  }
+
+  function spawnShootingStar() {
+    if (still) return;
+    shootingStars.push({
+      x: W * (0.2 + Math.random() * 0.45),
+      y: H * (0.06 + Math.random() * 0.14),
+      vx: 360 + Math.random() * 180,
+      vy: 95 + Math.random() * 70,
+      life: 0, max: 0.85,
+    });
   }
 
   function makeFirefly(seed) {
     return {
-      x: (0.12 + Math.random() * 0.76) * (W || 1000),
-      y: (0.24 + Math.random() * 0.58) * (H || 800),
+      x: (0.10 + Math.random() * 0.80) * (W || 1000),
+      y: (0.22 + Math.random() * 0.62) * (H || 800),
       vx: (Math.random() - 0.5) * 18, vy: (Math.random() - 0.5) * 14,
       ph: Math.random() * TAU, sp: 1.8 + Math.random() * 2,
       toJar: false, jarT: 0, sx: 0, sy: 0,
@@ -295,25 +356,23 @@
 
   function startRound(isFirst) {
     celebrate = false; celebrateT = 0; canRestart = false;
-    darkAlpha = revealAll ? 0.16 : 0.87;
+    darkAlpha = revealAll ? 0.12 : 0.91;
     againBtn.classList.remove("show");
     hintBtn.hidden = false;
     particles = [];
+    shootingStars = [];
+    ripples = [];
     fireflies = Array.from({ length: still ? 7 : 14 }, (_, i) => makeFirefly(i));
 
-    // På smal telefon-skærm: 6 dyr pr. nat (roterer så alle 8 opleves); på bred iPad: alle 8!
-    const count = portrait ? 6 : 8;
-    const pool = Spil.shuffle(DYR_DATA.slice());
-    activeRound = pool.slice(0, count);
-
-    animals = activeRound.map((data, i) => ({
-      data, x: 0, y: 0, sz: 72,
+    const pool = Spil.shuffle(curScene.dyr.slice());
+    animals = pool.map((data, i) => ({
+      data, x: 0, y: 0, sz: 64,
       found: revealAll, charge: revealAll ? 1 : 0, pop: revealAll ? 1 : 0,
       react: 0, reactCool: 0, hintGlow: 0,
       blinkT: 1 + Math.random() * 3.5, blinkDur: 0,
       ph: i * 1.3 + Math.random() * 2,
     }));
-    layoutAnimals();
+    syncScenePositions();
     renderHud();
     autoHintT = time + 16;
 
@@ -383,6 +442,33 @@
     }, 1800);
   }
 
+  function tryFact(fakta) {
+    if (!fakta || celebrate || Spil.isTalking()) return false;
+    const [tekst, key] = fakta;
+    if (saidFacts.has(key) || time - lastFactT < 4.5) return false;
+    lastFactT = time;
+    // Markér først fakta som hørt, når sætningen får lov at tale færdig (bliver den afbrudt, kan barnet høre den igen!)
+    Spil.say(tekst, () => { saidFacts.add(key); }, key);
+    return true;
+  }
+
+  function switchScene(scId, speakIntro = true) {
+    const sc = SCENER[scId];
+    if (!sc) return;
+    curScene = sc;
+    panX = 0.5;
+    loadSceneAssets(curScene);
+    const preloadKeys = curScene.dyr.flatMap(d => (Array.isArray(d.lyd) ? d.lyd : [d.lyd]).concat(d.fakta ? [d.fakta[1]] : []));
+    curScene.hemmeligheder.forEach(h => { if (h.fakta) preloadKeys.push(h.fakta[1]); });
+    Spil.preload(preloadKeys);
+    if (scenesEl) {
+      scenesEl.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.sc === curScene.id));
+    }
+    buildScenery();
+    startRound(true);
+    if (speakIntro) Spil.say(curScene.intro[0], null, curScene.intro[1]);
+  }
+
   function triggerHint() {
     if (celebrate) return;
     const hidden = animals.filter(a => !a.found);
@@ -411,22 +497,30 @@
     beam.x = lerp(beam.x, beam.tx, 1 - Math.exp(-dt * follow));
     beam.y = lerp(beam.y, beam.ty, 1 - Math.exp(-dt * follow));
 
+    // På smal telefon-skærm panorerer scenen blidt med lommelygten, så man kan udforske hele skoven
+    const targetPan = portrait ? clamp(beam.x / Math.max(1, W), 0, 1) : 0.5;
+    panX = lerp(panX, targetPan, 1 - Math.exp(-dt * (portrait ? 3.5 : 6)));
+    syncScenePositions();
+
     // Mørket løfter sig blidt under nattefesten
-    const targetDark = celebrate || revealAll ? 0.18 : 0.87;
+    const targetDark = celebrate || revealAll ? 0.14 : 0.91;
     darkAlpha = lerp(darkAlpha, targetDark, 1 - Math.exp(-dt * 2.2));
     if (celebrate) celebrateT += dt;
 
-    // Månen: smiler og glimter, når man lyser på den
+    // Månen: glimter, sender et stjerneskud og hilser når man lyser på den
     const md = Math.hypot(beam.x - moon.x, beam.y - moon.y);
-    const moonLit = md < beam.r * 0.85;
+    const moonLit = md < beam.r * 0.88;
     moon.glow = lerp(moon.glow, moonLit || celebrate ? 1 : 0, 1 - Math.exp(-dt * 4));
     if (moonLit && moon.smile <= 0.15) {
       moon.smile = 3.5;
+      spawnShootingStar();
       chime(1046.5, 0.1, 1.3, 0); chime(1318.5, 0.08, 1.4, 0.12);
-      spawnSparkles(moon.x, moon.y, 10, "#fff5b8");
-      if (!Spil.isTalking() && time - moon.lastTalk > 22) {
-        moon.lastTalk = time;
-        Spil.say("Hej måne! Hvor skinner du flot!", null, "lommelygt-maane");
+      spawnSparkles(moon.x, moon.y, 12, "#fff5b8");
+      if (!tryFact(["Se månen! Den lyser, fordi solen skinner på den.", "lommelygt-fakta-maane"])) {
+        if (!Spil.isTalking() && time - moon.lastTalk > 22) {
+          moon.lastTalk = time;
+          Spil.say("Hej måne! Hvor skinner du flot!", null, "lommelygt-maane");
+        }
       }
     }
     if (moon.smile > 0 && !celebrate) moon.smile = Math.max(0, moon.smile - dt);
@@ -456,9 +550,10 @@
       } else {
         a.pop = Math.min(1, a.pop + dt * 2.6);
         if (lit && a.reactCool <= 0 && !celebrate) {
-          a.react = 1; a.reactCool = 2.6;
+          a.react = 1; a.reactCool = 2.8;
           spawnSparkles(a.x, a.y - a.sz * 0.25, 7, "#ffe680");
           playAnimalSynth(a.data.id);
+          if (a.data.fakta) tryFact(a.data.fakta);
         }
       }
     });
@@ -473,19 +568,41 @@
       }
     }
 
-    // Selvlysende svampe
-    mushrooms.forEach((m, i) => {
-      const mx = m.nx * W, my = m.ny * H;
-      const lit = Math.hypot(beam.x - mx, beam.y - my) < beam.r * 0.72;
+    // Interaktive hemmeligheder i scenen (hytte-lanterne, lysende svampe, månespejling i dammen m.m.)
+    secrets.forEach((m, i) => {
+      const mp = toScreen(m.nx, m.ny);
+      const lit = Math.hypot(beam.x - mp.x, beam.y - mp.y) < Math.max(beam.r * 0.82, bgBox().bw * m.r);
       if (m.cooldown > 0) m.cooldown = Math.max(0, m.cooldown - dt);
+      m.dwell = lit ? (m.dwell || 0) + dt : 0;
+      if (m.dwell >= 0.32 && m.fakta) tryFact(m.fakta);
       if (lit && m.cooldown <= 0) {
-        m.lit = 1; m.cooldown = 1.6;
-        chime(PENTATONIC[i % PENTATONIC.length], 0.09, 1.1, 0);
-        spawnSparkles(mx, my - 12, 6, m.col);
+        m.lit = 1; m.cooldown = 1.9;
+        if (m.kind === "lantern") {
+          chime(523.25, 0.09, 1.4, 0); chime(659.25, 0.08, 1.4, 0.11);
+          spawnSparkles(mp.x, mp.y - 6, 10, m.col);
+        } else if (m.kind === "ripple") {
+          chime(880, 0.08, 1.4, 0); chime(1174.66, 0.07, 1.4, 0.12);
+          ripples.push({ x: mp.x, y: mp.y, life: 0, max: 1.5 });
+          spawnSparkles(mp.x, mp.y, 8, m.col);
+        } else if (m.kind === "star") {
+          chime(1046.5, 0.08, 1.3, 0); chime(1567.98, 0.07, 1.4, 0.1);
+          spawnShootingStar();
+          spawnSparkles(mp.x, mp.y, 10, m.col);
+        } else {
+          chime(PENTATONIC[i % PENTATONIC.length], 0.09, 1.1, 0);
+          spawnSparkles(mp.x, mp.y - 10, 7, m.col);
+        }
+        if (m.fakta) tryFact(m.fakta);
       }
-      m.lit = Math.max(0, m.lit - dt * 0.65);
-      m.glow = lerp(m.glow, lit || m.lit > 0 || celebrate ? 1 : 0.26, 1 - Math.exp(-dt * 5));
+      m.lit = Math.max(0, m.lit - dt * 0.45);
+      m.glow = lerp(m.glow, lit || m.lit > 0 || celebrate ? 1 : m.baseGlow, 1 - Math.exp(-dt * 4.5));
     });
+
+    // Stjerneskud & vandkrusninger
+    shootingStars.forEach(s => { s.life += dt; s.x += s.vx * dt; s.y += s.vy * dt; });
+    shootingStars = shootingStars.filter(s => s.life < s.max);
+    ripples.forEach(r => { r.life += dt; });
+    ripples = ripples.filter(r => r.life < r.max);
 
     // Ildfluer: svæver frit, og flyver op i krukken når lommelygten rammer dem
     const jp = jarPos();
@@ -523,487 +640,135 @@
     particles = particles.filter(p => p.life < p.max);
   }
 
-  /* ---------- Tegning af den nordiske natteskov ---------- */
-  function drawSky() {
-    const gr = g.createLinearGradient(0, 0, 0, H * 0.64);
-    gr.addColorStop(0, "#09102b");
-    gr.addColorStop(0.55, "#152550");
-    gr.addColorStop(1, "#233d6e");
-    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  /* ---------- Tegning af den illustrerede nattescene & hemmelige detaljer ---------- */
+  function drawSceneBg() {
+    const b = bgBox();
+    const im = bgImgs[curScene.id];
+    if (im && im.complete && im.naturalWidth) {
+      g.drawImage(im, b.ox, b.oy, b.bw, b.bh);
+    } else {
+      g.fillStyle = "#0b132e";
+      g.fillRect(0, 0, W, H);
+    }
 
-    // Blid nordlys-antydning i toppen under nattefesten
+    // Blid nordlys-antydning i toppen under nattefesten (fader helt blødt ned til 0 uden skarp kant)
     if (celebrate) {
-      const a = Math.min(0.28, celebrateT * 0.12);
-      const ag = g.createLinearGradient(0, 0, W, H * 0.45);
-      ag.addColorStop(0, `rgba(90,235,195,0)`);
-      ag.addColorStop(0.35, `rgba(90,235,195,${a})`);
-      ag.addColorStop(0.7, `rgba(145,130,255,${a * 0.85})`);
-      ag.addColorStop(1, `rgba(90,235,195,0)`);
-      g.fillStyle = ag; g.fillRect(0, 0, W, H * 0.5);
+      const a = Math.min(0.30, celebrateT * 0.14);
+      const ag = g.createLinearGradient(0, 0, 0, H * 0.52);
+      ag.addColorStop(0, `rgba(90,235,195,${a})`);
+      ag.addColorStop(0.45, `rgba(135,135,255,${a * 0.65})`);
+      ag.addColorStop(1, "rgba(135,135,255,0)");
+      g.fillStyle = ag; g.fillRect(0, 0, W, H * 0.55);
     }
 
-    // Stjerner
-    stars.forEach(s => {
-      const tw = still ? 0.85 : 0.55 + 0.45 * Math.sin(time * s.sp + s.ph);
-      const boost = celebrate ? 1.25 : 1;
-      g.fillStyle = `rgba(255,252,232,${clamp(s.a * tw * boost, 0, 1)})`;
-      g.beginPath(); g.arc(s.x * W, s.y * H, s.r * Math.max(0.9, S / 820), 0, TAU); g.fill();
-    });
-
-    drawMoon();
-  }
-
-  function drawMoon() {
-    const { x, y, r, glow, smile } = moon;
-    // Blød måneglød
-    const gl = g.createRadialGradient(x, y, r * 0.2, x, y, r * (3.2 + glow * 1.4));
-    gl.addColorStop(0, `rgba(255,244,196,${0.32 + glow * 0.28})`);
-    gl.addColorStop(0.45, `rgba(210,224,255,${0.12 + glow * 0.12})`);
-    gl.addColorStop(1, "rgba(210,224,255,0)");
-    g.fillStyle = gl; g.beginPath(); g.arc(x, y, r * 4.6, 0, TAU); g.fill();
-
-    // Venlig halvmåne
-    g.save(); g.translate(x, y);
-    g.fillStyle = "#fff3c4";
-    g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
-    // Udskæring så den bliver en blød halvmåne (farvet som himlen)
-    g.fillStyle = "#101c40";
-    g.beginPath(); g.arc(r * 0.42, -r * 0.12, r * 0.86, 0, TAU); g.fill();
-    // Lille venligt ansigt på månen når den smiler eller under fest
-    if (smile > 0 || celebrate) {
-      const a = celebrate ? 0.85 : clamp(smile, 0, 1) * 0.85;
-      g.strokeStyle = `rgba(110,82,36,${a})`; g.lineWidth = Math.max(1.8, r * 0.065); g.lineCap = "round";
-      g.beginPath(); g.arc(-r * 0.42, -r * 0.08, r * 0.1, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
-      g.beginPath(); g.arc(-r * 0.34, r * 0.24, r * 0.16, 0.1 * Math.PI, 0.78 * Math.PI); g.stroke();
-      g.fillStyle = `rgba(255,150,150,${a * 0.45})`;
-      g.beginPath(); g.arc(-r * 0.56, r * 0.12, r * 0.11, 0, TAU); g.fill();
+    // Ekstra glød på månen & hemmelige detaljer (hytte-lanterne, svampe, dam-spejling)
+    if (moon.glow > 0.05 || celebrate) {
+      const gl = g.createRadialGradient(moon.x, moon.y, moon.r * 0.1, moon.x, moon.y, moon.r * (2.6 + moon.glow * 1.4));
+      gl.addColorStop(0, `rgba(255,244,196,${0.25 + moon.glow * 0.35})`);
+      gl.addColorStop(1, "rgba(255,244,196,0)");
+      g.fillStyle = gl; g.beginPath(); g.arc(moon.x, moon.y, moon.r * 4, 0, TAU); g.fill();
     }
-    g.restore();
-  }
 
-  function drawPine(x, y, h, colDark, colLight) {
-    // Stamme
-    g.fillStyle = "#2b1e19";
-    g.fillRect(x - h * 0.045, y - h * 0.22, h * 0.09, h * 0.24);
-    for (let i = 0; i < 4; i++) {
-      const ty = y - h * (0.14 + i * 0.2);
-      const tw = h * (0.32 - i * 0.055);
-      const th = h * (0.34 - i * 0.03);
-      g.fillStyle = colDark;
-      g.beginPath(); g.moveTo(x - tw, ty); g.lineTo(x, ty - th); g.lineTo(x + tw, ty); g.closePath(); g.fill();
-      g.fillStyle = colLight;
-      g.beginPath(); g.moveTo(x - tw * 0.15, ty - th * 0.08); g.lineTo(x, ty - th); g.lineTo(x - tw * 0.62, ty - th * 0.02); g.closePath(); g.fill();
-    }
-  }
-
-  function drawForest() {
-    // Fjerne blå bakker
-    g.fillStyle = "#142346";
-    g.beginPath(); g.moveTo(0, H);
-    for (let x = 0; x <= W + 16; x += 16) {
-      const nx = x / W;
-      const y = H * (0.50 - 0.04 * Math.sin(nx * 5.2 + 0.5) - 0.02 * Math.sin(nx * 11));
-      g.lineTo(x, y);
-    }
-    g.lineTo(W, H); g.closePath(); g.fill();
-
-    // Baggrunds-grantræer
-    trees.filter(t => t.layer === 0).forEach(t => drawPine(t.nx * W, t.ny * H, t.h * H, "#122a38", "#1a3c48"));
-
-    // Mellemste skovbakke
-    const hill1 = g.createLinearGradient(0, H * 0.50, 0, H * 0.85);
-    hill1.addColorStop(0, "#1c3d3c"); hill1.addColorStop(1, "#132c2c");
-    g.fillStyle = hill1;
-    g.beginPath(); g.moveTo(0, H);
-    for (let x = 0; x <= W + 16; x += 16) {
-      const nx = x / W;
-      const y = H * (0.58 + 0.035 * Math.sin(nx * 4.4 - 0.8) + 0.015 * Math.cos(nx * 9.5));
-      g.lineTo(x, y);
-    }
-    g.lineTo(W, H); g.closePath(); g.fill();
-
-    // Mellemgrunds-grantræer
-    trees.filter(t => t.layer === 1).forEach(t => drawPine(t.nx * W, t.ny * H, t.h * H, "#163834", "#235246"));
-
-    // Det store hyggelige ugle-træ med knasthul
-    const owlPos = portrait ? DYR_DATA[0].posP : DYR_DATA[0].posL;
-    drawHollowTree(owlPos[0] * W, owlPos[1] * H);
-
-    // Forgrundens mos-bakke
-    const hill2 = g.createLinearGradient(0, H * 0.66, 0, H);
-    hill2.addColorStop(0, "#244c3d"); hill2.addColorStop(0.5, "#19382e"); hill2.addColorStop(1, "#112722");
-    g.fillStyle = hill2;
-    g.beginPath(); g.moveTo(0, H);
-    for (let x = 0; x <= W + 16; x += 16) {
-      const nx = x / W;
-      const y = H * (0.71 - 0.03 * Math.sin(nx * 3.8 + 1.2) + 0.015 * Math.sin(nx * 8.2));
-      g.lineTo(x, y);
-    }
-    g.lineTo(W, H); g.closePath(); g.fill();
-
-    // Skovdam (til frøen)
-    const frogPos = portrait ? DYR_DATA[1].posP : DYR_DATA[1].posL;
-    drawPond(frogPos[0] * W, frogPos[1] * H + S * 0.03);
-
-    // Hule-busk (til bjørnen)
-    const bearPos = portrait ? DYR_DATA[3].posP : DYR_DATA[3].posL;
-    drawBush(bearPos[0] * W, bearPos[1] * H + S * 0.04, S * 0.14);
-
-    // Mosset træstamme (til musen)
-    const mousePos = portrait ? DYR_DATA[2].posP : DYR_DATA[2].posL;
-    drawMossyLog(mousePos[0] * W, mousePos[1] * H + S * 0.02, S * 0.16);
-
-    // Bregne (til kaninen)
-    const rabPos = portrait ? DYR_DATA[7].posP : DYR_DATA[7].posL;
-    drawFern(rabPos[0] * W, rabPos[1] * H + S * 0.04, S * 0.1);
-
-    // Selvlysende svampe
-    mushrooms.forEach(drawMushroom);
-
-    // Små græstotter i skovbunden
-    g.strokeStyle = "#31634c"; g.lineWidth = Math.max(1.8, S * 0.004); g.lineCap = "round";
-    g.beginPath();
-    for (let i = 0; i < 24; i++) {
-      const gx = (0.04 + hash(i * 13 + 3) * 0.92) * W;
-      const gy = (0.72 + hash(i * 17 + 5) * 0.24) * H;
-      const gh = (10 + hash(i * 19) * 12) * (S / 800);
-      const sw = still ? 0 : Math.sin(time * 1.6 + i) * 3;
-      g.moveTo(gx - 4, gy); g.lineTo(gx - 6 + sw, gy - gh * 0.85);
-      g.moveTo(gx, gy); g.lineTo(gx + sw, gy - gh);
-      g.moveTo(gx + 4, gy); g.lineTo(gx + 6 + sw, gy - gh * 0.8);
-    }
-    g.stroke();
-  }
-
-  function drawHollowTree(x, y) {
-    const w = clamp(S * 0.12, 48, 86);
-    const bot = H * 0.76;
-    // Stamme
-    g.fillStyle = "#4b3324";
-    g.beginPath();
-    g.moveTo(x - w * 0.52, bot);
-    g.quadraticCurveTo(x - w * 0.44, y + w * 0.6, x - w * 0.42, y - w * 0.9);
-    g.lineTo(x + w * 0.42, y - w * 0.9);
-    g.quadraticCurveTo(x + w * 0.44, y + w * 0.6, x + w * 0.56, bot);
-    g.closePath(); g.fill();
-    // Lysere barkside
-    g.fillStyle = "#5c3f2d";
-    g.beginPath();
-    g.moveTo(x - w * 0.36, bot);
-    g.quadraticCurveTo(x - w * 0.3, y + w * 0.5, x - w * 0.28, y - w * 0.85);
-    g.lineTo(x - w * 0.02, y - w * 0.85);
-    g.quadraticCurveTo(x - w * 0.05, y + w * 0.5, x - w * 0.08, bot);
-    g.closePath(); g.fill();
-    // Gren
-    g.strokeStyle = "#4b3324"; g.lineWidth = w * 0.22; g.lineCap = "round";
-    g.beginPath(); g.moveTo(x + w * 0.25, y - w * 0.35); g.quadraticCurveTo(x + w * 0.85, y - w * 0.5, x + w * 1.15, y - w * 0.78); g.stroke();
-    // Løvkrone foroven
-    g.fillStyle = "#1a4236";
-    [[0, -1.25, 0.95], [-0.75, -0.95, 0.75], [0.78, -0.92, 0.78], [0.35, -1.35, 0.72], [-0.4, -1.32, 0.68]].forEach(([dx, dy, r]) => {
-      g.beginPath(); g.arc(x + dx * w, y + dy * w, r * w, 0, TAU); g.fill();
-    });
-    g.fillStyle = "#245746";
-    [[-0.25, -1.35, 0.55], [0.35, -1.15, 0.48]].forEach(([dx, dy, r]) => {
-      g.beginPath(); g.arc(x + dx * w, y + dy * w, r * w, 0, TAU); g.fill();
-    });
-    // Mørkt knasthul hvor uglen sidder
-    g.fillStyle = "#22150e";
-    g.beginPath(); g.ellipse(x, y - w * 0.04, w * 0.34, w * 0.42, 0, 0, TAU); g.fill();
-    g.strokeStyle = "#6c4b36"; g.lineWidth = Math.max(2, w * 0.05);
-    g.beginPath(); g.ellipse(x, y - w * 0.04, w * 0.36, w * 0.44, 0, 0, TAU); g.stroke();
-  }
-
-  function drawPond(x, y) {
-    const rx = clamp(S * 0.16, 68, 130), ry = rx * 0.4;
-    const gr = g.createRadialGradient(x, y - ry * 0.2, rx * 0.1, x, y, rx);
-    gr.addColorStop(0, "#2b5e85"); gr.addColorStop(0.7, "#1b3d5c"); gr.addColorStop(1, "#122940");
-    g.fillStyle = gr;
-    g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, TAU); g.fill();
-    // Blide vandkrusninger
-    g.strokeStyle = "rgba(180,225,255,0.28)"; g.lineWidth = 2; g.lineCap = "round";
-    for (let i = 0; i < 3; i++) {
-      const off = still ? 0 : Math.sin(time * 1.4 + i * 2) * 5;
-      g.beginPath();
-      g.moveTo(x - rx * (0.42 - i * 0.1) + off, y + (i - 1) * ry * 0.35);
-      g.lineTo(x + rx * (0.28 - i * 0.06) + off, y + (i - 1) * ry * 0.35);
-      g.stroke();
-    }
-    // Åkandeblad til frøen
-    g.fillStyle = "#3f8d58";
-    g.beginPath(); g.ellipse(x, y - ry * 0.1, rx * 0.32, ry * 0.32, 0, 0.28, TAU - 0.28); g.lineTo(x, y - ry * 0.1); g.closePath(); g.fill();
-    // Et par siv ved bredden
-    g.strokeStyle = "#326c4c"; g.lineWidth = 2.5;
-    [[-0.88, -0.1, 0.45], [-0.78, 0.05, 0.52], [0.85, -0.05, 0.48]].forEach(([dx, dy, h]) => {
-      const sx = x + dx * rx, sy = y + dy * ry;
-      g.beginPath(); g.moveTo(sx, sy); g.quadraticCurveTo(sx + 4, sy - h * rx * 0.5, sx + 8, sy - h * rx); g.stroke();
-    });
-  }
-
-  function drawBush(x, y, s) {
-    g.fillStyle = "#193e33";
-    [[0, -0.25, 0.48], [-0.42, -0.05, 0.36], [0.42, -0.04, 0.38], [-0.22, -0.32, 0.34], [0.24, -0.3, 0.35]].forEach(([dx, dy, r]) => {
-      g.beginPath(); g.arc(x + dx * s, y + dy * s, r * s, 0, TAU); g.fill();
-    });
-    g.fillStyle = "#265a47";
-    [[-0.2, -0.35, 0.24], [0.18, -0.32, 0.22], [0, -0.22, 0.25]].forEach(([dx, dy, r]) => {
-      g.beginPath(); g.arc(x + dx * s, y + dy * s, r * s, 0, TAU); g.fill();
-    });
-  }
-
-  function drawMossyLog(x, y, s) {
-    g.save(); g.translate(x, y);
-    // Stamme
-    g.fillStyle = "#5c3d28";
-    rrect(g, -s * 0.65, -s * 0.22, s * 1.25, s * 0.44, s * 0.18); g.fill();
-    g.fillStyle = "#6e4b32";
-    rrect(g, -s * 0.6, -s * 0.2, s * 1.1, s * 0.16, s * 0.1); g.fill();
-    // Hul ende til musen
-    g.fillStyle = "#2a1910";
-    g.beginPath(); g.ellipse(s * 0.52, 0, s * 0.16, s * 0.2, 0, 0, TAU); g.fill();
-    g.strokeStyle = "#825b3d"; g.lineWidth = Math.max(2, s * 0.03);
-    g.beginPath(); g.ellipse(s * 0.52, 0, s * 0.17, s * 0.21, 0, 0, TAU); g.stroke();
-    // Mos-puder ovenpå
-    g.fillStyle = "#3f8754";
-    [[-0.35, -0.22, 0.18], [-0.14, -0.24, 0.15], [0.12, -0.22, 0.16]].forEach(([dx, dy, r]) => {
-      g.beginPath(); g.ellipse(dx * s, dy * s, r * s, r * s * 0.5, 0, Math.PI, TAU); g.fill();
-    });
-    g.restore();
-  }
-
-  function drawFern(x, y, s) {
-    g.save(); g.translate(x, y);
-    [-0.65, -0.25, 0.25, 0.65].forEach((ang, i) => {
+    secrets.forEach(m => {
+      const mp = toScreen(m.nx, m.ny);
+      const pulse = still ? 1 : 0.88 + 0.12 * Math.sin(time * 2.4 + m.ph);
+      const rad = b.bw * m.r * (0.75 + m.glow * 0.65);
+      const gl = g.createRadialGradient(mp.x, mp.y, 0, mp.x, mp.y, rad);
+      gl.addColorStop(0, m.col + "cc");
+      gl.addColorStop(0.45, m.col + "44");
+      gl.addColorStop(1, m.col + "00");
       g.save();
-      g.rotate(ang + (still ? 0 : Math.sin(time * 1.5 + i) * 0.04));
-      g.strokeStyle = "#3a8453"; g.lineWidth = Math.max(2, s * 0.045); g.lineCap = "round";
-      g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(s * 0.08, -s * 0.4, 0, -s * 0.72); g.stroke();
-      g.fillStyle = "#4ca368";
-      for (let k = 1; k <= 4; k++) {
-        const ly = -s * (0.14 * k), lw = s * (0.18 - k * 0.025);
-        g.beginPath(); g.ellipse(-lw * 0.7, ly, lw, lw * 0.36, -0.35, 0, TAU); g.fill();
-        g.beginPath(); g.ellipse(lw * 0.7, ly, lw, lw * 0.36, 0.35, 0, TAU); g.fill();
-      }
+      g.globalAlpha = clamp(m.glow * pulse * 0.85, 0, 0.95);
+      g.fillStyle = gl; g.beginPath(); g.arc(mp.x, mp.y, rad, 0, TAU); g.fill();
       g.restore();
     });
-    g.restore();
-  }
 
-  function drawMushroom(m) {
-    const x = m.nx * W, y = m.ny * H, s = clamp(S * 0.034, 15, 28);
-    const pulse = still ? 1 : 0.88 + 0.12 * Math.sin(time * 2.4 + m.ph);
-    // Glød omkring svampen
-    const gl = g.createRadialGradient(x, y - s * 0.7, 0, x, y - s * 0.7, s * (2.2 + m.glow * 2.2));
-    gl.addColorStop(0, m.col + "aa");
-    gl.addColorStop(1, m.col + "00");
-    g.save(); g.globalAlpha = m.glow * pulse;
-    g.fillStyle = gl; g.beginPath(); g.arc(x, y - s * 0.7, s * 4.4, 0, TAU); g.fill();
-    g.restore();
+    // Vandkrusninger i dammen
+    ripples.forEach(r => {
+      const f = r.life / r.max;
+      g.save();
+      g.strokeStyle = `rgba(255,244,190,${(1 - f) * 0.7})`;
+      g.lineWidth = 2.2;
+      g.beginPath();
+      g.ellipse(r.x, r.y, 14 + f * 56, 6 + f * 22, 0, 0, TAU);
+      g.stroke();
+      g.restore();
+    });
 
-    // To små svampe sammen
-    [[0, 0, 1], [s * 0.75, s * 0.12, 0.65]].forEach(([dx, dy, sc]) => {
-      const r = s * sc;
-      g.fillStyle = "#e8e4d5";
-      rrect(g, x + dx - r * 0.18, y + dy - r * 0.75, r * 0.36, r * 0.8, r * 0.12); g.fill();
-      g.fillStyle = m.col;
-      g.beginPath(); g.ellipse(x + dx, y + dy - r * 0.72, r * 0.65, r * 0.44, 0, Math.PI, TAU); g.fill();
-      g.fillStyle = "rgba(255,255,255,0.8)";
-      g.beginPath(); g.arc(x + dx - r * 0.22, y + dy - r * 0.92, r * 0.09, 0, TAU); g.fill();
-      g.beginPath(); g.arc(x + dx + r * 0.18, y + dy - r * 0.88, r * 0.07, 0, TAU); g.fill();
+    // Stjerneskud på nattehimlen
+    shootingStars.forEach(s => {
+      const f = 1 - s.life / s.max;
+      g.save();
+      const grad = g.createLinearGradient(s.x, s.y, s.x - s.vx * 0.16, s.y - s.vy * 0.16);
+      grad.addColorStop(0, `rgba(255,252,220,${f})`);
+      grad.addColorStop(1, "rgba(255,252,220,0)");
+      g.strokeStyle = grad; g.lineWidth = 3; g.lineCap = "round";
+      g.beginPath(); g.moveTo(s.x, s.y); g.lineTo(s.x - s.vx * 0.16, s.y - s.vy * 0.16); g.stroke();
+      g.restore();
     });
   }
 
-  /* ---------- De 8 skovdyr (bløde, tydelige vektor-illustrationer) ---------- */
-  function drawAnimal(a) {
+  /* ---------- De 8 skovdyr (billedbogs-sprites med rigtige gule øjne) ---------- */
+  function animalPose(a) {
     const s = a.sz;
     const bounce = a.found ? (still ? 1 : 0.9 + 0.1 * a.pop + Math.sin(a.pop * Math.PI) * 0.16) : 0.72 + a.charge * 0.18;
     const hop = a.react > 0 ? Math.sin(a.react * Math.PI) * s * 0.2 : 0;
-    const sway = still ? 0 : Math.sin(time * 2.1 + a.ph) * (a.found ? 0.045 : 0.015);
-    const id = a.data.id;
+    const sway = still ? 0 : Math.sin(time * 2.1 + a.ph) * (a.found ? 0.04 : 0.014);
+    const drawSz = s * 1.42;
+    const oy = -drawSz * 0.54;
+    return { s, bounce, hop, sway, drawSz, oy };
+  }
+
+  function drawAnimal(a) {
+    const { s, bounce, hop, sway, drawSz, oy } = animalPose(a);
+    const sp = sprites[a.data.id];
+    const tuck = a.data.tuck || 0;
+    const dist = Math.hypot(beam.x - a.x, beam.y - (a.y - s * 0.1));
+    const lit = clamp(1 - dist / (beam.r * 1.15), 0, 1);
 
     g.save();
+    // Blød skygge-kontakt bag dyrets nederste del (smelter dyret ned i skovbunden/hulen)
+    g.fillStyle = "rgba(6, 10, 22, 0.42)";
+    g.beginPath();
+    g.ellipse(a.x, a.y + drawSz * (0.36 - tuck * 0.65), drawSz * 0.36, drawSz * 0.11, 0, 0, TAU);
+    g.fill();
+
+    // Klip dyret langs den naturlige forgrundskant (sten, træhul, træstamme, græs), så det kigger FREM bagfra!
+    if (tuck > 0) {
+      const clipBottom = a.y + drawSz * (0.46 - tuck);
+      g.beginPath();
+      g.rect(a.x - drawSz, a.y - drawSz * 1.4, drawSz * 2, clipBottom - (a.y - drawSz * 1.4));
+      g.clip();
+    }
+
     g.translate(a.x, a.y - hop);
     g.scale(bounce, bounce);
     g.rotate(sway);
 
-    // Blød skygge under dyret
-    if (id !== "ugle") {
-      g.fillStyle = "rgba(0,0,0,0.22)";
-      g.beginPath(); g.ellipse(0, s * 0.24, s * 0.42, s * 0.1, 0, 0, TAU); g.fill();
+    // Afstem lysstyrke med natte-scenen (lidt køligere/dæmpet i måneskin, varmere når lommelygten rammer)
+    const bright = 0.84 + lit * 0.14 + (celebrate ? 0.08 : 0);
+    if (sp && sp.full.complete && sp.full.naturalWidth) {
+      if ("filter" in g) g.filter = `brightness(${bright.toFixed(2)}) saturate(0.92)`;
+      g.drawImage(sp.full, -drawSz / 2, oy, drawSz, drawSz);
+      if ("filter" in g) g.filter = "none";
     }
-
-    const eye = (ex, ey, er) => {
-      g.fillStyle = "#181d2c"; g.beginPath(); g.arc(ex, ey, er, 0, TAU); g.fill();
-      g.fillStyle = "#ffffff"; g.beginPath(); g.arc(ex - er * 0.3, ey - er * 0.3, er * 0.36, 0, TAU); g.fill();
-    };
-    const cheek = (cx, cy, cr) => {
-      g.fillStyle = "rgba(255,140,155,0.45)"; g.beginPath(); g.arc(cx, cy, cr, 0, TAU); g.fill();
-    };
-
-    if (id === "ugle") {
-      const flap = a.react > 0 ? Math.sin(a.react * Math.PI * 3) * 0.35 : 0;
-      // Øretotter
-      g.fillStyle = "#8a5a3c";
-      g.beginPath(); g.moveTo(-s * 0.28, -s * 0.32); g.lineTo(-s * 0.38, -s * 0.56); g.lineTo(-s * 0.12, -s * 0.42); g.fill();
-      g.beginPath(); g.moveTo(s * 0.28, -s * 0.32); g.lineTo(s * 0.38, -s * 0.56); g.lineTo(s * 0.12, -s * 0.42); g.fill();
-      // Krop & mave
-      g.fillStyle = "#9d6a48"; g.beginPath(); g.ellipse(0, -s * 0.04, s * 0.38, s * 0.42, 0, 0, TAU); g.fill();
-      g.fillStyle = "#ecd6b6"; g.beginPath(); g.ellipse(0, s * 0.08, s * 0.25, s * 0.26, 0, 0, TAU); g.fill();
-      // Vinger
-      g.save(); g.translate(-s * 0.34, -s * 0.04); g.rotate(0.2 + flap);
-      g.fillStyle = "#7c4e33"; g.beginPath(); g.ellipse(0, s * 0.08, s * 0.13, s * 0.25, 0, 0, TAU); g.fill(); g.restore();
-      g.save(); g.translate(s * 0.34, -s * 0.04); g.rotate(-0.2 - flap);
-      g.fillStyle = "#7c4e33"; g.beginPath(); g.ellipse(0, s * 0.08, s * 0.13, s * 0.25, 0, 0, TAU); g.fill(); g.restore();
-      // Store gyldne ugleøjne
-      g.fillStyle = "#ffe074";
-      g.beginPath(); g.arc(-s * 0.15, -s * 0.16, s * 0.14, 0, TAU); g.arc(s * 0.15, -s * 0.16, s * 0.14, 0, TAU); g.fill();
-      eye(-s * 0.15, -s * 0.16, s * 0.08); eye(s * 0.15, -s * 0.16, s * 0.08);
-      // Næb
-      g.fillStyle = "#f7a428"; g.beginPath(); g.moveTo(-s * 0.07, -s * 0.06); g.lineTo(s * 0.07, -s * 0.06); g.lineTo(0, s * 0.05); g.closePath(); g.fill();
-    } else if (id === "froe") {
-      // Bagben
-      g.fillStyle = "#4da84c";
-      g.beginPath(); g.ellipse(-s * 0.34, s * 0.14, s * 0.16, s * 0.12, -0.3, 0, TAU); g.fill();
-      g.beginPath(); g.ellipse(s * 0.34, s * 0.14, s * 0.16, s * 0.12, 0.3, 0, TAU); g.fill();
-      // Krop & lys mave
-      g.fillStyle = "#62c45b"; g.beginPath(); g.ellipse(0, s * 0.02, s * 0.38, s * 0.28, 0, 0, TAU); g.fill();
-      g.fillStyle = "#d9f59d"; g.beginPath(); g.ellipse(0, s * 0.1, s * 0.26, s * 0.15, 0, 0, TAU); g.fill();
-      // Øjenknopper
-      g.fillStyle = "#62c45b";
-      g.beginPath(); g.arc(-s * 0.18, -s * 0.22, s * 0.14, 0, TAU); g.arc(s * 0.18, -s * 0.22, s * 0.14, 0, TAU); g.fill();
-      g.fillStyle = "#fff";
-      g.beginPath(); g.arc(-s * 0.18, -s * 0.22, s * 0.1, 0, TAU); g.arc(s * 0.18, -s * 0.22, s * 0.1, 0, TAU); g.fill();
-      eye(-s * 0.18, -s * 0.22, s * 0.055); eye(s * 0.18, -s * 0.22, s * 0.055);
-      // Stort smil + kinder
-      cheek(-s * 0.24, 0, s * 0.07); cheek(s * 0.24, 0, s * 0.07);
-      g.strokeStyle = "#204e23"; g.lineWidth = Math.max(2, s * 0.035); g.lineCap = "round";
-      g.beginPath(); g.arc(0, -s * 0.02, s * 0.18, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
-    } else if (id === "mus") {
-      // Lille hale
-      g.strokeStyle = "#e6a4a8"; g.lineWidth = Math.max(2, s * 0.04); g.lineCap = "round";
-      g.beginPath(); g.moveTo(-s * 0.28, s * 0.12); g.quadraticCurveTo(-s * 0.56, s * 0.05, -s * 0.52, -s * 0.14); g.stroke();
-      // Store runde ører
-      g.fillStyle = "#a99fa8";
-      g.beginPath(); g.arc(-s * 0.16, -s * 0.24, s * 0.17, 0, TAU); g.arc(s * 0.14, -s * 0.26, s * 0.17, 0, TAU); g.fill();
-      g.fillStyle = "#f2b8c4";
-      g.beginPath(); g.arc(-s * 0.16, -s * 0.24, s * 0.1, 0, TAU); g.arc(s * 0.14, -s * 0.26, s * 0.1, 0, TAU); g.fill();
-      // Krop
-      g.fillStyle = "#bab0ba"; g.beginPath(); g.ellipse(0, s * 0.02, s * 0.34, s * 0.24, 0, 0, TAU); g.fill();
-      g.fillStyle = "#e6dde4"; g.beginPath(); g.ellipse(s * 0.05, s * 0.1, s * 0.2, s * 0.12, 0, 0, TAU); g.fill();
-      // Øjne & lyserød snude
-      eye(-s * 0.04, -s * 0.06, s * 0.055); eye(s * 0.18, -s * 0.06, s * 0.055);
-      g.fillStyle = "#f28ca0"; g.beginPath(); g.arc(s * 0.34, s * 0.02, s * 0.065, 0, TAU); g.fill();
-      // Knurhår
-      g.strokeStyle = "rgba(255,255,255,0.65)"; g.lineWidth = 1.5;
-      [-0.04, 0.04].forEach(dy => {
-        g.beginPath(); g.moveTo(s * 0.3, s * 0.02); g.lineTo(s * 0.48, s * (0.02 + dy * 2)); g.stroke();
-      });
-    } else if (id === "bjoern") {
-      // Runde bjørneører
-      g.fillStyle = "#7a4e32";
-      g.beginPath(); g.arc(-s * 0.26, -s * 0.42, s * 0.13, 0, TAU); g.arc(s * 0.26, -s * 0.42, s * 0.13, 0, TAU); g.fill();
-      g.fillStyle = "#b5815c";
-      g.beginPath(); g.arc(-s * 0.26, -s * 0.42, s * 0.07, 0, TAU); g.arc(s * 0.26, -s * 0.42, s * 0.07, 0, TAU); g.fill();
-      // Hyggelig krop + mave
-      g.fillStyle = "#8c5b3c"; g.beginPath(); g.ellipse(0, s * 0.05, s * 0.4, s * 0.34, 0, 0, TAU); g.fill();
-      g.fillStyle = "#c89972"; g.beginPath(); g.ellipse(0, s * 0.11, s * 0.24, s * 0.2, 0, 0, TAU); g.fill();
-      // Hoved
-      g.fillStyle = "#8c5b3c"; g.beginPath(); g.arc(0, -s * 0.24, s * 0.29, 0, TAU); g.fill();
-      // Snude
-      g.fillStyle = "#dfb590"; g.beginPath(); g.ellipse(0, -s * 0.17, s * 0.14, s * 0.11, 0, 0, TAU); g.fill();
-      g.fillStyle = "#2b1c14"; g.beginPath(); g.ellipse(0, -s * 0.21, s * 0.065, s * 0.045, 0, 0, TAU); g.fill();
-      eye(-s * 0.12, -s * 0.3, s * 0.048); eye(s * 0.12, -s * 0.3, s * 0.048);
-      cheek(-s * 0.18, -s * 0.2, s * 0.055); cheek(s * 0.18, -s * 0.2, s * 0.055);
-      // Vinkende pote
-      const wave = a.react > 0 ? Math.sin(a.react * Math.PI * 3) * 0.4 : 0;
-      g.save(); g.translate(s * 0.34, -s * 0.02); g.rotate(-0.4 + wave);
-      g.fillStyle = "#7a4e32"; g.beginPath(); g.ellipse(0, -s * 0.08, s * 0.11, s * 0.16, 0, 0, TAU); g.fill(); g.restore();
-    } else if (id === "raev") {
-      // Busket hale med hvid spids
-      const swish = still ? 0 : Math.sin(time * 2.6 + a.ph) * 0.16 + (a.react > 0 ? 0.25 : 0);
-      g.save(); g.translate(s * 0.24, s * 0.12); g.rotate(swish);
-      g.fillStyle = "#e06d2f"; g.beginPath(); g.ellipse(s * 0.22, -s * 0.06, s * 0.28, s * 0.14, -0.35, 0, TAU); g.fill();
-      g.fillStyle = "#fff5e6"; g.beginPath(); g.ellipse(s * 0.4, -s * 0.14, s * 0.12, s * 0.09, -0.35, 0, TAU); g.fill();
-      g.restore();
-      // Krop & hvidt bryst
-      g.fillStyle = "#e06d2f"; g.beginPath(); g.ellipse(0, s * 0.06, s * 0.32, s * 0.26, 0, 0, TAU); g.fill();
-      g.fillStyle = "#fff5e6"; g.beginPath(); g.ellipse(-s * 0.08, s * 0.08, s * 0.16, s * 0.18, 0, 0, TAU); g.fill();
-      // Spidse ræveører
-      g.fillStyle = "#c95820";
-      g.beginPath(); g.moveTo(-s * 0.26, -s * 0.24); g.lineTo(-s * 0.34, -s * 0.52); g.lineTo(-s * 0.08, -s * 0.34); g.fill();
-      g.beginPath(); g.moveTo(s * 0.1, -s * 0.24); g.lineTo(s * 0.18, -s * 0.52); g.lineTo(-s * 0.04, -s * 0.34); g.fill();
-      // Hoved
-      g.fillStyle = "#e87838"; g.beginPath(); g.ellipse(-s * 0.08, -s * 0.18, s * 0.26, s * 0.21, 0, 0, TAU); g.fill();
-      g.fillStyle = "#fff5e6";
-      g.beginPath(); g.ellipse(-s * 0.22, -s * 0.11, s * 0.13, s * 0.09, 0.2, 0, TAU); g.fill();
-      g.beginPath(); g.ellipse(s * 0.04, -s * 0.11, s * 0.13, s * 0.09, -0.2, 0, TAU); g.fill();
-      eye(-s * 0.18, -s * 0.21, s * 0.045); eye(s * 0.02, -s * 0.21, s * 0.045);
-      g.fillStyle = "#221a18"; g.beginPath(); g.arc(-s * 0.08, -s * 0.08, s * 0.048, 0, TAU); g.fill();
-    } else if (id === "pindsvin") {
-      // Pigge (blød brun vifte)
-      g.fillStyle = "#5c4230";
-      for (let i = 0; i < 9; i++) {
-        const ang = -Math.PI * 0.92 + (i / 8) * Math.PI * 0.88;
-        g.beginPath();
-        g.moveTo(Math.cos(ang) * s * 0.16, Math.sin(ang) * s * 0.12);
-        g.lineTo(Math.cos(ang) * s * 0.46, Math.sin(ang) * s * 0.4);
-        g.lineTo(Math.cos(ang + 0.22) * s * 0.22, Math.sin(ang + 0.22) * s * 0.18);
-        g.closePath(); g.fill();
-      }
-      g.fillStyle = "#7a5942"; g.beginPath(); g.ellipse(-s * 0.04, s * 0.02, s * 0.34, s * 0.24, 0, Math.PI, TAU); g.fill();
-      // Blødt ansigt & krop
-      g.fillStyle = "#d9be9e"; g.beginPath(); g.ellipse(s * 0.12, s * 0.08, s * 0.28, s * 0.18, 0, 0, TAU); g.fill();
-      // Små ører, øjne & sort snude
-      g.fillStyle = "#c2a280"; g.beginPath(); g.arc(s * 0.06, -s * 0.08, s * 0.065, 0, TAU); g.fill();
-      eye(s * 0.18, s * 0.01, s * 0.045);
-      cheek(s * 0.18, s * 0.09, s * 0.05);
-      g.fillStyle = "#231a16"; g.beginPath(); g.arc(s * 0.39, s * 0.06, s * 0.05, 0, TAU); g.fill();
-    } else if (id === "raadyr") {
-      // Slanke ben
-      g.strokeStyle = "#8a5a38"; g.lineWidth = Math.max(3, s * 0.07); g.lineCap = "round";
-      [[-0.18, 0.08], [-0.04, 0.1], [0.16, 0.08], [0.28, 0.1]].forEach(([dx, dy]) => {
-        g.beginPath(); g.moveTo(dx * s, dy * s); g.lineTo(dx * s, s * 0.34); g.stroke();
-      });
-      // Krop med hvide rådyr-prikker
-      g.fillStyle = "#b87c4b"; g.beginPath(); g.ellipse(s * 0.08, s * 0.04, s * 0.34, s * 0.2, 0, 0, TAU); g.fill();
-      g.fillStyle = "#fff0d6";
-      [[0.02, -0.02], [0.15, -0.04], [0.24, 0.02], [0.1, 0.06]].forEach(([dx, dy]) => {
-        g.beginPath(); g.arc(dx * s, dy * s, s * 0.04, 0, TAU); g.fill();
-      });
-      // Hals & hoved
-      g.fillStyle = "#b87c4b";
-      rrect(g, -s * 0.24, -s * 0.34, s * 0.16, s * 0.36, s * 0.08); g.fill();
-      // Store opmærksomme ører
-      g.fillStyle = "#a3683b";
-      g.beginPath(); g.ellipse(-s * 0.28, -s * 0.48, s * 0.08, s * 0.16, -0.45, 0, TAU); g.fill();
-      g.beginPath(); g.ellipse(-s * 0.04, -s * 0.48, s * 0.08, s * 0.16, 0.45, 0, TAU); g.fill();
-      g.fillStyle = "#e8be9c";
-      g.beginPath(); g.ellipse(-s * 0.28, -s * 0.48, s * 0.04, s * 0.09, -0.45, 0, TAU); g.fill();
-      g.beginPath(); g.ellipse(-s * 0.04, -s * 0.48, s * 0.04, s * 0.09, 0.45, 0, TAU); g.fill();
-      // Hoved
-      g.fillStyle = "#c48856"; g.beginPath(); g.ellipse(-s * 0.16, -s * 0.34, s * 0.2, s * 0.16, 0, 0, TAU); g.fill();
-      g.fillStyle = "#f2d6bc"; g.beginPath(); g.ellipse(-s * 0.28, -s * 0.29, s * 0.09, s * 0.07, 0, 0, TAU); g.fill();
-      eye(-s * 0.14, -s * 0.36, s * 0.048);
-      g.fillStyle = "#2b1d16"; g.beginPath(); g.arc(-s * 0.35, -s * 0.3, s * 0.042, 0, TAU); g.fill();
-    } else if (id === "kanin") {
-      // Lange kaninører
-      const earWig = still ? 0 : Math.sin(time * 2.4 + a.ph) * 0.08;
-      g.save(); g.translate(-s * 0.12, -s * 0.28); g.rotate(-0.18 + earWig);
-      g.fillStyle = "#f2ece6"; g.beginPath(); g.ellipse(0, -s * 0.2, s * 0.095, s * 0.25, 0, 0, TAU); g.fill();
-      g.fillStyle = "#f5b8c6"; g.beginPath(); g.ellipse(0, -s * 0.2, s * 0.048, s * 0.16, 0, 0, TAU); g.fill(); g.restore();
-      g.save(); g.translate(s * 0.12, -s * 0.28); g.rotate(0.18 - earWig);
-      g.fillStyle = "#f2ece6"; g.beginPath(); g.ellipse(0, -s * 0.2, s * 0.095, s * 0.25, 0, 0, TAU); g.fill();
-      g.fillStyle = "#f5b8c6"; g.beginPath(); g.ellipse(0, -s * 0.2, s * 0.048, s * 0.16, 0, 0, TAU); g.fill(); g.restore();
-      // Rund krop + bomuldshale
-      g.fillStyle = "#ffffff"; g.beginPath(); g.arc(s * 0.28, s * 0.12, s * 0.12, 0, TAU); g.fill();
-      g.fillStyle = "#f2ece6"; g.beginPath(); g.ellipse(0, s * 0.06, s * 0.32, s * 0.26, 0, 0, TAU); g.fill();
-      g.fillStyle = "#f7f3ee"; g.beginPath(); g.arc(0, -s * 0.16, s * 0.23, 0, TAU); g.fill();
-      eye(-s * 0.1, -s * 0.18, s * 0.048); eye(s * 0.1, -s * 0.18, s * 0.048);
-      cheek(-s * 0.16, -s * 0.1, s * 0.055); cheek(s * 0.16, -s * 0.1, s * 0.055);
-      // Lyserød næse
-      g.fillStyle = "#f58da8"; g.beginPath(); g.ellipse(0, -s * 0.11, s * 0.055, s * 0.04, 0, 0, TAU); g.fill();
-    }
-
     g.restore();
+
+    // Re-stempl en blød strimmel af 4K-baggrunden (sten/bark/græs) henover dyrets nederste kant, så integrationen er 100% sømløs
+    const bgIm = bgImgs[curScene.id];
+    if (tuck > 0 && bgIm && bgIm.complete && bgIm.naturalWidth) {
+      const b = bgBox();
+      const rimY = a.y + drawSz * (0.44 - tuck);
+      const bandH = drawSz * (tuck + 0.12);
+      const rx = a.x - drawSz * 0.56, rw = drawSz * 1.12;
+      g.save();
+      g.beginPath();
+      g.ellipse(a.x, rimY + bandH * 0.42, rw * 0.52, bandH * 0.55, 0, 0, TAU);
+      g.clip();
+      g.globalAlpha = 0.88;
+      g.drawImage(bgIm, b.ox, b.oy, b.bw, b.bh);
+      g.restore();
+    }
   }
 
   /* ---------- Mørke-lag & lommelygte-kegle ---------- */
@@ -1036,9 +801,10 @@
       if (a.found) punch(a.x, a.y - a.sz * 0.1, a.sz * 1.45, 0.72);
     });
 
-    // Selvlysende svampe lyser svagt omkring sig
-    mushrooms.forEach(m => {
-      punch(m.nx * W, m.ny * H - 12, 34 + m.glow * 52, 0.35 + m.glow * 0.5);
+    // Hemmelige lyskilder (hytte-lanterne, lysende svampe, dam-spejling) lyser svagt i mørket
+    secrets.forEach(m => {
+      const mp = toScreen(m.nx, m.ny);
+      punch(mp.x, mp.y, 26 + m.glow * 56, 0.28 + m.glow * 0.56);
     });
 
     // Ildfluer laver bittesmå lysprikker i mørket
@@ -1055,47 +821,46 @@
     g.fillStyle = halo; g.beginPath(); g.arc(beam.x, beam.y, beam.r * 1.05, 0, TAU); g.fill();
   }
 
-  /* ---------- Blinkende øjne i mørket (tegnes OVER mørket) ---------- */
+  /* ---------- Blinkende gule øjne i mørket (dyrets egne øjne, tegnet OVER mørket) ---------- */
   function drawHiddenEyes() {
     animals.forEach(a => {
       if (a.found) return;
-      const ex = a.x + a.data.eyeOff[0] * a.sz;
-      const ey = a.y + a.data.eyeOff[1] * a.sz;
       const dist = Math.hypot(beam.x - a.x, beam.y - (a.y - a.sz * 0.15));
-      const near = clamp(1 - dist / (beam.r * 1.35), 0, 1);
+      const near = clamp(1 - dist / (beam.r * 1.25), 0, 1);
 
       // Blid gylden glød når dyret er ved at blive opdaget eller kaldt på
       if (a.charge > 0.02 || a.hintGlow > 0) {
-        const ringR = a.sz * (0.45 + a.charge * 0.35 + (a.hintGlow > 0 ? Math.sin(time * 6) * 0.08 : 0));
+        const ringR = a.sz * (0.55 + a.charge * 0.35 + (a.hintGlow > 0 ? Math.sin(time * 6) * 0.08 : 0));
         const alpha = Math.max(a.charge * 0.75, clamp(a.hintGlow / 2.5, 0, 0.65));
         g.strokeStyle = `rgba(255,235,140,${alpha})`;
         g.lineWidth = 3;
-        g.beginPath(); g.arc(a.x, a.y - a.sz * 0.12, ringR, -Math.PI / 2, -Math.PI / 2 + TAU * (a.charge > 0.02 ? a.charge : 1)); g.stroke();
+        g.beginPath(); g.arc(a.x, a.y - a.sz * 0.1, ringR, -Math.PI / 2, -Math.PI / 2 + TAU * (a.charge > 0.02 ? a.charge : 1)); g.stroke();
       }
 
-      // Hvis lyset er helt tæt på, ser barnet allerede dyrets rigtige øjne — ellers kigger øjnene i mørket
-      if (near > 0.72) return;
-      const eyeAlpha = (1 - near * 0.9) * (a.hintGlow > 0 ? 1 : 0.78);
-      const sep = clamp(a.sz * 0.15, 7, 13);
-      const r = clamp(a.sz * 0.065, 3.5, 5.8) * (a.hintGlow > 0 ? 1.25 : 1);
+      // Fader blidt væk når lommelygten lyser direkte på dyret, så de rigtige øjne under mørket tager sømløst over
+      const fade = 1 - smooth(clamp((near - 0.32) / 0.42, 0, 1));
+      if (fade <= 0.02) return;
+
+      const sp = sprites[a.data.id];
+      if (!sp || !sp.eyes.complete || !sp.eyes.naturalWidth) return;
+
+      const { bounce, hop, sway, drawSz, oy } = animalPose(a);
+      const ey = oy + a.data.eyeY * drawSz;
+      const blinkScale = a.blinkDur > 0 ? 0.12 : 1;
 
       g.save();
-      g.globalAlpha = eyeAlpha;
-      if (a.blinkDur > 0) {
-        // Lukkede øjne (blidt blink)
-        g.strokeStyle = "#ffe58a"; g.lineWidth = 2.2; g.lineCap = "round";
-        g.beginPath();
-        g.moveTo(ex - sep - r, ey); g.lineTo(ex - sep + r, ey);
-        g.moveTo(ex + sep - r, ey); g.lineTo(ex + sep + r, ey);
-        g.stroke();
-      } else {
-        // Lysende nysgerrige øjne i mørket
-        g.fillStyle = "#ffe98c";
-        g.beginPath(); g.ellipse(ex - sep, ey, r, r * 1.12, 0, 0, TAU); g.fill();
-        g.beginPath(); g.ellipse(ex + sep, ey, r, r * 1.12, 0, 0, TAU); g.fill();
-        g.fillStyle = "#161a2e";
-        g.beginPath(); g.arc(ex - sep, ey, r * 0.45, 0, TAU); g.arc(ex + sep, ey, r * 0.45, 0, TAU); g.fill();
+      g.globalAlpha = fade * (a.hintGlow > 0 ? 1 : 0.92);
+      g.translate(a.x, a.y - hop);
+      g.scale(bounce, bounce);
+      g.rotate(sway);
+      if (blinkScale < 1) {
+        g.translate(0, ey);
+        g.scale(1, blinkScale);
+        g.translate(0, -ey);
       }
+      g.shadowColor = "rgba(255, 224, 110, 0.72)";
+      g.shadowBlur = a.hintGlow > 0 ? 16 : 8;
+      g.drawImage(sp.eyes, -drawSz / 2, oy, drawSz, drawSz);
       g.restore();
     });
   }
@@ -1127,8 +892,7 @@
   }
 
   function draw() {
-    drawSky();
-    drawForest();
+    drawSceneBg();
     animals.forEach(drawAnimal);
     drawDarkness();
     drawHiddenEyes();
@@ -1167,12 +931,12 @@
     start(r) {
       Spil.preload([
         "lommelygt-hej", "lommelygt-hint", "lommelygt-maane", "lommelygt-godnat", "lommelygt-ny",
-        "lommelygt-ugle", "dyr-ugle", "lommelygt-froe", "dyr-froe", "lommelygt-mus", "dyr-mus",
-        "lommelygt-bjoern", "lommelygt-raev", "lommelygt-pindsvin", "lommelygt-raadyr", "lommelygt-kanin",
+        "lommelygt-scene-skov", "lommelygt-scene-bondegaard", "lommelygt-scene-jungle",
+        "lommelygt-fakta-maane",
       ]);
-      alive = true; timers = [];
+      alive = true; timers = []; saidFacts = new Set(); lastFactT = -99;
       r.innerHTML = `<div class="ll">
-        <canvas aria-label="Natteskov med lommelygte"></canvas>
+        <canvas aria-label="Nattescene med lommelygte"></canvas>
         <div class="ll-jar" aria-label="Fundne dyr">
           <svg class="ll-jar-ico" viewBox="0 0 36 42" aria-hidden="true">
             <rect x="10" y="2" width="16" height="5" rx="2" fill="#d9a85b"/>
@@ -1183,14 +947,18 @@
           </svg>
           <div class="ll-dots"></div>
         </div>
-        <button class="ll-hint" aria-label="Hvem gemmer sig i skoven?">✨</button>
-        <button class="ll-again" aria-label="En ny nat i skoven">🌙</button>
+        <div class="ll-scenes" role="group" aria-label="Vælg natte-scene">
+          ${SCENE_LIST.map(s => `<button data-sc="${s.id}" aria-label="${s.navn}">${s.ikon}</button>`).join("")}
+        </div>
+        <button class="ll-hint" aria-label="Hvem gemmer sig i mørket?">✨</button>
+        <button class="ll-again" aria-label="En ny nat">🌙</button>
       </div>`;
 
       root = r.querySelector(".ll");
       cv = root.querySelector("canvas");
       jarEl = root.querySelector(".ll-jar");
       dotsEl = root.querySelector(".ll-dots");
+      scenesEl = root.querySelector(".ll-scenes");
       hintBtn = root.querySelector(".ll-hint");
       againBtn = root.querySelector(".ll-again");
       g = cv.getContext("2d");
@@ -1201,12 +969,12 @@
       holding = false; pointerId = null; pointerActive = false; idleAfter = 0;
       lastRustleT = -9; nightsDone = loadNights();
       const dyb = Spil.dyb || "";
-      revealAll = dyb === "lys";
+      revealAll = dyb === "lys" || dyb.endsWith("-lys");
+      const startSc = dyb.startsWith("bondegaard") ? "bondegaard" : dyb.startsWith("jungle") ? "jungle" : "skov";
 
       beam = { x: innerWidth * 0.5, y: innerHeight * 0.6, tx: innerWidth * 0.5, ty: innerHeight * 0.6, r: 150 };
       resize();
-      buildScenery();
-      startRound(true);
+      switchScene(startSc, false);
 
       addEventListener("resize", resize);
       cv.addEventListener("pointerdown", down);
@@ -1215,6 +983,9 @@
       cv.addEventListener("pointercancel", up);
       hintBtn.onclick = triggerHint;
       againBtn.onclick = () => startRound(false);
+      scenesEl.querySelectorAll("button").forEach(b => {
+        b.onclick = () => { if (b.dataset.sc !== curScene.id) switchScene(b.dataset.sc, true); };
+      });
 
       startAudio();
 
