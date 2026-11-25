@@ -498,12 +498,18 @@
     drawHillLayer(trackY - H * .01, H * .11, Math.max(190, W * .25), .36, "#86cb76");
 
     // Baggrundstræer langs bakkerne (scrolling parallax)
+    const millX = (sc === "eng" && phase !== "ride")
+      ? W * .12
+      : (phase === "ride" && rideKind !== "bro" && rideKind !== "tunnel")
+        ? -W * .2 + clamp(rideT / rideDur, 0, 1) * W * 1.5
+        : null;
     const spacing = Math.max(150, W * .22);
     const nTrees = Math.ceil(W / spacing) + 2;
     const baseIdx = Math.floor((worldX * .36) / spacing);
     for (let i = -1; i < nTrees; i++) {
       const idxT = baseIdx + i;
       const tx = idxT * spacing - worldX * .36 + (Math.sin(idxT * 12.7) * .3 + .5) * spacing;
+      if (millX !== null && Math.abs(tx - millX) < m * .14) continue;
       const pine = sc === "skov" || (Math.abs(idxT) % 3 === 0);
       const ts = m * (.085 + (Math.abs(idxT * 7) % 4) * .014);
       drawTree(tx, trackY - H * .03, ts, pine);
