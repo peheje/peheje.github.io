@@ -919,6 +919,7 @@
     if (d === "perron") { nyStation(true); return true; }
     if (d === "by") { station = 1; nyStation(true); return true; }
     if (d === "afgang" || d === "tur") {
+      trainX = 0;
       dyr = deck.splice(0, 3);
       el.carEls.forEach((c, i) => {
         c._a = dyr[i];

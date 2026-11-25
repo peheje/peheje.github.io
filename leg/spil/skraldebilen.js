@@ -12,25 +12,25 @@
   /* ---------- Skrald og spande ---------- */
   // Spandene: farve (krop og låg) og et stort billede af det, der hører i spanden. Ingen tekst.
   const TYPER = {
-    mad: { navn: "mad", krop: "#a5682a", laag: "#7a4818", ikon: "🍌" },
-    papir: { navn: "papir", krop: "#3f7fd0", laag: "#2b5fa4", ikon: "📰" },
-    glas: { navn: "glas", krop: "#3f9e5a", laag: "#2c7442", ikon: "🍾" }
+    mad: { navn: "mad", krop: "#a5682a", laag: "#7a4818", ikon: "billeder/skraldebilen/bananskal.webp" },
+    papir: { navn: "papir", krop: "#3f7fd0", laag: "#2b5fa4", ikon: "billeder/skraldebilen/avis.webp" },
+    glas: { navn: "glas", krop: "#3f9e5a", laag: "#2c7442", ikon: "billeder/skraldebilen/flaske.webp" }
   };
-  // Skraldet: emoji, hvilken spand det hører til, lydnøgle, og hvad stemmen siger.
+  // Skraldet: billede (billeder/skraldebilen/<b >.webp), hvilken spand det hører til, lydnøgle, og hvad stemmen siger.
   // "nemt" er de slags skrald, der er med i den første gade (kun mad og papir, få slags).
   const SKRALD = [
-    { e: "🍌", t: "mad", k: "skrald-bananskal", s: "Et bananskal!", nemt: true },
-    { e: "🍎", t: "mad", k: "skrald-aebleskrog", s: "Et æbleskrog!", nemt: true },
-    { e: "🥚", t: "mad", k: "skrald-aeggeskal", s: "Et æggeskal!" },
-    { e: "🥕", t: "mad", k: "skrald-gulerod", s: "En gulerod!" },
-    { e: "🍞", t: "mad", k: "skrald-broed", s: "Et stykke brød!", nemt: true },
-    { e: "📰", t: "papir", k: "skrald-avis", s: "En avis!", nemt: true },
-    { e: "📦", t: "papir", k: "skrald-papkasse", s: "En papkasse!", nemt: true },
-    { e: "✉️", t: "papir", k: "skrald-brev", s: "Et brev!" },
-    { e: "📄", t: "papir", k: "skrald-papir", s: "Et stykke papir!" },
-    { e: "🍾", t: "glas", k: "skrald-flaske", s: "En flaske!" },
-    { e: "🫙", t: "glas", k: "skrald-glas", s: "Et glas!" },
-    { e: "🥛", t: "glas", k: "skrald-maelk", s: "Et glas mælk!" }
+    { b: "bananskal", t: "mad", k: "skrald-bananskal", s: "Et bananskal!", nemt: true },
+    { b: "aebleskrog", t: "mad", k: "skrald-aebleskrog", s: "Et æbleskrog!", nemt: true },
+    { b: "aeggeskal", t: "mad", k: "skrald-aeggeskal", s: "Et æggeskal!" },
+    { b: "gulerod", t: "mad", k: "skrald-gulerod", s: "En gulerod!" },
+    { b: "broed", t: "mad", k: "skrald-broed", s: "Et stykke brød!", nemt: true },
+    { b: "avis", t: "papir", k: "skrald-avis", s: "En avis!", nemt: true },
+    { b: "papkasse", t: "papir", k: "skrald-papkasse", s: "En papkasse!", nemt: true },
+    { b: "brev", t: "papir", k: "skrald-brev", s: "Et brev!" },
+    { b: "papir", t: "papir", k: "skrald-papir", s: "Et stykke papir!" },
+    { b: "flaske", t: "glas", k: "skrald-flaske", s: "En flaske!" },
+    { b: "glas", t: "glas", k: "skrald-glas", s: "Et glas!" },
+    { b: "maelk", t: "glas", k: "skrald-maelk", s: "Et glas mælk!" }
   ];
   const ROS = [["Super!", "ros-0"], ["Flot klaret!", "ros-1"], ["Sejt!", "ros-2"],
     ["Du er god til det!", "ros-3"], ["Wow!", "ros-4"]];
@@ -195,11 +195,12 @@
 
     /* ---------- Skraldet, der trækkes rundt ---------- */
     .sb-skrald{position:absolute;left:0;top:0;z-index:40;width:var(--st);height:var(--st);
-      display:grid;place-items:center;font-size:calc(var(--st) * .84);line-height:1;border-radius:50%;
+      display:grid;place-items:center;border-radius:50%;
       background:radial-gradient(closest-side,rgba(255,250,232,.55) 0 32%,rgba(255,250,232,0) 92%);
-      filter:drop-shadow(0 0 3px rgba(31,58,95,.4)) drop-shadow(0 8px 8px rgba(40,70,100,.3));
+      filter:drop-shadow(0 0 3px rgba(31,58,95,.32)) drop-shadow(0 8px 8px rgba(40,70,100,.28));
       transform-origin:50% 50%;will-change:transform;touch-action:none;cursor:grab;
       -webkit-user-drag:none;-webkit-touch-callout:none}
+    .sb-skrald img{width:92%;height:92%;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none}
     .sb-skrald.loftet{cursor:grabbing;z-index:41;
       filter:drop-shadow(0 16px 14px rgba(40,70,100,.34)) drop-shadow(0 0 14px rgba(255,255,255,.95))}
     .sb-skrald.valgt{filter:drop-shadow(0 10px 10px rgba(40,70,100,.3)) drop-shadow(0 0 18px #fff);
@@ -238,8 +239,8 @@
     /* Billedet sidder på et hvidt mærke, så det kan ses på alle farver */
     .sb-ikon{display:grid;place-items:center;width:min(calc(var(--spandh) * .56),78%);aspect-ratio:1;border-radius:50%;
       background:radial-gradient(circle at 50% 38%,#fff,#eef3f6);box-shadow:0 4px 0 rgba(0,0,0,.2),inset 0 -4px 0 rgba(31,58,95,.08);
-      font-size:calc(var(--spandh) * .34);font-size:min(calc(var(--spandh) * .34),50cqw);line-height:1;
       transition:opacity .3s,transform .3s}
+    .sb-ikon img{width:78%;height:78%;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none}
     .sb-spand.tomt .sb-ikon{opacity:0;transform:scale(.55)}
 
     .sb-spand.hop{animation:sb-hop .75s cubic-bezier(.3,1.3,.5,1)}
@@ -404,7 +405,7 @@
     el.className = "sb-skrald ny";
     el.setAttribute("role", "button");
     el.setAttribute("aria-label", s.s);
-    el.textContent = s.e;
+    el.innerHTML = `<img src="billeder/skraldebilen/${s.b}.webp" alt="" draggable="false">`;
     el.addEventListener("pointerdown", startTraek);
     el.addEventListener("contextmenu", e => e.preventDefault());
     sb.appendChild(el);
@@ -626,7 +627,7 @@
       b.style.setProperty("--krop", d.krop);
       b.style.setProperty("--laag", d.laag);
       b.setAttribute("aria-label", "Spand til " + d.navn);
-      b.innerHTML = `<span class="sb-laag"></span><span class="sb-krop"><span class="sb-ikon">${d.ikon}</span></span>`;
+      b.innerHTML = `<span class="sb-laag"></span><span class="sb-krop"><span class="sb-ikon"><img src="${d.ikon}" alt="" draggable="false"></span></span>`;
       b.addEventListener("click", () => trykSpand(b));
       wrap.appendChild(b);
       spande.push(b);
@@ -793,6 +794,7 @@
       Spil.preload(["skrald-hej", "skrald-hvor", "skrald-forkert", "skrald-gade-klar",
         "skrald-ny-gade", "skrald-glas-kommer", "skrald-fest",
         ...SKRALD.map(s => s.k), ...Object.keys(TYPER).map(t => "skrald-navn-" + t), ...ROS.map(x => x[1])]);
+      SKRALD.forEach(s => { const img = new Image(); img.src = "billeder/skraldebilen/" + s.b + ".webp"; });
       root = r; alive = true; timers = []; kilder = [];
       stk = null; drag = null; valgt = false; busy = false; koe = []; taeller = 0;
       gadeNr = 0; faerdige = 0; ventIntro = false; sidstFejl = 0;
