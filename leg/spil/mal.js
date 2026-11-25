@@ -249,8 +249,25 @@
       padding:max(8px,env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-right,0px)) max(8px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));
       background:linear-gradient(160deg,#e9f5ff,#f4ecff 55%,#fff1e4);font-family:var(--display)}
     .ma-wrap{position:relative;flex:1;min-width:0;min-height:0;border-radius:clamp(14px,2.6vh,26px);overflow:hidden;background:${PAPER};
-      box-shadow:0 6px 0 rgba(31,58,95,.16),inset 0 0 0 2px rgba(31,58,95,.08);touch-action:none}
-    .ma-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+      box-shadow:0 6px 0 rgba(31,58,95,.16),inset 0 0 0 2px rgba(31,58,95,.08);touch-action:none;transition:background .35s}
+    .ma-wrap.nat{background:radial-gradient(ellipse at 50% 0%,#263a70 0%,#162244 65%,#0e1630 100%);
+      box-shadow:0 6px 0 rgba(12,18,40,.35),inset 0 0 0 2px rgba(255,255,255,.12)}
+    .ma-wrap.nat::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.65;
+      background-image:
+        radial-gradient(2px 2px at 12% 18%,#fff8cc,transparent),
+        radial-gradient(1.5px 1.5px at 28% 72%,#cfe8ff,transparent),
+        radial-gradient(2.2px 2.2px at 45% 26%,#fff,transparent),
+        radial-gradient(1.5px 1.5px at 64% 14%,#ffeaa0,transparent),
+        radial-gradient(2px 2px at 78% 42%,#fff,transparent),
+        radial-gradient(1.5px 1.5px at 88% 78%,#cfe8ff,transparent),
+        radial-gradient(2px 2px at 20% 48%,#fff,transparent),
+        radial-gradient(1.8px 1.8px at 56% 84%,#fff8cc,transparent),
+        radial-gradient(1.5px 1.5px at 90% 20%,#fff,transparent),
+        radial-gradient(2px 2px at 36% 60%,#ffeaa0,transparent)}
+    .ma-wrap.nat .ma-canvas{filter:drop-shadow(0 0 5px rgba(255,255,255,.22))}
+    .ma-wrap.nat .ma-outline svg{stroke:#eef4ff;opacity:.85}
+    .ma-wrap.nat .ma-wipe{background:#162244}
+    .ma-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair;z-index:1}
     /* Pensel-markør (mus/pen): viser farve og størrelse, med mørk + lys kant, så den ses på alle baggrunde */
     @media (hover:hover){.ma-canvas{cursor:none}}
     .ma-cur{position:absolute;left:0;top:0;z-index:4;pointer-events:none;border-radius:50%;transform:translate(-50%,-50%);
@@ -259,6 +276,13 @@
       filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px rgba(31,58,95,.9))}
     .ma-outline{position:absolute;inset:0;z-index:2;pointer-events:none}
     .ma-outline svg{width:100%;height:100%;display:block;fill:none;stroke:#26364a;stroke-width:10;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+    .ma-mus{position:absolute;z-index:4;top:clamp(10px,1.6vh,16px);right:clamp(10px,1.6vh,16px);
+      width:clamp(46px,7vh,62px);aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.86);
+      box-shadow:0 4px 0 rgba(31,58,95,.16);font-size:clamp(20px,3.2vh,28px);display:grid;place-items:center;padding:0;
+      transition:transform .12s,opacity .2s}
+    .ma-mus.off{opacity:.55;filter:grayscale(1)}
+    .ma-mus:active{transform:translateY(3px) scale(.95)}
+    .ma-wrap.nat .ma-mus{background:rgba(255,255,255,.16);color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.3)}
     .ma-rail{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(5px,1.4vh,14px);flex:none}
     .ma-colors,.ma-tools{display:grid;grid-template-columns:repeat(2,auto);gap:clamp(4px,1vh,9px);justify-content:center}
     .ma-color,.ma-tool{width:var(--sz);height:var(--sz);display:grid;place-items:center;padding:0;
@@ -325,8 +349,8 @@
     .ma-big{position:fixed;inset:0;z-index:15;display:grid;place-items:center;padding:clamp(12px,3vh,30px);background:rgba(31,58,95,.68)}
     .ma-big img{max-width:100%;max-height:100%;border-radius:10px;background:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35)}
     .ma-big .ma-close{position:fixed}
-    /* iPad: tynd og tyk står på samme række (malebog, ny og galleri rykkes efter dem); telefon: som i koden */
-    .ma-tool[data-tool="malebog"],.ma-tool[data-tool="new"],.ma-tool[data-tool="gallery"]{order:1}
+    /* iPad: tynd og tyk står på samme række (malebog, papir, ny og galleri rykkes efter dem); telefon: som i koden */
+    .ma-tool[data-tool="malebog"],.ma-tool[data-tool="paper"],.ma-tool[data-tool="new"],.ma-tool[data-tool="gallery"]{order:1}
     @media (orientation:portrait){
       .ma{flex-direction:column}
       .ma-tool[data-tool]{order:0}
@@ -343,7 +367,7 @@
 
   let root, canvas, ctx, base, bctx, wrap, alive, timers, ro;
   let W = 0, H = 0;
-  let color = COLORS[0].c, tool = "brush", stamp = STAMPS[0], thick = true;
+  let color = COLORS[0].c, tool = "brush", stamp = STAMPS[0], thick = true, nightPaper = false;
   let dirty = false, confirming = false, confirmTimer = 0;
   let gallery = [], outlineKey = null, outlineImg = null;
   const active = new Map();
@@ -718,6 +742,14 @@
     cancelConfirm();
     if (k === "new") return askNew();
     if (k === "gallery") return openGallery();
+    if (k === "paper") {
+      nightPaper = !nightPaper;
+      wrap.classList.toggle("nat", nightPaper);
+      const btn = q('.ma-tool[data-tool="paper"]');
+      if (btn) { btn.textContent = nightPaper ? "☀️" : "🌙"; btn.classList.toggle("on", nightPaper); }
+      Spil.tone(nightPaper ? [440, 554, 659] : [523, 659, 784], .07);
+      return;
+    }
     if (k === "stamp") return openPicker("stamp");
     if (k === "malebog") return openPicker("malebog");
     if (k === "thin") { thick = false; updateTools(); return; }
@@ -879,7 +911,7 @@
       const c = document.createElement("canvas");
       c.width = w; c.height = h;
       const g = c.getContext("2d");
-      g.fillStyle = PAPER; g.fillRect(0, 0, w, h);
+      g.fillStyle = nightPaper ? "#162244" : PAPER; g.fillRect(0, 0, w, h);
       g.drawImage(canvas, 0, 0, w, h);
       if (outlineKey && outlineImg) {
         const s = Math.min(w / 800, h / 600), dw = 800 * s, dh = 600 * s;
@@ -990,13 +1022,14 @@
         "mal-malebog", "mal-ny", "mal-nyt", "mal-galleri", "mal-tom", "mal-flot", "mal-brun", "mal-sort", "mal-hvid",
         ...COLORS.map(c => c.key)]);
       alive = true; timers = []; dirty = false; confirming = false; active.clear();
-      tool = "brush"; color = COLORS[0].c; stamp = STAMPS[0]; thick = true;
+      tool = "brush"; color = COLORS[0].c; stamp = STAMPS[0]; thick = true; nightPaper = false;
       outlineKey = null; outlineImg = null; gallery = readGallery();
 
       r.innerHTML = `<div class="ma">
         <div class="ma-wrap">
           <canvas class="ma-canvas" aria-label="Tegning"></canvas>
           <div class="ma-outline" aria-hidden="true"></div>
+          <button class="ma-mus" aria-label="Musik til og fra">🎵</button>
           <div class="ma-cur" hidden></div>
           <div class="ma-confirm" hidden><button class="ma-yes" aria-label="Ja, lav en ny tegning">✓</button></div>
           <div class="ma-wipe" hidden></div>
@@ -1009,6 +1042,7 @@
             <button class="ma-tool" data-tool="glitter" aria-label="Glimmer">✨</button>
             <button class="ma-tool" data-tool="stamp" aria-label="Stempel">${stamp}</button>
             <button class="ma-tool" data-tool="malebog" aria-label="Malebog"><svg viewBox="150 120 565 360" aria-hidden="true">${ART.fisk}</svg></button>
+            <button class="ma-tool" data-tool="paper" aria-label="Nat-papir">🌙</button>
             <button class="ma-tool" data-tool="thin" aria-label="Tynd pensel / små stempler"><i class="ma-dot"></i></button>
             <button class="ma-tool" data-tool="thick" aria-label="Tyk pensel / store stempler"><i class="ma-dot"></i></button>
             <button class="ma-tool" data-tool="new" aria-label="Ny tegning">🧽</button>
@@ -1043,6 +1077,15 @@
       root.querySelectorAll(".ma-color").forEach(b => b.onclick = () => chooseColor(COLORS.find(c => c.c === b.dataset.c)));
       root.querySelectorAll(".ma-tool").forEach(b => b.onclick = () => chooseTool(b.dataset.tool));
       q(".ma-yes").onclick = doNew;
+      const musBtn = q(".ma-mus");
+      const syncMus = () => {
+        const off = Spil.music && Spil.music.isMuted();
+        musBtn.textContent = off ? "🔇" : "🎵";
+        musBtn.classList.toggle("off", !!off);
+      };
+      syncMus();
+      musBtn.onclick = () => { Spil.sfx.click(); Spil.music && Spil.music.toggle(); syncMus(); };
+      Spil.music && Spil.music.play("lyd/musik-mal.mp3", .28);
 
       if (window.ResizeObserver) {
         ro = new ResizeObserver(() => fit());
@@ -1065,6 +1108,7 @@
       removeEventListener("pointercancel", up);
       removeEventListener("blur", releaseAll);
       stopBrushSound();
+      Spil.music && Spil.music.stop();
       active.clear();
       hideConfirm();
       closeBig();

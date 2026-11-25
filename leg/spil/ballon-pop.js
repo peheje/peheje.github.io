@@ -18,8 +18,10 @@
 
   Spil.css("css-ballon-pop", `
     .bp{position:relative;height:100%;overflow:hidden;overflow:clip;background:linear-gradient(#6ec0f0 0%,#a9dcfa 48%,#d8f1ff 66%)}
-    .bp-sun{position:absolute;right:7%;top:6%;width:clamp(70px,14vh,130px);aspect-ratio:1;border-radius:50%;pointer-events:none;
+    .bp-sun{position:absolute;right:7%;top:6%;width:clamp(70px,14vh,130px);aspect-ratio:1;border-radius:50%;cursor:pointer;z-index:2;
       background:radial-gradient(circle,#fff3a0 0 40%,#ffd84a 41% 52%,rgba(255,216,74,.35) 54%,rgba(255,216,74,0) 70%);animation:bp-glow 3s ease-in-out infinite alternate}
+    .bp-sun.glad{animation:bp-sunpop .55s ease-out}
+    @keyframes bp-sunpop{35%{transform:scale(1.24) rotate(12deg)}70%{transform:scale(.95) rotate(-6deg)}100%{transform:scale(1) rotate(0)}}
     @keyframes bp-glow{to{transform:scale(1.07)}}
     .bp-cloud{position:absolute;height:clamp(28px,5vh,48px);border-radius:99px;background:#fff;opacity:.95;pointer-events:none;animation:bp-drift linear infinite}
     .bp-cloud::before,.bp-cloud::after{content:"";position:absolute;background:#fff;border-radius:50%}
@@ -30,7 +32,9 @@
     /* Den bagerste bakke går helt ned, så himlen ikke titter frem under den ved højre kant */
     .bp-hill.far{bottom:0;height:42%;border-radius:50% 50% 0 0/31% 31% 0 0;background:linear-gradient(#bfe6a8,#9fd486 62%)}
     .bp-hill.near{bottom:0;height:22%;left:-25%;right:-5%;background:linear-gradient(#95d775,#5fae4a);border-radius:60% 40% 0 0/100% 100% 0 0}
-    .bp-tree{position:absolute;bottom:17%;width:clamp(10px,1.6vh,18px);height:clamp(40px,9vh,90px);background:#8a592e;border-radius:6px;pointer-events:none}
+    .bp-tree{position:absolute;bottom:17%;width:clamp(10px,1.6vh,18px);height:clamp(40px,9vh,90px);background:#8a592e;border-radius:6px;cursor:pointer;z-index:1}
+    .bp-tree.rasl::before{animation:bp-rasl .45s ease-in-out!important}
+    @keyframes bp-rasl{25%{transform:translateX(-50%) rotate(-11deg) scale(1.08)}65%{transform:translateX(-50%) rotate(9deg) scale(1.04)}100%{transform:translateX(-50%) rotate(0)}}
     .bp-tree::after{content:"";position:absolute;left:50%;bottom:-5px;width:clamp(46px,9vh,96px);height:clamp(10px,2vh,18px);transform:translateX(-50%);
       border-radius:50%;background:radial-gradient(closest-side,rgba(40,85,30,.28),rgba(40,85,30,0))}
     .bp-tree::before{content:"";position:absolute;left:50%;bottom:70%;width:clamp(50px,11vh,110px);aspect-ratio:1;transform:translateX(-50%);border-radius:50%;
@@ -39,9 +43,11 @@
     .bp-tree:nth-of-type(even)::before{animation-delay:-2.6s}
     @keyframes bp-tree-sway{from{transform:translateX(-50%) rotate(-2deg)}to{transform:translateX(-50%) rotate(2deg)}}
     /* Blomst: gul midte, fem kronblade (skygger af midten), stilk og et blad */
-    .bp-flower{position:absolute;font-size:clamp(8px,1.5vh,13px);width:1em;height:1em;border-radius:50%;pointer-events:none;background:#ffd84a;
+    .bp-flower{position:absolute;font-size:clamp(8px,1.5vh,13px);width:1em;height:1em;border-radius:50%;cursor:pointer;z-index:2;background:#ffd84a;
       transform-origin:50% 3.6em;animation:bp-flower-sway 4.2s ease-in-out infinite alternate;
       box-shadow:0 -.78em 0 .08em var(--f),.74em -.24em 0 .08em var(--f),.46em .63em 0 .08em var(--f),-.46em .63em 0 .08em var(--f),-.74em -.24em 0 .08em var(--f)}
+    .bp-flower.hop{animation:bp-flhop .5s ease-out!important}
+    @keyframes bp-flhop{35%{transform:scale(1.45) translateY(-10px)}70%{transform:scale(.92)}100%{transform:scale(1)}}
     .bp-flower:nth-of-type(2n){animation-duration:5s;animation-delay:-1.5s}
     .bp-flower:nth-of-type(3n){animation-duration:3.7s;animation-delay:-2.8s}
     @keyframes bp-flower-sway{from{transform:rotate(-5deg)}to{transform:rotate(5deg)}}
@@ -257,14 +263,34 @@
       const tufts = [[15, 4], [32, 11], [49, 4], [66, 9], [83, 5]]
         .map(([x, y], i) => `<svg class="bp-tuft" style="left:${x}%;bottom:${y}%;animation-delay:-${i * .9}s" viewBox="0 0 36 22" aria-hidden="true"><path d="M6 21 Q2 10 9 4 Q12 12 16 20 M16 21 Q17 7 22 2 Q22 12 22 21 M23 21 Q28 11 33 6 Q30 14 27 21" fill="none" stroke="#4f9a43" stroke-width="3.2" stroke-linecap="round"/></svg>`).join("");
       root.innerHTML = `<div class="bp">
-        <div class="bp-sun"></div>
+        <div class="bp-sun" role="button" aria-label="Sol"></div>
         <div class="bp-cloud" style="top:12%;width:clamp(90px,16vw,170px);animation-duration:60s;animation-delay:-10s"></div>
         <div class="bp-cloud" style="top:28%;width:clamp(70px,12vw,130px);animation-duration:85s;animation-delay:-50s"></div>
         <div class="bp-hill far"></div>
-        <div class="bp-tree" style="left:10%"></div><div class="bp-tree" style="right:14%;bottom:18%"></div>
+        <div class="bp-tree" style="left:10%" role="button" aria-label="Træ"></div><div class="bp-tree" style="right:14%;bottom:18%" role="button" aria-label="Træ"></div>
         <div class="bp-hill near"></div>${tufts}${flowers}
         <div class="bp-count">🎈 0</div></div>`;
       field = q(".bp");
+      const sunEl = q(".bp-sun");
+      sunEl.onpointerdown = () => {
+        sunEl.classList.remove("glad"); void sunEl.offsetWidth; sunEl.classList.add("glad");
+        Spil.tone([523, 659, 784, 1047], .07);
+        const [x, y] = centre(sunEl); bits(x, y, "#ffd84a", 10);
+      };
+      root.querySelectorAll(".bp-tree").forEach(tr => {
+        tr.onpointerdown = () => {
+          tr.classList.remove("rasl"); void tr.offsetWidth; tr.classList.add("rasl");
+          Spil.tone([392, 440], .06, "triangle");
+          const [x, y] = centre(tr); bits(x, y - 35, "#8fd674", 8);
+        };
+      });
+      root.querySelectorAll(".bp-flower").forEach((fl, i) => {
+        fl.onpointerdown = () => {
+          fl.classList.remove("hop"); void fl.offsetWidth; fl.classList.add("hop");
+          pling(COLORS[i % COLORS.length][2]);
+          const [x, y] = centre(fl); bits(x, y, getComputedStyle(fl).getPropertyValue("--f").trim() || "#ffd84a", 6);
+        };
+      });
       Spil.preload([...COLORS.map(c => "farve-" + Spil.key(c[1])), ...PRAISE.map((_, i) => "ros-" + i), ...DYR.flatMap(d => Spil.jaDyr(d[1])),
         ...Array.from({ length: 20 }, (_, i) => `balloner-${(i + 1) * 10}`)]);
       // Dybe links til test: kaempe, dyr, eng, stille

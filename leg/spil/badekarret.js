@@ -52,8 +52,19 @@
       box-shadow:inset -3px -4px 6px rgba(31,58,95,.2),0 4px 6px rgba(31,58,95,.16)}
     .bk-fod.v{left:9%;transform:rotate(8deg)}
     .bk-fod.h{right:9%;transform:rotate(-8deg)}
-    .bk-hane{position:absolute;right:.5%;bottom:calc(100% - 5%);width:clamp(54px,min(12vh,16vw),104px);z-index:4;pointer-events:none;
-      filter:drop-shadow(0 4px 4px rgba(31,58,95,.2))}
+    .bk-hane{position:absolute;right:.5%;bottom:calc(100% - 5%);width:clamp(54px,min(12vh,16vw),104px);z-index:6;cursor:pointer;
+      filter:drop-shadow(0 4px 4px rgba(31,58,95,.2));transition:transform .15s}
+    .bk-hane:active{transform:scale(.94)}
+    .bk-straale{position:absolute;right:calc(.5% + clamp(54px,min(12vh,16vw),104px) * .67);top:-5%;width:clamp(10px,1.8vh,18px);height:0;
+      border-radius:99px;z-index:5;pointer-events:none;opacity:0;
+      background:linear-gradient(90deg,rgba(255,255,255,.85),rgba(110,205,248,.92),rgba(255,255,255,.7));
+      box-shadow:0 0 10px rgba(140,220,255,.75);transition:height .18s ease-out,opacity .18s}
+    .bk-straale.on{height:38%;opacity:1}
+    .bk-hane-dryp{position:absolute;right:calc(.5% + clamp(54px,min(12vh,16vw),104px) * .68);top:-6%;width:clamp(7px,1.2vh,12px);height:clamp(10px,1.7vh,16px);
+      border-radius:50% 50% 50% 50%/65% 65% 35% 35%;z-index:5;pointer-events:none;
+      background:radial-gradient(circle at 35% 30%,#fff 0 22%,#7cd4fa 65%,#399fd8);
+      animation:bk-dryp 2.8s ease-in infinite}
+    @keyframes bk-dryp{0%,60%{transform:translateY(0) scale(.7);opacity:0}72%{transform:translateY(4px) scale(1);opacity:.95}100%{transform:translateY(34px) scale(.85);opacity:0}}
     .bk-krop{position:absolute;inset:0;border-radius:22% 22% 30% 30%/14% 14% 22% 22%;
       background:linear-gradient(180deg,#fff 0 34%,#f5fafd 62%,#d8e7f0 100%);
       box-shadow:inset 0 -22px 30px rgba(31,58,95,.14),inset 18px 0 26px -18px rgba(31,58,95,.12),
@@ -79,10 +90,12 @@
     .bk-skum span.bag{background:radial-gradient(circle at 34% 26%,#f2fbff 0 50%,#e4f4fc 75%,#cfe8f5 100%)}
     @keyframes bk-skumboel{from{transform:translateY(0)}to{transform:translateY(-3px)}}
     /* En sæbe på kanten */
-    .bk-saebe{position:absolute;left:7%;top:2.5%;width:9%;height:7%;min-width:32px;min-height:15px;
-      border-radius:40% 44% 40% 44%/50%;z-index:5;transform:rotate(-7deg);
+    .bk-saebe{position:absolute;left:7%;top:2.5%;width:9%;height:7%;min-width:38px;min-height:18px;
+      border-radius:40% 44% 40% 44%/50%;z-index:6;transform:rotate(-7deg);cursor:pointer;
       background:linear-gradient(150deg,#ffd3e6,#ff9ec4 60%,#f2749f);
-      box-shadow:inset 0 3px 0 rgba(255,255,255,.75),0 4px 8px rgba(31,58,95,.18)}
+      box-shadow:inset 0 3px 0 rgba(255,255,255,.75),0 4px 8px rgba(31,58,95,.18);transition:transform .15s}
+    .bk-saebe.vrik{animation:bk-vrik .45s ease-in-out}
+    @keyframes bk-vrik{25%{transform:rotate(-18deg) scale(1.15)}60%{transform:rotate(8deg) scale(1.1)}100%{transform:rotate(-7deg) scale(1)}}
     .bk-saebe::after{content:"";position:absolute;left:18%;top:24%;width:34%;height:22%;border-radius:50%;
       background:rgba(255,255,255,.8)}
     /* Et par små luftbobler som pynt i luften */
@@ -94,7 +107,7 @@
     @keyframes bk-prik{from{transform:translateY(0)}to{transform:translateY(-26px)}}
 
     /* Gummianden (tegnet med CSS, så den er gul og blød) */
-    .bk-dukke{position:absolute;left:13%;bottom:16%;width:clamp(68px,min(18vh,26vw),158px);aspect-ratio:1.15/1;z-index:3}
+    .bk-dukke{position:absolute;left:13%;bottom:16%;width:clamp(68px,min(18vh,26vw),158px);aspect-ratio:1.15/1;z-index:5;cursor:pointer}
     .bk-dukke .dk{position:absolute;inset:0;transform-origin:50% 78%;animation:bk-svom 5s ease-in-out infinite}
     .bk-dukke.hop .dk{animation:bk-hop .8s cubic-bezier(.3,1.5,.5,1)}
     .bk-dukke .hale{position:absolute;left:0;bottom:24%;width:26%;height:28%;
@@ -453,8 +466,10 @@
                 <div class="bk-dukke lille" style="left:82%;bottom:34%;--sd:.4s">${AND}</div>
               </div>
             </div>
-            <div class="bk-saebe"></div>
-            <svg class="bk-hane" viewBox="0 0 100 100" aria-hidden="true">
+            <div class="bk-saebe" role="button" aria-label="Sæbe"></div>
+            <div class="bk-hane-dryp"></div>
+            <div class="bk-straale"></div>
+            <svg class="bk-hane" viewBox="0 0 100 100" role="button" aria-label="Vandhane">
               <defs><linearGradient id="bk-krom" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#d3dde6"/><stop offset="1" stop-color="#8ea2b3"/>
               </linearGradient></defs>
@@ -471,6 +486,40 @@
 
       q(".bk-sig").onclick = () => sporg();
       q(".bk-kar").onclick = () => sporg();
+      const saebeBobler = (el, n = 7) => {
+        const scene = q(".bk-scene"); if (!scene || !el) return;
+        const r = el.getBoundingClientRect(), s = scene.getBoundingClientRect();
+        for (let i = 0; i < n; i++) {
+          const d = document.createElement("div"); d.className = "bk-festboble";
+          const str = 14 + Math.random() * 20;
+          d.style.width = str + "px"; d.style.height = str + "px";
+          d.style.left = (r.left - s.left + r.width * (.2 + Math.random() * .6)) + "px";
+          d.style.top = (r.top - s.top) + "px";
+          d.style.setProperty("--dx", ((Math.random() - .5) * 80).toFixed(0) + "px");
+          d.style.animationDelay = (i * .06).toFixed(2) + "s";
+          scene.appendChild(d); setTimeout(() => d.remove(), 4200);
+        }
+      };
+      q(".bk-hane").onclick = e => {
+        e.stopPropagation();
+        const st = q(".bk-straale");
+        if (st) { st.classList.add("on"); later(() => st.classList.remove("on"), 1000); }
+        plask(.45, .18);
+        saebeBobler(st || q(".bk-hane"), 8);
+      };
+      q(".bk-saebe").onclick = e => {
+        e.stopPropagation();
+        const sb = q(".bk-saebe");
+        sb.classList.remove("vrik"); void sb.offsetWidth; sb.classList.add("vrik");
+        Spil.tone([660, 880, 1047], .06);
+        saebeBobler(sb, 9);
+      };
+      q(".bk-dukke").onclick = e => {
+        e.stopPropagation();
+        const d = q(".bk-dukke");
+        d.classList.remove("hop"); void d.offsetWidth; d.classList.add("hop");
+        kvak(); plask(.2, .12); sproejt();
+      };
       lavSkum();
       addEventListener("resize", lavSkum);
       // Dybe links til test (index.html?spil=badekarret&dyb=...):

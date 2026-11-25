@@ -137,6 +137,7 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
     if(running){running.stop();running=null}
     Spil.dyb="";
     Spil.stopTalking();
+    Spil.music && Spil.music.stop();
     $("stage").innerHTML="";$("stage").hidden=true;$("home").hidden=true;tegnMenu();$("menu").hidden=false;
     try{history.replaceState(null,"",location.pathname)}catch(e){}
     Spil.say("Hvad vil du spille?",null,"hvad-vil-du");

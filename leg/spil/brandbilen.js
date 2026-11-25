@@ -30,7 +30,7 @@
   `);
 
   let root, cv, c, W, H, raf, last, alive, timers, clock, phase, houses, fireIdx, lastIdx, truck, parts, water, clouds,
-    target, spraying, sprayT, jet, idleT, count, animal, rescue, saidGood, hiss, hissGain, siren, L;
+    target, spraying, sprayT, jet, idleT, count, animal, rescue, saidGood, hiss, hissGain, siren, L, honkT, sunT;
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
   const q = s => root.querySelector(s);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -94,17 +94,27 @@
 
   // Tegnet sol og skyer (emoji ser forskellige ud på iPad og bliver små og grå)
   function sun(x, y, r) {
-    c.save(); c.translate(x, y); if (!still) c.rotate(clock * .15);
+    const sc = sunT > 0 ? 1 + Math.sin(sunT * Math.PI * 3) * .12 : 1;
+    c.save(); c.translate(x, y); c.scale(sc, sc);
+    c.save(); if (!still) c.rotate(clock * .15);
     c.strokeStyle = "#ffc93c"; c.lineWidth = r * .22; c.lineCap = "round"; c.beginPath();
     for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5; c.moveTo(Math.cos(a) * r * 1.3, Math.sin(a) * r * 1.3); c.lineTo(Math.cos(a) * r * 1.65, Math.sin(a) * r * 1.65); }
     c.stroke(); c.restore();
-    c.fillStyle = "#ffd84d"; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
-    c.fillStyle = "#ffe98a"; c.beginPath(); c.arc(x - r * .25, y - r * .25, r * .5, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "rgba(255,216,77,.28)"; c.beginPath(); c.arc(0, 0, r * 1.25, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "#ffd84d"; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "#ffe98a"; c.beginPath(); c.arc(-r * .25, -r * .25, r * .5, 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
+  function drawTree(x, y, s) {
+    c.fillStyle = "#8a5a30"; rr(x - s * .14, y - s * .55, s * .28, s * .55, 3); c.fill();
+    c.fillStyle = "#4fa347"; c.beginPath(); c.arc(x, y - s * .72, s * .42, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "#6cc45e"; c.beginPath(); c.arc(x - s * .18, y - s * .62, s * .3, 0, Math.PI * 2); c.arc(x + s * .2, y - s * .62, s * .28, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "#95df7e"; c.beginPath(); c.arc(x - s * .12, y - s * .84, s * .18, 0, Math.PI * 2); c.fill();
   }
   function cloud(x, y, s) {
     const w = s * .55, puff = (col, dy) => {
       c.fillStyle = col;
-      rr(x - w * .9, y + dy, w * 1.75, w * .5, w * .25); // rr starter en ny sti, så den kommer først
+      rr(x - w * .9, y + dy, w * 1.75, w * .5, w * .25);
       [[-.55, .1, .42], [-.15, -.2, .55], [.35, -.05, .48], [.7, .15, .34]].forEach(([dx, yy, r]) => { c.moveTo(x + dx * w + r * w, y + yy * w + dy); c.arc(x + dx * w, y + yy * w + dy, r * w, 0, Math.PI * 2); });
       c.fill();
     };
@@ -115,15 +125,24 @@
     const g = c.createLinearGradient(0, 0, 0, L.base);
     g.addColorStop(0, "#6cbdf0"); g.addColorStop(1, "#d6f0ff");
     c.fillStyle = g; c.fillRect(0, 0, W, H);
-    if (L.port) sun(W * .5, H * .17, Math.min(W, H) * .07); else sun(W * .9, H * .1, Math.min(W, H) * .055);
+    const sx = L.port ? W * .5 : W * .9, sy = L.port ? H * .17 : H * .1, sr = Math.min(W, H) * (L.port ? .07 : .055);
+    L.sun = { x: sx, y: sy, r: sr };
+    sun(sx, sy, sr);
     clouds.forEach(cl => cloud(cl.x * W, cl.y * H, cl.s * Math.min(W, H)));
-    // bakker og græs bag husene
+    c.fillStyle = "#bce6a2";
+    c.beginPath(); c.moveTo(0, L.base - H * .11);
+    for (let i = 0; i <= 5; i++) c.quadraticCurveTo(W * (i + .5) / 5, L.base - H * (.19 + (i % 2) * .04), W * (i + 1) / 5, L.base - H * .11);
+    c.lineTo(W, L.base); c.lineTo(0, L.base); c.fill();
     c.fillStyle = "#9edb7e";
     c.beginPath(); c.moveTo(0, L.base - H * .06);
     for (let i = 0; i <= 8; i++) c.quadraticCurveTo(W * (i + .5) / 8, L.base - H * (.1 + (i % 2) * .03), W * (i + 1) / 8, L.base - H * .06);
     c.lineTo(W, L.base); c.lineTo(0, L.base); c.fill();
-    // fortov og vej
-    c.fillStyle = "#e3ddd2"; c.fillRect(0, L.base, W, L.groundY - L.base + H * .02);
+    const ts = Math.min(W, H) * .09;
+    [W * .03, ...houses.slice(0, 3).map((h, i) => (h.x + h.w + houses[i + 1].x) / 2), W * .97].forEach((tx, i) => {
+      drawTree(tx, L.base, ts * (.85 + (i % 2) * .22));
+    });
+    c.fillStyle = "#e7e1d6"; c.fillRect(0, L.base, W, L.groundY - L.base + H * .02);
+    c.fillStyle = "#d4cdc0"; c.fillRect(0, L.groundY + H * .01, W, H * .012);
     c.fillStyle = "#5b5f6b"; c.fillRect(0, L.groundY + H * .02, W, H);
     c.fillStyle = "#ffd23f";
     const ry = L.groundY + H * .02 + (H - L.groundY) * .45;
@@ -135,29 +154,38 @@
     if (h.wob > 0) { c.translate(h.x + h.w / 2, h.base); c.rotate(Math.sin(clock * 30) * h.wob * .05); c.translate(-(h.x + h.w / 2), -h.base); }
     const top = h.base - h.h, lw = Math.max(2, h.w * .02);
     c.lineWidth = lw; c.strokeStyle = h.dark; c.lineJoin = "round";
-    // skorsten
+    c.fillStyle = "rgba(31,58,95,.14)"; c.beginPath(); c.ellipse(h.x + h.w / 2, h.base + 3, h.w * .56, 6, 0, 0, Math.PI * 2); c.fill();
     c.fillStyle = h.roof; rr(h.x + h.w * .68, top - h.roofH * .85, h.w * .13, h.roofH * .6, 3); c.fill(); c.stroke();
-    // krop
+    rr(h.x + h.w * .65, top - h.roofH * .9, h.w * .19, h.roofH * .14, 2); c.fill(); c.stroke();
     c.fillStyle = h.col; rr(h.x, top, h.w, h.h, 6); c.fill(); c.stroke();
-    // tag
+    c.fillStyle = "rgba(255,255,255,.16)"; rr(h.x + lw, top + lw, h.w * .18, h.h - lw * 2, 4); c.fill();
     c.fillStyle = h.roof;
     c.beginPath(); c.moveTo(h.x - h.w * .08, top + 2); c.lineTo(h.x + h.w / 2, top - h.roofH); c.lineTo(h.x + h.w * 1.08, top + 2); c.closePath(); c.fill(); c.stroke();
-    // dør
+    c.strokeStyle = "rgba(255,255,255,.45)"; c.lineWidth = lw * .8;
+    c.beginPath(); c.moveTo(h.x - h.w * .05, top + 2); c.lineTo(h.x + h.w * 1.05, top + 2); c.stroke();
+    c.strokeStyle = h.dark; c.lineWidth = lw;
     c.fillStyle = h.dark; rr(h.x + h.w * .14, h.base - h.h * .4, h.w * .24, h.h * .4, [h.w * .1, h.w * .1, 0, 0]); c.fill();
-    c.fillStyle = "#ffd23f"; c.beginPath(); c.arc(h.x + h.w * .33, h.base - h.h * .2, h.w * .02, 0, Math.PI * 2); c.fill();
-    // nederste vindue
-    c.fillStyle = "#e6f6ff"; rr(h.x + h.w * .56, h.base - h.h * .4, h.w * .28, h.h * .22, 4); c.fill(); c.stroke();
-    // øverste vindue (her sidder dyret)
+    c.fillStyle = "#fff6cf"; c.beginPath(); c.arc(h.x + h.w * .26, h.base - h.h * .29, h.w * .055, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "#ffd23f"; c.beginPath(); c.arc(h.x + h.w * .33, h.base - h.h * .18, h.w * .022, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "#d9d2c5"; rr(h.x + h.w * .11, h.base - 3, h.w * .3, 5, 2); c.fill();
+    const lx = h.x + h.w * .55, ly = h.base - h.h * .4, lw2 = h.w * .28, lh2 = h.h * .22;
+    c.fillStyle = "#e6f6ff"; rr(lx, ly, lw2, lh2, 4); c.fill(); c.stroke();
+    c.strokeStyle = "#fff"; c.lineWidth = lw * .7;
+    c.beginPath(); c.moveTo(lx + lw2 / 2, ly); c.lineTo(lx + lw2 / 2, ly + lh2); c.moveTo(lx, ly + lh2 / 2); c.lineTo(lx + lw2, ly + lh2 / 2); c.stroke();
+    c.fillStyle = "#8a5a30"; rr(lx - 2, ly + lh2 - 1, lw2 + 4, Math.max(5, h.h * .055), 2); c.fill();
+    ["#ff7fbf", "#ffd84d", "#ff5c5c"].forEach((fc, fi) => {
+      c.fillStyle = "#4fa347"; c.beginPath(); c.arc(lx + lw2 * (.2 + fi * .3), ly + lh2 - 1, Math.max(2.5, h.w * .03), 0, Math.PI * 2); c.fill();
+      c.fillStyle = fc; c.beginPath(); c.arc(lx + lw2 * (.2 + fi * .3), ly + lh2 - Math.max(3, h.h * .025), Math.max(2.2, h.w * .026), 0, Math.PI * 2); c.fill();
+    });
+    c.strokeStyle = h.dark; c.lineWidth = lw;
     const w = h.win, s = w.s, petHere = h.pet && !(rescue && rescue.house === h && rescue.left);
     if (h.fire > 0) { const gl = c.createRadialGradient(w.x, w.y + s * .2, s * .1, w.x, w.y, s * .75); gl.addColorStop(0, "#fff0b8"); gl.addColorStop(1, "#ff8336"); c.fillStyle = gl; }
     else c.fillStyle = "#e6f6ff";
     rr(w.x - s / 2, w.y - s / 2, s, s, 4); c.fill(); c.stroke();
-    // vinduet står åbent, mens dyret venter (intet vindueskors, der stikker ud til siderne)
     if (!petHere) {
       c.strokeStyle = "#fff"; c.lineWidth = lw * .8;
       c.beginPath(); c.moveTo(w.x, w.y - s / 2); c.lineTo(w.x, w.y + s / 2); c.moveTo(w.x - s / 2, w.y); c.lineTo(w.x + s / 2, w.y); c.stroke();
     }
-    // dyret vipper lidt, som om det kalder på hjælp
     if (petHere) emoji(h.pet, w.x, w.y + s * .06 - (still ? 0 : Math.abs(Math.sin(clock * 4)) * s * .06), s * .82);
     c.restore();
   }
@@ -200,7 +228,7 @@
     // kofanger
     c.fillStyle = "#9aa3b5"; rr(w * .44, -h * .3, w * .07, h * .12, 3); c.fill();
     // blink på taget
-    const on = Math.floor(clock * 6) % 2 === 0 && (truck.moving || phase === "spray" || phase === "drive");
+    const on = Math.floor(clock * 6) % 2 === 0 && (truck.moving || phase === "spray" || phase === "drive" || honkT > 0);
     c.fillStyle = on ? "#4d96ff" : "#1f3a8a"; rr(w * .26, -h * 1.04, w * .1, h * .12, 4); c.fill();
     if (on) { c.fillStyle = "rgba(77,150,255,.35)"; c.beginPath(); c.arc(w * .31, -h * .98, h * .35, 0, Math.PI * 2); c.fill(); }
     // stige (sammenfoldet) hvis den ikke er ude
@@ -289,6 +317,7 @@
   /* ---------- Opdatering ---------- */
   function update(dt) {
     clock += dt; idleT += dt;
+    honkT = Math.max(0, honkT - dt); sunT = Math.max(0, sunT - dt);
     if (!still) clouds.forEach(cl => { cl.x += cl.v * dt; if (cl.x > 1.15) cl.x = -.15; });
     houses.forEach(h => { h.wob = Math.max(0, h.wob - dt * 2); });
     const h = fireIdx >= 0 ? houses[fireIdx] : null;
@@ -444,6 +473,15 @@
   function pointer(e) {
     const r = root.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
     if (e.type === "pointerdown") {
+      if (L.sun && Math.hypot(x - L.sun.x, y - L.sun.y) < L.sun.r * 1.6) {
+        sunT = .6; Spil.tone([659, 784, 1047], .07);
+        const cr = root.getBoundingClientRect(); Spil.burst(cr.left + L.sun.x, cr.top + L.sun.y, "☀️✨💛");
+        return;
+      }
+      if (Math.abs(x - truck.x) < L.tw * .52 && y > L.truckBase - L.th * 1.25 && y < L.truckBase + 8) {
+        honkT = .75; Spil.tone([392, 523], .12, "triangle");
+        return;
+      }
       if (phase === "idle") { const i = hitHouse(x, y); if (i >= 0) tapHouse(i); return; }
       if (phase === "spray") { spraying = true; target = { x, y }; sprayT = .45; return; }
     } else if (e.type === "pointermove") {
@@ -499,7 +537,7 @@
       root = r.querySelector(".bb"); cv = root.querySelector("canvas"); c = cv.getContext("2d");
       houses = HOUSES.map(h => ({ ...h, fire: 0, wob: 0, pet: null }));
       clouds = [{ x: .15, y: .12, s: .12, v: .012 }, { x: .55, y: .2, s: .09, v: .008 }, { x: .85, y: .08, s: .1, v: .01 }];
-      parts = []; water = []; rescue = null; fireIdx = -1; lastIdx = -1; count = 0; spraying = false; sprayT = 0; jet = null; idleT = 0; target = null;
+      parts = []; water = []; rescue = null; fireIdx = -1; lastIdx = -1; count = 0; spraying = false; sprayT = 0; jet = null; idleT = 0; target = null; honkT = 0; sunT = 0;
       phase = "start"; hiss = null; hissGain = null;
       resize();
       truck = { x: -L.tw, from: 0, to: 0, t: 0, dur: 1, dir: 1, spin: 0, moving: false };

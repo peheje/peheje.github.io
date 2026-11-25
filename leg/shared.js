@@ -70,7 +70,8 @@
     const my = ++token;
     stopSrc();
     let finished = false; talking = true;
-    const fin = () => { if (finished || my !== token) return; finished = true; talking = false; done && done(); };
+    duckMusic(true);
+    const fin = () => { if (finished || my !== token) return; finished = true; talking = false; duckMusic(false); done && done(); };
     if (keys && AC) {
       try { speechSynthesis.cancel(); } catch (e) {}
       Promise.all([].concat(keys).map(load)).then(bufs => {
@@ -113,7 +114,7 @@
     };
     setTimeout(check, 1500);
   }
-  function stopTalking() { token++; talking = false; stopSrc(); try { speechSynthesis.cancel(); } catch (e) {} }
+  function stopTalking() { token++; talking = false; duckMusic(false); stopSrc(); try { speechSynthesis.cancel(); } catch (e) {} }
   const isTalking = () => talking;
   // Dyr med en rigtig dyrelyd i lyd/dyr-<dyr>.mp3 (frie CC0-optagelser, se lyd/DYRELYDE.md).
   // For dem siger ja-<dyr> "Ja! Hør, hvad koen siger!", og så kommer dyrets egen lyd bagefter.
@@ -176,6 +177,49 @@
     return threeP;
   }
 
-  Object.assign(Spil, { three, say, stopTalking, isTalking, preload, key, jaDyr, audio: ctx, tone, sfx, burst, burstAt, css, shuffle, danishVoices, label, setVoice, getVoice: () => voice });
+  /* ---------- Baggrundsmusik (Web Audio, så volumen og ducking virker på iPad Safari) ---------- */
+  const musikBufs = {};
+  let mSrc = null, mGain = null, mVol = .26, mTok = 0, mUrl = null, mMuted = false;
+  try { mMuted = localStorage.getItem("lk-musik") === "0"; } catch (e) {}
+  function musikTarget() { return mMuted ? .0001 : (talking ? mVol * .26 : mVol); }
+  function duckMusic(on) {
+    if (!mGain || !actx) return;
+    try { mGain.gain.setTargetAtTime(mMuted ? .0001 : (on ? mVol * .26 : mVol), actx.currentTime, .15); } catch (e) {}
+  }
+  function stopMusic() {
+    mTok++; mUrl = null;
+    if (mSrc) { try { mSrc.stop(); } catch (e) {} mSrc = null; }
+    if (mGain) { try { mGain.disconnect(); } catch (e) {} mGain = null; }
+  }
+  function playMusic(url, vol = .26) {
+    if (!AC) return;
+    stopMusic();
+    mUrl = url; mVol = vol;
+    const my = mTok;
+    if (!musikBufs[url]) {
+      musikBufs[url] = fetch(url).then(r => { if (!r.ok) throw new Error(url); return r.arrayBuffer(); })
+        .then(b => new Promise((res, rej) => ctx().decodeAudioData(b, res, rej)));
+      musikBufs[url].catch(() => { delete musikBufs[url]; });
+    }
+    musikBufs[url].then(buf => {
+      if (my !== mTok) return;
+      const c = ctx(), s = c.createBufferSource(), g = c.createGain();
+      s.buffer = buf; s.loop = true;
+      g.gain.setValueAtTime(.0001, c.currentTime);
+      g.gain.setTargetAtTime(musikTarget(), c.currentTime, .35);
+      s.connect(g).connect(c.destination);
+      s.start();
+      mSrc = s; mGain = g;
+    }).catch(() => {});
+  }
+  function toggleMusic() {
+    mMuted = !mMuted;
+    try { localStorage.setItem("lk-musik", mMuted ? "0" : "1"); } catch (e) {}
+    duckMusic(talking);
+    return !mMuted;
+  }
+  const music = { play: playMusic, stop: stopMusic, toggle: toggleMusic, isMuted: () => mMuted };
+
+  Object.assign(Spil, { three, say, stopTalking, isTalking, preload, key, jaDyr, audio: ctx, tone, sfx, music, burst, burstAt, css, shuffle, danishVoices, label, setVoice, getVoice: () => voice });
   window.Spil = Spil;
 })();
