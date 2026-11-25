@@ -70,7 +70,7 @@
   `);
 
   let root, cv, c, W, H, raf, last, alive, timers, phase, loc, count, goal, mission, color, trip, rocket, cam, sky,
-    items, parts, decor, meteors, rings, spawnT, decorT, meteorT, ringT, turbo, hovT, shake, landT, rumbleSrc, finishing, flags, clock, dybTest;
+    items, parts, decor, meteors, rings, spawnT, decorT, meteorT, ringT, turbo, hovT, shake, landT, rumbleSrc, finishing, flags, clock, dybTest, alienSide;
   const later = (fn, ms) => timers.push(setTimeout(() => alive && fn(), ms));
   const q = s => root.querySelector(s);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -158,22 +158,29 @@
   }
 
   function cloud(x, y, s) {
-    c.fillStyle = "#fff"; c.beginPath(); // én samlet form, så de runde dele ikke ses igennem hinanden, når skyen fader
-    [[0, 0, .5], [-.45, .12, .34], [.45, .1, .38], [.2, -.22, .36], [-.2, -.15, .3]].forEach(([a, b, r]) => {
-      c.moveTo(x + (a + r) * s, y + b * s); c.arc(x + a * s, y + b * s, r * s, 0, Math.PI * 2);
-    });
-    c.fill();
-    c.fillStyle = "rgba(190,215,235,.5)"; c.beginPath(); c.ellipse(x, y + s * .3, s * .75, s * .12, 0, 0, Math.PI * 2); c.fill();
+    // Én samlet sky-form med flad bund og blød indvendig skygge, så intet skinner igennem ved fade
+    c.save();
+    const p = new Path2D();
+    p.moveTo(x - s * .72, y + s * .24);
+    p.arc(x - s * .46, y + s * .06, s * .28, Math.PI * .5, Math.PI * 1.45);
+    p.arc(x - s * .14, y - s * .12, s * .34, Math.PI * 1.05, Math.PI * 1.88);
+    p.arc(x + s * .26, y - s * .06, s * .3, Math.PI * 1.15, Math.PI * 1.95);
+    p.arc(x + s * .52, y + s * .08, s * .24, Math.PI * 1.35, Math.PI * .5);
+    p.closePath();
+    c.fillStyle = "#ffffff"; c.fill(p);
+    c.clip(p);
+    c.fillStyle = "#dceefb"; c.fillRect(x - s, y + s * .13, s * 2, s * .2);
+    c.restore();
   }
 
-  // Himlen over startrampen: sol, skyer og bakker i det fjerne. Skyerne ligger i flere højder, så raketten flyver forbi dem.
+  // Himlen over startrampen: sol, skyer og bløde bakker i det fjerne. Skyerne ligger i flere højder, så raketten flyver forbi dem.
   function drawEarthSky(gy) {
     const m = Math.min(W, H), sx = W * .84, sy = H * .18 + cam * .05; // solen er langt væk og flytter sig næsten ikke
     c.globalAlpha = 1 - clamp(cam / (H * 1.2), 0, 1); // ude i rummet er sol og skyer væk
     if (sy > -m * .2 && sy < H + m * .2) {
-      const sg = c.createRadialGradient(sx, sy, m * .05, sx, sy, m * .12);
-      sg.addColorStop(0, "rgba(255,245,200,.8)"); sg.addColorStop(1, "rgba(255,245,200,0)");
-      c.fillStyle = sg; c.beginPath(); c.arc(sx, sy, m * .12, 0, Math.PI * 2); c.fill();
+      const sg = c.createRadialGradient(sx, sy, m * .05, sx, sy, m * .13);
+      sg.addColorStop(0, "rgba(255,245,200,.85)"); sg.addColorStop(1, "rgba(255,245,200,0)");
+      c.fillStyle = sg; c.beginPath(); c.arc(sx, sy, m * .13, 0, Math.PI * 2); c.fill();
       c.fillStyle = "#ffd23f"; c.beginPath(); c.arc(sx, sy, m * .065, 0, Math.PI * 2); c.fill();
     }
     [[.18, .62, .09], [.6, .5, .07], [.82, .32, .06], [.3, .95, .1], [.75, 1.15, .08]].forEach(([x, y, k]) => {
@@ -182,22 +189,40 @@
     });
     c.globalAlpha = 1;
     if (gy > H + 10) return;
-    c.fillStyle = "#a6dc95"; // bakker langt væk
-    c.beginPath(); c.moveTo(-10, gy + H * .05);
-    c.quadraticCurveTo(W * .15, gy - H * .1, W * .35, gy - H * .01);
-    c.quadraticCurveTo(W * .62, gy - H * .12, W * .8, gy - H * .02);
-    c.quadraticCurveTo(W * .92, gy - H * .07, W + 10, gy - H * .02);
-    c.lineTo(W + 10, gy + H * .05); c.fill();
+    // To lag bløde bakker giver dybde bag startrampen
+    c.fillStyle = "#9bd8a6";
+    c.beginPath(); c.moveTo(-10, gy + H * .06);
+    c.quadraticCurveTo(W * .2, gy - H * .11, W * .44, gy - H * .02);
+    c.quadraticCurveTo(W * .72, gy - H * .13, W + 10, gy - H * .01);
+    c.lineTo(W + 10, gy + H * .06); c.fill();
+    c.fillStyle = "#83cc88";
+    c.beginPath(); c.moveTo(-10, gy + H * .06);
+    c.quadraticCurveTo(W * .16, gy - H * .05, W * .36, gy - H * .005);
+    c.quadraticCurveTo(W * .64, gy - H * .08, W * .85, gy - H * .01);
+    c.quadraticCurveTo(W * .94, gy - H * .04, W + 10, gy + H * .01);
+    c.lineTo(W + 10, gy + H * .06); c.fill();
   }
 
   function drawFlag(x, gy, col, i) {
-    const h = RH(), by = groundAt(x, gy), top = by - h * .62, wave = Math.sin(clock * 4 + i) * h * .03;
+    const h = RH(), by = groundAt(x, gy) + H * .025, top = by - h * .62, wave = Math.sin(clock * 4 + i) * h * .03;
+    c.fillStyle = "rgba(0,0,0,.22)";
+    c.beginPath(); c.ellipse(x + h * .03, by + 2, h * .075, h * .022, 0, 0, Math.PI * 2); c.fill();
     c.strokeStyle = "#e8e8f0"; c.lineWidth = Math.max(3, h * .03); c.lineCap = "round";
-    c.beginPath(); c.moveTo(x, by + 2); c.lineTo(x, top); c.stroke();
+    c.beginPath(); c.moveTo(x, by + 1); c.lineTo(x, top); c.stroke();
     c.fillStyle = col;
     c.beginPath(); c.moveTo(x, top); c.quadraticCurveTo(x + h * .18, top + h * .05 + wave, x + h * .34, top + h * .1);
     c.quadraticCurveTo(x + h * .18, top + h * .17 - wave, x, top + h * .22); c.fill();
     c.fillStyle = "#fff"; starPath(x + h * .13, top + h * .1, h * .045, 0); c.fill();
+  }
+
+  function drawFlags(gy) {
+    if (loc < 0 || gy > H + 10) return;
+    const p = PLANETS[loc];
+    (flags[p.k] || []).forEach((f, i) => drawFlag(f.x * W, gy, f.c, i));
+    if (phase === "flag") {
+      const hx = W < 560 ? W * .22 : W * .3;
+      emoji("👆", hx, groundAt(hx, gy) + H * .06 + Math.sin(clock * 6) * 8, Math.min(W, H) * .1);
+    }
   }
 
   // En lille, rund måne med skygge (bruges på Mars og Jupiter)
@@ -209,23 +234,70 @@
     [[.3, -.2, .22], [-.3, .3, .18]].forEach(([a, b, k]) => { c.beginPath(); c.arc(x + a * r, y + b * r, k * r, 0, Math.PI * 2); c.fill(); });
   }
 
-  // Jorden set fra Månen: hav, grønne lande, hvide skyer og skygge på den ene side
+  // Jorden set fra Månen: atmosfære, hav, genkendelige kontinenter, poler, bløde skybånd og naturlig dag/nat-skygge
   function drawEarth(x, y, r) {
     c.save();
-    c.shadowColor = "rgba(124,198,242,.7)"; c.shadowBlur = r * .5;
-    c.fillStyle = "#2f7fe0"; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
-    c.shadowBlur = 0; c.clip();
-    c.fillStyle = "#5cc46b";
-    [[-.35, -.35, .45, .3, .4], [.3, .1, .35, .5, -.3], [-.4, .45, .3, .2, .2], [.45, -.55, .2, .15, 0]].forEach(([a, b, rx, ry, rot]) => {
-      c.beginPath(); c.ellipse(x + a * r, y + b * r, rx * r, ry * r, rot, 0, Math.PI * 2); c.fill();
+    // Blød blå atmosfære-glød omkring kloden
+    const atm = c.createRadialGradient(x, y, r * .88, x, y, r * 1.32);
+    atm.addColorStop(0, "rgba(110,195,255,.5)"); atm.addColorStop(1, "rgba(110,195,255,0)");
+    c.fillStyle = atm; c.beginPath(); c.arc(x, y, r * 1.32, 0, Math.PI * 2); c.fill();
+
+    // Havet (lyst mod solen oppe til venstre, dybere blåt mod skyggesiden)
+    const sea = c.createRadialGradient(x - r * .35, y - r * .35, r * .1, x, y, r * 1.15);
+    sea.addColorStop(0, "#4ea8ff"); sea.addColorStop(.65, "#2876d8"); sea.addColorStop(1, "#174a96");
+    c.fillStyle = sea; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    c.clip();
+
+    // Organiske kontinenter (Nord-/Sydamerika til venstre, Europa/Afrika til højre)
+    const land = pts => {
+      c.beginPath();
+      pts.forEach(([px, py], i) => {
+        const ax = x + px * r, ay = y + py * r;
+        if (i === 0) c.moveTo(ax, ay);
+        else {
+          const [qx, qy] = pts[i - 1], mx = (x + qx * r + ax) / 2, my = (y + qy * r + ay) / 2;
+          c.quadraticCurveTo(x + qx * r, y + qy * r, mx, my);
+        }
+      });
+      c.closePath(); c.fill();
+    };
+    c.fillStyle = "#56bf68";
+    // Nordamerika
+    land([[-.78, -.42], [-.48, -.64], [-.18, -.52], [-.22, -.26], [-.4, -.12], [-.5, .04], [-.66, -.12]]);
+    // Sydamerika
+    land([[-.42, .08], [-.18, .16], [-.12, .42], [-.28, .72], [-.44, .56], [-.48, .28]]);
+    // Europa + Afrika
+    land([[.16, -.54], [.52, -.62], [.78, -.36], [.64, -.12], [.34, -.16], [.18, -.32]]);
+    land([[.14, -.12], [.46, -.1], [.72, .12], [.58, .54], [.34, .64], [.2, .32]]);
+    // Lidt lysere højland på sol-siden
+    c.fillStyle = "#76d67a";
+    land([[-.62, -.46], [-.4, -.54], [-.3, -.32], [-.52, -.24]]);
+    land([[.24, -.42], [.48, -.46], [.54, -.26], [.28, -.28]]);
+
+    // Hvide polkapper
+    c.fillStyle = "rgba(240,248,255,.85)";
+    c.beginPath(); c.ellipse(x - r * .05, y - r * .94, r * .46, r * .16, -.08, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(x + r * .05, y + r * .96, r * .4, r * .14, .05, 0, Math.PI * 2); c.fill();
+
+    // Bløde buede skybånd
+    c.strokeStyle = "rgba(255,255,255,.55)"; c.lineCap = "round";
+    [[-.55, -.18, .12, -.26, .09], [-.15, .14, .52, .04, .08], [-.45, .48, .15, .42, .07]].forEach(([x0, y0, x1, y1, w]) => {
+      c.lineWidth = r * w; c.beginPath();
+      c.moveTo(x + x0 * r, y + y0 * r);
+      c.quadraticCurveTo(x + (x0 + x1) * .5 * r, y + ((y0 + y1) * .5 - .08) * r, x + x1 * r, y + y1 * r);
+      c.stroke();
     });
-    c.fillStyle = "rgba(255,255,255,.55)"; // bløde skyer
-    [[-.05, -.02, .32, .09, -.2], [.15, .58, .3, .08, .1], [-.6, .05, .2, .07, .3]].forEach(([a, b, rx, ry, rot]) => {
-      c.beginPath(); c.ellipse(x + a * r, y + b * r, rx * r, ry * r, rot, 0, Math.PI * 2); c.fill();
-    });
-    const sh = c.createRadialGradient(x - r * .35, y - r * .35, r * .2, x, y, r * 1.05);
-    sh.addColorStop(0, "rgba(255,255,255,.18)"); sh.addColorStop(.6, "rgba(0,0,0,0)"); sh.addColorStop(1, "rgba(5,10,40,.45)");
+
+    // Naturlig dag/nat-skygge fra nederste højre hjørne + tynd lys atmosfærekant på solsiden
+    const sh = c.createRadialGradient(x - r * .48, y - r * .45, r * .45, x - r * .08, y - r * .08, r * 1.18);
+    sh.addColorStop(0, "rgba(255,255,255,.12)");
+    sh.addColorStop(.58, "rgba(0,0,0,0)");
+    sh.addColorStop(.86, "rgba(8,18,56,.42)");
+    sh.addColorStop(1, "rgba(5,10,36,.68)");
     c.fillStyle = sh; c.fillRect(x - r, y - r, r * 2, r * 2);
+
+    c.strokeStyle = "rgba(175,228,255,.55)"; c.lineWidth = Math.max(1.5, r * .06);
+    c.beginPath(); c.arc(x, y, r - c.lineWidth * .4, Math.PI * .85, Math.PI * 1.75); c.stroke();
     c.restore();
   }
 
@@ -244,12 +316,11 @@
     } else if (p.k === "jupiter") { // Io og Europa
       drawMoonlet(W * .8, H * .15 + dy, m * .04, "#fff08a", "#d8a03a");
       drawMoonlet(W * .64, H * .26 + dy, m * .028, "#ffffff", "#b9b2a6");
-    } else { // Saturns ringe som en stor bue hen over himlen
-      c.save(); c.translate(W / 2, gy + H * .08); c.rotate(-.12);
-      const rx = Math.max(W * .62, H * .45), ry = H * .62;
-      [["#fff3cf", .05, .85], ["#e9c27c", .035, .8], ["#ffe3a3", .025, .85]].forEach(([col, w, a], i) => {
+    } else { // Saturns ringe som en bred, skrå bue hen over himlen
+      c.save(); c.translate(W * .55, gy + H * .04); c.rotate(-.2);
+      const rx = Math.max(W * .92, H * .72), ry = H * .32;
+      [["#fff3cf", .042, .8, 1], ["#e9c27c", .028, .72, .91], ["#ffe3a3", .022, .78, .8]].forEach(([col, w, a, k]) => {
         c.strokeStyle = col; c.globalAlpha = a; c.lineWidth = m * w;
-        const k = 1 - i * .07;
         c.beginPath(); c.ellipse(0, 0, rx * k, ry * k, 0, Math.PI, Math.PI * 2); c.stroke();
       });
       c.restore(); c.globalAlpha = 1;
@@ -268,19 +339,26 @@
       gg.addColorStop(0, "#74cc6f"); gg.addColorStop(1, "#4e9f50");
       c.fillStyle = gg; c.fill(top);
       const h = RH(), tx = W / 2 - h * .62, tw = h * .2, th = h * 1.05, n = Math.round(th / tw), cell = th / n;
+      const tBase = groundAt(tx, gy) + h * .04, pBase = groundAt(W / 2, gy);
       c.strokeStyle = "#8d95ad"; c.lineWidth = Math.max(2, h * .025); c.lineJoin = "round";
-      c.strokeRect(tx - tw / 2, gy - th, tw, th);
+      c.strokeRect(tx - tw / 2, tBase - th, tw, th);
       c.beginPath(); // gitteret går præcis op til toppen af tårnet
       for (let i = 0; i < n; i++) {
-        const y0 = gy - i * cell, y1 = y0 - cell;
+        const y0 = tBase - i * cell, y1 = y0 - cell;
         c.moveTo(tx - tw / 2, y0); c.lineTo(tx + tw / 2, y1); c.moveTo(tx + tw / 2, y0); c.lineTo(tx - tw / 2, y1);
       }
-      c.moveTo(tx + tw / 2, gy - th * .7); c.lineTo(W / 2 - h * .14, gy - th * .7);
+      c.moveTo(tx + tw / 2, tBase - th * .7); c.lineTo(W / 2 - h * .14, tBase - th * .7);
       c.stroke();
-      c.fillStyle = "#5a6380"; c.fillRect(tx - tw * .7, gy - th - h * .04, tw * 1.4, h * .04); // platform på toppen
+      c.fillStyle = "#5a6380"; c.fillRect(tx - tw * .7, tBase - th - h * .04, tw * 1.4, h * .04); // platform på toppen
       c.fillStyle = Math.sin(clock * 4) > 0 || still ? "#ff4d5e" : "#a8323d"; // blinkende lampe
-      c.beginPath(); c.arc(tx, gy - th - h * .07, h * .03, 0, Math.PI * 2); c.fill();
-      c.fillStyle = "#5a6380"; c.fillRect(W / 2 - h * .45, gy - h * .02, h * .9, h * .06);
+      c.beginPath(); c.arc(tx, tBase - th - h * .07, h * .03, 0, Math.PI * 2); c.fill();
+      // Startrampe med skrå betonfod, der står fast i bakken
+      c.fillStyle = "#485069";
+      c.beginPath();
+      c.moveTo(W / 2 - h * .52, pBase + h * .07); c.lineTo(W / 2 - h * .44, pBase - h * .01);
+      c.lineTo(W / 2 + h * .44, pBase - h * .01); c.lineTo(W / 2 + h * .52, pBase + h * .07);
+      c.closePath(); c.fill();
+      c.fillStyle = "#6c7696"; c.fillRect(W / 2 - h * .45, pBase - h * .025, h * .9, h * .035);
       return;
     }
     const g = c.createLinearGradient(0, gy - H * .04, 0, gy + H * .2);
@@ -300,9 +378,9 @@
         c.fillStyle = "#e07a52"; c.beginPath(); c.ellipse(x - m * .01, y - m * .005, m * .065, m * .02, -.05, 0, Math.PI * 2); c.fill();
       }
     } else {
-      // kratere med lys kant forneden og skygge foroven, så de ligner huller
+      // kratere følger planetens krumning, med lys kant forneden og skygge foroven
       CRATERS.forEach(([x, y, r]) => {
-        const cx = x * W, cy = gy + H * .02 + y * H * .14, rx = r * m * 1.4, ry = r * m * .5;
+        const cx = x * W, cy = groundAt(cx, gy) + H * .025 + y * H * .12, rx = r * m * 1.4, ry = r * m * .5;
         c.fillStyle = p.prik; c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); c.fill();
         c.fillStyle = "rgba(0,0,0,.12)"; c.beginPath(); c.ellipse(cx, cy - ry * .25, rx * .85, ry * .65, 0, 0, Math.PI * 2); c.fill();
         c.strokeStyle = "rgba(255,255,255,.45)"; c.lineWidth = Math.max(2, ry * .3); c.lineCap = "round";
@@ -317,8 +395,6 @@
       }
     }
     c.restore();
-    (flags[p.k] || []).forEach((f, i) => drawFlag(f.x * W, gy, f.c, i));
-    if (phase === "flag") emoji("👆", W * .3, gy + H * .06 + Math.sin(clock * 6) * 8, Math.min(W, H) * .1);
   }
 
   function drawMeteor(m) {
@@ -376,6 +452,7 @@
     c.shadowBlur = 0;
     meteors.forEach(drawMeteor);
     drawRocket(rocket.x, rocket.y, RH(), rocket.flame, rocket.tilt + Math.sin(clock * 28) * rocket.wob * .35);
+    drawFlags(groundY() + cam);
     rings.forEach(r => drawRing(r, true));
     parts.forEach(p => {
       if (p.kind === "smoke") return;
@@ -620,26 +697,38 @@
     later(() => { if (phase === "flag") Spil.say("Tryk på jorden for at sætte flaget!", null, "raket-flag"); }, 9000);
   }
 
+  function placeAlien(fx) {
+    const a = q(".rk-alien");
+    if (!a || a.hidden) return;
+    const size = Math.min(120, Math.max(64, H * .12)), sz = Math.min(size, W * .22);
+    // Beregn pladsen til den røde knap ud fra CSS (knappen er skjult, når flaget sættes, så offsetLeft er 0)
+    const goW = clamp(Math.min(H * .18, W * .26), 90, 170), goLeft = W - Math.max(W * .08, 16) - goW;
+    const lx = Math.max(8, rocket.x - RH() * .5 - sz), rx = rocket.x + RH() * .5;
+    const rOk = rx + sz < goLeft - 12;
+    if (typeof fx === "number") {
+      alienSide = rOk && Math.abs(rx + sz / 2 - fx) > Math.abs(lx + sz / 2 - fx) ? 1 : -1;
+    } else if (alienSide === 1 && !rOk) {
+      alienSide = -1;
+    }
+    const ax = alienSide === 1 ? rx : lx;
+    a.style.fontSize = sz + "px";
+    a.style.left = ax + "px";
+    a.style.top = (groundAt(ax + sz / 2, groundY()) - sz * .96) + "px";
+  }
+
   function plantFlag(x) {
     const p = PLANETS[loc], list = flags[p.k] = flags[p.k] || [];
     const col = FLAGCOL[(list.length + loc) % FLAGCOL.length];
-    list.push({ x: clamp(x / W, .05, .95), c: col });
+    list.push({ x: clamp(x / W, .06, .94), c: col });
     if (list.length > 8) list.shift();
     saveFlags();
     phase = "planet";
     const r = root.getBoundingClientRect();
     Spil.burst(r.left + x, r.top + groundAt(x, groundY()) - RH() * .4);
     Spil.sfx.right();
-    // rumvæsenet dukker op til venstre for raketten (knappen sidder til højre)
-    const a = q(".rk-alien"), size = Math.min(120, Math.max(64, H * .12));
+    const a = q(".rk-alien");
     a.hidden = false; a.classList.remove("hej");
-    // rumvæsenet står på den side af raketten, der er længst fra det nye flag (og uden om knappen)
-    const fx = x, btn = q(".rk-go").offsetLeft, sz = Math.min(size, W * .22);
-    const lx = Math.max(8, rocket.x - RH() * .5 - sz), rx = rocket.x + RH() * .5;
-    const rOk = rx + sz < btn - 8 || btn <= 0;
-    const ax = rOk && Math.abs(rx + sz / 2 - fx) > Math.abs(lx + sz / 2 - fx) ? rx : lx;
-    a.style.fontSize = sz + "px";
-    a.style.left = ax + "px"; a.style.top = (groundY() - sz * 1.05) + "px";
+    placeAlien(x);
     Spil.say("Flot! Nu er flaget sat!", readyAgain, "raket-flag-sat");
     later(() => { if (!Spil.isTalking()) readyAgain(); }, 6000);
   }
@@ -661,6 +750,7 @@
     cv.width = W * dpr; cv.height = H * dpr; c.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (["pad", "count", "planet", "flag", "flagwait"].includes(phase)) { rocket.x = W / 2; rocket.y = rest(); }
     rocket.x = clamp(rocket.x, W * .1, W * .9); rocket.tx = clamp(rocket.tx, W * .1, W * .9);
+    placeAlien();
   }
 
   function frame(t) {

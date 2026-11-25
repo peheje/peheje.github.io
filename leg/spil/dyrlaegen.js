@@ -75,7 +75,7 @@
   const REDSKABER = [
     { id: "roentgen", ikon: "🔍", navn: "Røntgen", farve: "#e4e2ff",
       hintKey: "dyrl-hint-roentgen", hintTekst: "Prøv røntgen-luppen! Tryk på forstørrelsesglasset nede i bunden." },
-    { id: "pincet", ikon: "🤏", navn: "Pincet", farve: "#ffe8f0",
+    { id: "pincet", ikon: "🤏", billede: "billeder/dyrlaegen/pincet.webp", navn: "Pincet", farve: "#ffe8f0",
       hintKey: "dyrl-hint-pincet", hintTekst: "Prøv pincetten! Tryk på pincetten nede i bunden." },
     { id: "plaster", ikon: "🩹", navn: "Plaster", farve: "#ffe4d6",
       hintKey: "dyrl-hint-plaster", hintTekst: "Prøv plasteret! Tryk på plasteret nede i bunden." },
@@ -249,6 +249,7 @@
       box-shadow:0 6px 0 rgba(31,58,95,.22);display:flex;align-items:center;justify-content:center;
       font-size:clamp(34px,5.6vh,52px);line-height:1;padding:0;transition:transform .16s,box-shadow .16s;
       font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif}
+    .dl-tool img{width:76%;height:76%;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none}
     .dl-tool:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(31,58,95,.22)}
     .dl-tool.valgt{transform:translateY(-10px) scale(1.08);outline:5px solid var(--ink);
       box-shadow:0 12px 0 rgba(31,58,95,.22)}
@@ -269,6 +270,7 @@
     .dl-markoer{position:fixed;z-index:25;pointer-events:none;font-size:clamp(46px,7.5vh,68px);
       translate:-50% -65%;filter:drop-shadow(0 6px 6px rgba(31,58,95,.25));
       font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif}
+    .dl-markoer img{width:1.15em;height:1.15em;display:block;object-fit:contain;pointer-events:none}
     .dl-markoer[hidden]{display:none}
 
     /* Små partikler */
@@ -917,12 +919,17 @@
     }
   }
 
+  const redskabIkon = t => t.billede ? `<img src="${t.billede}" alt="">` : t.ikon;
+
   /* ---------- Flyvende markør og pointer-håndtering ---------- */
   function visMarkoer(x, y) {
     const m = $(".dl-markoer");
     if (!m || !valgtTool) return;
     const r = REDSKABER.find(t => t.id === valgtTool);
-    m.textContent = r.ikon;
+    if (m.dataset.tool !== r.id) {
+      m.dataset.tool = r.id;
+      m.innerHTML = redskabIkon(r);
+    }
     m.style.left = x + "px";
     m.style.top = y + "px";
     m.hidden = false;
@@ -1035,7 +1042,7 @@
           `<button class="dl-farve" data-plaster="${p.id}" style="background:${p.bg}" aria-label="${p.id}">${p.pynt}</button>`
         ).join("")}</div>
         <div class="dl-bakke">${REDSKABER.map(t =>
-          `<button class="dl-tool" data-tool="${t.id}" style="background:${t.farve}" aria-label="${t.navn}">${t.ikon}</button>`
+          `<button class="dl-tool" data-tool="${t.id}" style="background:${t.farve}" aria-label="${t.navn}">${redskabIkon(t)}</button>`
         ).join("")}</div>
         <div class="dl-godbakke" hidden></div>
         <button class="dl-naeste" hidden aria-label="Næste dyr">➡️</button>
