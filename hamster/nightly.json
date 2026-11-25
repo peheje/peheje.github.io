@@ -602,6 +602,25 @@
         "text": "A bright moon asks nothing of the house except that it remain warm within.",
         "source": "Found under the door"
       }
+    },
+    {
+      "date": "2026-11-25",
+      "text": "I cannot recall which page of the big book holds my winter porridge recipe. Would you remember something for me while I look?",
+      "extras": [
+        "The moon is just past full tonight, leaning the slightest shaving thinner along one bright rim.",
+        "Wednesday went dark by four o'clock, leaving the lane quiet except for cold wind in the beech hedge.",
+        "The two unopened jam-sealed envelopes still sit beside the chipped blue teacup, patient as stones.",
+        "The mole next door left three small footprints in the frost by my gate before turning back for his scarf.",
+        "I laid my good wool socks by the stove to warm through before bedtime; even a quiet knight minds cold toes."
+      ],
+      "quest": {
+        "kind": "memory",
+        "done": "Ah, there it is, tucked between two pressed birch leaves on page forty. Thank you; my head feels much tidier.",
+        "keepsake": {
+          "name": "A folded recipe slip",
+          "description": "Written in tidy ink on stiff cream paper, with a faint ring from a warm teacup at the corner."
+        }
+      }
     }
   ]
 }
