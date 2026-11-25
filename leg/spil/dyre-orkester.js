@@ -6,11 +6,11 @@
 (function () {
   // Tonerne danner en glad skala (C-dur uden F og H), så alt lyder pænt sammen.
   const DYR = [
-    { e: "🐄", ins: "🥁", navn: "Koen", f: 261.63, type: "triangle", h: [1, .3, .12], c1: "#ffe6a1", c2: "#efb234" },
-    { e: "🐈", ins: "🎻", navn: "Katten", f: 293.66, type: "sine", h: [1, .42, .1], c1: "#cfe9ff", c2: "#5fa8dd" },
-    { e: "🐕", ins: "🎺", navn: "Hunden", f: 329.63, type: "triangle", h: [1, .22, .16], c1: "#ffd8c9", c2: "#ef855c" },
-    { e: "🐸", ins: "🎸", navn: "Frøen", f: 392.0, type: "sine", h: [1, .5, .06], c1: "#d6f5c2", c2: "#6fc255" },
-    { e: "🦆", ins: "🎷", navn: "Anden", f: 440.0, type: "triangle", h: [1, .34, .06], c1: "#ffe1f0", c2: "#e884b6" },
+    { e: "🐄", ins: "🥁", img: "billeder/dyre-orkester/ko-tromme.webp", navn: "Koen", f: 261.63, type: "triangle", h: [1, .3, .12], c1: "#ffe6a1", c2: "#efb234" },
+    { e: "🐈", ins: "🎻", img: "billeder/dyre-orkester/kat-violin.webp", navn: "Katten", f: 293.66, type: "sine", h: [1, .42, .1], c1: "#cfe9ff", c2: "#5fa8dd" },
+    { e: "🐕", ins: "🎺", img: "billeder/dyre-orkester/hund-trompet.webp", navn: "Hunden", f: 329.63, type: "triangle", h: [1, .22, .16], c1: "#ffd8c9", c2: "#ef855c" },
+    { e: "🐸", ins: "🎸", img: "billeder/dyre-orkester/froe-guitar.webp", navn: "Frøen", f: 392.0, type: "sine", h: [1, .5, .06], c1: "#d6f5c2", c2: "#6fc255" },
+    { e: "🦆", ins: "🎷", img: "billeder/dyre-orkester/and-saxofon.webp", navn: "Anden", f: 440.0, type: "triangle", h: [1, .34, .06], c1: "#ffe1f0", c2: "#e884b6" },
   ];
   const ROS = ["Super!", "Flot klaret!", "Sejt!", "Du er god til det!", "Wow!"];
   // Pynt i baggrunden: små noder og lysglimt (kun pynt, ikke noget man kan trykke på)
@@ -92,17 +92,17 @@
     .do-band{position:absolute;left:0;right:0;bottom:14%;z-index:6;display:flex;align-items:flex-end;justify-content:center;
       gap:clamp(2px,1.3vw,22px);padding-inline:clamp(4px,1.6vw,18px);box-sizing:border-box}
     .do-animal{position:relative;flex:0 1 auto;width:clamp(60px,16vmin,154px);aspect-ratio:1;background:none;padding:0;
-      border-radius:50%;transition:transform .12s;touch-action:manipulation}
+      display:grid;place-items:center;border-radius:50%;transition:transform .12s;touch-action:manipulation}
     .do-pad{position:absolute;inset:2%;border-radius:50%;
       background:radial-gradient(circle at 50% 28%,var(--c1),var(--c2));
       box-shadow:0 7px 0 rgba(0,0,0,.28),inset 0 -6px 0 rgba(0,0,0,.12),inset 0 6px 0 rgba(255,255,255,.28);
       transition:transform .16s,box-shadow .16s,filter .16s}
-    .do-emoji{position:relative;font-size:clamp(36px,9.2vmin,88px);line-height:1;
+    .do-sprite{position:relative;display:block;width:102%;height:102%;object-fit:contain;
+      pointer-events:none;user-select:none;-webkit-user-drag:none;
       filter:drop-shadow(0 5px 6px rgba(0,0,0,.32));animation:do-bob 3.2s ease-in-out infinite;animation-delay:var(--d)}
     /* På brede skærme er der plads til større dyr */
     @media (min-aspect-ratio:1/1){
       .do-animal{width:min(23vmin,17.5vw,200px)}
-      .do-emoji{font-size:clamp(44px,12.4vmin,112px)}
     }
     /* På en telefon må teksten ikke gemme sig bag hjem-knappen */
     @media (max-width:560px){
@@ -113,28 +113,20 @@
     @media (max-aspect-ratio:3/4){
       .do-band{flex-wrap:wrap;align-items:center;row-gap:clamp(10px,2.4vh,22px);column-gap:clamp(6px,2.4vw,16px);bottom:7%;padding-inline:2vw}
       .do-animal{width:min(27.5vw,150px)}
-      .do-emoji{font-size:min(16.5vw,86px)}
     }
     @keyframes do-bob{50%{transform:translateY(-7%) rotate(-2deg)}}
     .do-animal:active .do-pad{transform:translateY(4px) scale(.97);box-shadow:0 2px 0 rgba(0,0,0,.28)}
-    .do-animal.hop .do-emoji{animation:do-hop .55s cubic-bezier(.3,1.5,.5,1)}
+    .do-animal.hop .do-sprite{animation:do-hop .55s cubic-bezier(.3,1.5,.5,1)}
     @keyframes do-hop{35%{transform:translateY(-34%) scale(1.14) rotate(6deg)}70%{transform:translateY(0) scale(.96)}}
     /* Dyret lyser op, når det spiller i melodien */
-    /* Hele knappen løftes (emojiens egen transform tages af vippe-animationen) */
+    /* Hele knappen løftes (figurens egen transform tages af vippe-animationen) */
     .do-animal.glow{z-index:2;transform:translateY(-10%) scale(1.13)}
     .do-animal.glow .do-pad{filter:brightness(1.3) saturate(1.2);
       box-shadow:0 0 0 6px #fff3c4,0 0 50px 22px rgba(255,226,120,.75),0 7px 0 rgba(0,0,0,.28)}
     @media (prefers-reduced-motion:reduce){.do-animal.glow{transform:none}}
     .do-animal.ok .do-pad{box-shadow:0 0 0 6px #fff3c4,0 0 46px 18px rgba(255,240,150,.75),0 7px 0 rgba(0,0,0,.28)}
-    .do-animal.nej .do-emoji{animation:do-wobble .45s ease-in-out}
+    .do-animal.nej .do-sprite{animation:do-wobble .45s ease-in-out}
     @keyframes do-wobble{25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
-    /* Hvert dyr har sit instrument i en lille cirkel nederst til højre */
-    .do-animal{container-type:inline-size}
-    .do-ins{position:absolute;right:-3%;bottom:1%;width:38%;aspect-ratio:1;border-radius:50%;
-      display:grid;place-items:center;font-size:20px;font-size:21cqw;line-height:1;
-      background:radial-gradient(circle at 50% 32%,#fffdf3,#f3e4c4);
-      box-shadow:0 4px 0 rgba(0,0,0,.25),inset 0 -3px 0 rgba(0,0,0,.08);transform:rotate(-8deg)}
-    .do-animal.hop .do-ins{animation:do-wobble .45s ease-in-out}
 
     /* Noder og stjerner, der flyver op fra dyret */
     .do-layer{position:absolute;inset:0;z-index:7;pointer-events:none;overflow:hidden}
@@ -196,8 +188,10 @@
         repeating-linear-gradient(90deg,rgba(0,0,0,.1) 0 2px,transparent 2px 9%),
         linear-gradient(180deg,#b57a45,#8a5526 60%,#5d3617);
       box-shadow:0 10px 0 #4a2a10,0 22px 40px rgba(0,0,0,.45)}
-    .do-party b{font-size:1em;line-height:1;animation:do-dans 1s ease-in-out infinite;
+    .do-party b{display:block;font-size:1em;line-height:1;animation:do-dans 1s ease-in-out infinite;
       filter:drop-shadow(0 8px 10px rgba(0,0,0,.35))}
+    .do-party-img{display:block;width:1.18em;height:1.18em;object-fit:contain;
+      pointer-events:none;user-select:none;-webkit-user-drag:none}
     @keyframes do-dans{50%{transform:translateY(-26%) rotate(8deg) scale(1.08)}}
 
     .do-top.skjult{visibility:hidden}
@@ -205,8 +199,8 @@
     @media (orientation:portrait){.do-knapper{margin-left:clamp(44px,13vw,66px)}
       .do-play,.do-fri{min-width:0;width:clamp(108px,34vw,160px);padding:0 8px}}
     @media (prefers-reduced-motion:reduce){
-      .do-beam,.do-emoji,.do-maestro .do-peng,.do-play .do-note,.do-fri .do-note,.do-baton,.do-sky span,.do-sky i,.do-valance::after{animation:none}
-      .do-animal.hop .do-emoji,.do-animal.hop .do-ins,.do-animal.nej .do-emoji,.do-party b{animation:none}
+      .do-beam,.do-sprite,.do-maestro .do-peng,.do-play .do-note,.do-fri .do-note,.do-baton,.do-sky span,.do-sky i,.do-valance::after{animation:none}
+      .do-animal.hop .do-sprite,.do-animal.nej .do-sprite,.do-party b{animation:none}
       .do-fly{animation:do-fly-rolig 1.2s ease-out forwards}
     }
   `);
@@ -442,7 +436,7 @@
     p.className = "do-party";
     p.innerHTML = `<div class="do-dans">${
       Spil.shuffle(DYR.slice()).map((a, i) =>
-        `<b style="animation-delay:${(i * .11).toFixed(2)}s">${a.e}</b>`).join("")}</div>`;
+        `<b style="animation-delay:${(i * .11).toFixed(2)}s"><img class="do-party-img" src="${a.img}" alt="" draggable="false" aria-hidden="true"></b>`).join("")}</div>`;
     root.appendChild(p);
     Spil.sfx.fanfare();
     const mit = stk;
@@ -515,7 +509,7 @@
         b.style.setProperty("--d", (i * .23).toFixed(2) + "s");
         b.style.setProperty("--c1", d.c1);
         b.style.setProperty("--c2", d.c2);
-        b.innerHTML = `<span class="do-pad"></span><span class="do-emoji">${d.e}</span><span class="do-ins" aria-hidden="true">${d.ins}</span>`;
+        b.innerHTML = `<span class="do-pad"></span><img class="do-sprite" src="${d.img}" alt="" draggable="false" aria-hidden="true">`;
         b.onclick = () => trykDyr(i, b);
         band.appendChild(b);
         return b;
