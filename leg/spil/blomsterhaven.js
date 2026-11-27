@@ -65,18 +65,8 @@
       display:flex;align-items:center;justify-content:center}
     .bh-nat-knap:active{transform:translateY(3px)}
 
-    /* Baggrund: havehegn, pynt og besøgende dyr */
+    /* Baggrund: pynt og besøgende dyr */
     .bh-scene{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end}
-    .bh-hegn{position:absolute;left:0;right:0;bottom:44%;height:16%;pointer-events:none;
-      background:repeating-linear-gradient(90deg,#e9d5b8 0 26px,#d4b690 26px 28px,transparent 28px 46px);
-      opacity:.9;border-top:5px solid #d4b690;border-bottom:5px solid #c4a076}
-    .bh.nat .bh-hegn{filter:brightness(.58) saturate(.8)}
-    /* Lyskæde i blød bue mellem æbletræerne (låses op efter 4 buketter) */
-    .bh-lyskaede{position:absolute;left:12%;right:12%;top:8%;height:14%;pointer-events:none;opacity:0;transition:opacity .6s;z-index:2}
-    .bh-lyskaede.vis{opacity:1}
-    .bh-lyskaede svg{width:100%;height:100%;overflow:visible;display:block}
-    .bh-paere{animation:bh-glimt 2.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
-    .bh.nat .bh-paere-gloed{opacity:.95}
 
     /* Havepynt (låses op efter 1, 2, 3 buketter) — forankret på græsset bag bænken med skygge, dag/nat-lys og klik-reaktion */
     .bh-pynt{position:absolute;pointer-events:auto;cursor:pointer;bottom:34%;z-index:3;
@@ -146,18 +136,22 @@
     .bh-potte:active{transform:scale(.95)}
     .bh-potte.klar-pluk::before{content:"";position:absolute;inset:4px;border-radius:20px;
       box-shadow:0 0 0 4px #ffd23f,0 0 18px rgba(255,210,63,.7);animation:bh-puls 1.4s ease-in-out infinite;pointer-events:none}
-    .bh-plante-wrap{position:relative;width:100%;flex:1;display:flex;align-items:flex-end;justify-content:center;pointer-events:none;margin-bottom:-12px;z-index:2}
+    .bh-plante-wrap{position:relative;width:100%;flex:1;display:flex;align-items:flex-end;justify-content:center;pointer-events:none;margin-bottom:-22px;z-index:2}
     .bh-plante{max-height:clamp(95px,16.5vh,148px);max-width:96%;width:auto;object-fit:contain;display:block;
       transform-origin:bottom center;filter:drop-shadow(0 4px 5px rgba(45,30,45,.22));animation:bh-svaj 3.4s ease-in-out infinite}
     .bh-plante.voks{animation:bh-voks .55s cubic-bezier(.34,1.56,.64,1)}
     .bh-plante.spire{max-height:clamp(44px,7.5vh,68px)}
     .bh-plante.knop{max-height:clamp(74px,12.5vh,112px)}
-    .bh-pottesk{position:relative;width:clamp(72px,10vw,108px);height:clamp(48px,7.4vh,64px);z-index:1;
-      background:linear-gradient(180deg,#e07b54 0%,#c7613d 100%);
-      border-radius:8px 8px 22px 22px;border:3px solid #5a3426;box-shadow:0 4px 0 rgba(61,43,61,.25)}
-    .bh-pottesk::before{content:"";position:absolute;left:-7px;right:-7px;top:-10px;height:16px;border-radius:9px;
-      background:linear-gradient(180deg,#eb8b63,#d36d47);border:3px solid #5a3426}
-    .bh-jord{position:absolute;left:4px;right:4px;top:-6px;height:10px;border-radius:50%;background:#66422c}
+    .bh-pottesk-img{position:relative;z-index:1;width:clamp(84px,11.5vw,124px);height:auto;max-height:clamp(60px,9.2vh,84px);
+      object-fit:contain;display:block;pointer-events:none;transform-origin:bottom center;
+      filter:drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    /* Diskret håndlavet variation mellem de 6 potter (farvetone, størrelse, spejling af skrammer/lys) */
+    .bh-potte[data-idx="0"] .bh-pottesk-img{transform:scale(1.03) rotate(-.8deg)}
+    .bh-potte[data-idx="1"] .bh-pottesk-img{transform:scaleX(-1) scale(.96) rotate(.9deg);filter:hue-rotate(8deg) brightness(1.05) saturate(.94) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-potte[data-idx="2"] .bh-pottesk-img{transform:scale(1.01) rotate(.5deg);filter:hue-rotate(-7deg) brightness(.95) saturate(1.08) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-potte[data-idx="3"] .bh-pottesk-img{transform:scaleX(-1) scale(1.04) rotate(-.6deg);filter:hue-rotate(4deg) brightness(.98) saturate(1.04) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-potte[data-idx="4"] .bh-pottesk-img{transform:scale(.95) rotate(1.1deg);filter:hue-rotate(-5deg) brightness(1.06) saturate(.9) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-potte[data-idx="5"] .bh-pottesk-img{transform:scaleX(-1) scale(1.02) rotate(-.7deg);filter:hue-rotate(10deg) brightness(.94) saturate(1.05) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
 
     /* Behov-boble over potten + støv/kilde-prikker */
     .bh-behov{position:absolute;top:2px;right:4px;z-index:4;width:clamp(38px,5.6vh,48px);height:clamp(38px,5.6vh,48px);
@@ -201,29 +195,35 @@
       background:#ff6b6b;color:#fff;font:800 15px/26px var(--display,system-ui);text-align:center;box-shadow:0 2px 0 rgba(61,43,61,.3)}
     .bh-tool-badge[hidden]{display:none}
 
-    /* Buket-værksted overlay (vælg sløjfe og giv til dyret!) */
-    .bh-buket-lag{position:absolute;inset:0;z-index:18;background:rgba(45,35,60,.42);backdrop-filter:blur(4px);
+    /* Buket-værksted overlay (håndmalet buket-indpakning, farvede sløjfer og glad modtager!) */
+    .bh-buket-lag{position:absolute;inset:0;z-index:18;background:rgba(45,35,60,.45);backdrop-filter:blur(5px);
       display:flex;align-items:center;justify-content:center;padding:16px}
     .bh-buket-lag[hidden]{display:none}
-    .bh-buket-kort{width:min(480px,92vw);border-radius:36px;background:#fffdf6;border:4px solid #4a354a;
-      box-shadow:0 12px 0 rgba(61,43,61,.28);padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:16px}
-    .bh-buket-vis{position:relative;width:230px;height:210px;display:flex;align-items:flex-end;justify-content:center}
-    .bh-buket-blomst{position:absolute;bottom:48px;height:145px;width:auto;object-fit:contain;transform-origin:bottom center;
-      filter:drop-shadow(0 4px 5px rgba(45,30,45,.2))}
-    .bh-buket-papir{position:relative;z-index:3;width:118px;height:96px;border-radius:10px 10px 46px 46px;
-      background:linear-gradient(135deg,#f7e3c4,#e7c496);border:3px solid #6b4325;
-      clip-path:polygon(0 0,100% 0,78% 100%,22% 100%)}
-    .bh-buket-sloejfe{position:absolute;bottom:44px;left:50%;transform:translateX(-50%);z-index:4;
-      width:74px;height:36px;display:flex;align-items:center;justify-content:center}
-    .bh-sloejfe-oere{width:30px;height:24px;border-radius:50%;border:3px solid var(--sk,#b83b3b);background:var(--sf,#ff6b6b)}
-    .bh-sloejfe-knude{width:18px;height:18px;border-radius:50%;border:3px solid var(--sk,#b83b3b);background:var(--sf,#ff6b6b);margin:0 -8px;z-index:2}
-    .bh-sloejfe-raekke{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-    .bh-sloejfe-knap{width:62px;height:62px;border-radius:50%;border:4px solid #4a354a;box-shadow:0 4px 0 rgba(61,43,61,.22);
-      transition:transform .14s}
-    .bh-sloejfe-knap.valgt{transform:scale(1.15);box-shadow:0 0 0 4px #ffd23f,0 4px 0 rgba(61,43,61,.22)}
-    .bh-giv-knap{padding:14px 34px;border-radius:999px;background:#7ed957;border:3px solid #3d6b2b;
-      box-shadow:0 6px 0 #3d6b2b;font-size:34px;line-height:1;display:flex;align-items:center;gap:10px;
-      animation:bh-puls 1.3s ease-in-out infinite}
+    .bh-buket-kort{width:min(500px,92vw);border-radius:38px;
+      background:radial-gradient(circle at 50% 18%,#fffef8 0%,#fff7e2 68%,#f9ebd0 100%);
+      border:4px solid #4a354a;box-shadow:0 12px 0 rgba(61,43,61,.28),0 20px 40px rgba(35,20,45,.25);
+      padding:22px 20px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;position:relative}
+    .bh-buket-top{display:flex;align-items:flex-end;justify-content:center;gap:12px;width:100%}
+    .bh-buket-modtager{height:clamp(108px,18vh,152px);width:auto;object-fit:contain;display:block;
+      filter:drop-shadow(0 5px 6px rgba(45,30,45,.2));animation:bh-nik 2.6s ease-in-out infinite}
+    .bh-buket-vis{position:relative;width:220px;height:220px;display:flex;align-items:flex-end;justify-content:center}
+    .bh-buket-blomst{position:absolute;bottom:76px;height:142px;width:auto;object-fit:contain;transform-origin:bottom center;
+      filter:drop-shadow(0 4px 5px rgba(45,30,45,.2));z-index:2}
+    .bh-buket-papir-img{position:relative;z-index:3;height:132px;width:auto;object-fit:contain;display:block;
+      filter:drop-shadow(0 6px 6px rgba(45,30,45,.22))}
+    .bh-buket-sloejfe-img{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);z-index:4;
+      width:98px;height:auto;object-fit:contain;display:block;
+      filter:drop-shadow(0 3px 4px rgba(45,30,45,.25));transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+    .bh-sloejfe-raekke{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+    .bh-sloejfe-knap{width:64px;height:64px;border-radius:50%;padding:7px;box-sizing:border-box;
+      background:#fffdf6;border:3px solid #4a354a;box-shadow:0 4px 0 rgba(61,43,61,.22);
+      display:flex;align-items:center;justify-content:center;transition:transform .14s}
+    .bh-sloejfe-knap img{width:100%;height:100%;object-fit:contain;display:block}
+    .bh-sloejfe-knap.valgt{background:#fff1ad;transform:scale(1.14);box-shadow:0 0 0 4px #ffd23f,0 4px 0 rgba(61,43,61,.22)}
+    .bh-giv-knap{width:84px;height:84px;padding:0;border-radius:50%;background:#7ed957;border:4px solid #3d6b2b;
+      box-shadow:0 6px 0 #3d6b2b;font-size:44px;line-height:1;
+      font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif;
+      display:flex;align-items:center;justify-content:center;animation:bh-puls 1.3s ease-in-out infinite}
     .bh-giv-knap:active{transform:translateY(4px);box-shadow:0 2px 0 #3d6b2b}
 
     /* Telefon (smal skærm): 3x2 potter, kompakte knapper uden vandret scroll */
@@ -234,7 +234,8 @@
       .bh-plante{max-height:clamp(68px,11vh,94px)}
       .bh-plante.spire{max-height:38px}
       .bh-plante.knop{max-height:60px}
-      .bh-pottesk{width:68px;height:40px}
+      .bh-pottesk-img{width:76px;max-height:54px}
+      .bh-plante-wrap{margin-bottom:-16px}
       .bh-hegn{bottom:54%;height:11%}
       .bh-lyskaede{bottom:64%}
       .bh-pynt{bottom:47%}
@@ -429,13 +430,14 @@
         el, id,
         x: 15 + Math.random() * 70, y: 18 + Math.random() * 34,
         tx: 20 + Math.random() * 60, ty: 20 + Math.random() * 34,
-        tid: Math.random() * 6, vend: 1,
+        tid: Math.random() * 6, vend: 1, hvileTil: 0,
       };
       el.addEventListener("click", e => {
         e.stopPropagation();
         haveLyd("kryb");
         el.classList.remove("snur"); void el.offsetWidth; el.classList.add("snur");
         if (!roligt()) Spil.burstAt(el, "✨🌸✨");
+        k.hvileTil = 0;
         k.tx = 12 + Math.random() * 76; k.ty = 14 + Math.random() * 38;
       });
       lag.appendChild(el);
@@ -443,23 +445,31 @@
     }
   }
 
+  let sidstKryb = 0;
   function krybLoop(nu) {
     if (!alive) return;
     raf = requestAnimationFrame(krybLoop);
+    const dt = Math.min(.05, (nu - (sidstKryb || nu)) / 1000);
+    sidstKryb = nu;
     if (roligt()) return;
     const t = nu / 1000;
     for (const k of kryb) {
-      const dx = k.tx - k.x, dy = k.ty - k.y, d = Math.hypot(dx, dy);
-      if (d < 3) {
-        k.tx = 10 + Math.random() * 80;
-        k.ty = 16 + Math.random() * 38;
-      } else {
-        const fart = k.id === "bi" ? .07 : .045;
-        k.x += (dx / d) * fart * 3;
-        k.y += (dy / d) * fart * 3;
-        if (Math.abs(dx) > 1) k.vend = dx > 0 ? 1 : -1;
+      if (t >= k.hvileTil) {
+        const dx = k.tx - k.x, dy = k.ty - k.y, d = Math.hypot(dx, dy);
+        if (d < 2.2) {
+          // Hold en rolig pause på 3–6,5 sekunder, før den svæver videre
+          k.hvileTil = t + 3 + Math.random() * 3.5;
+          k.tx = 12 + Math.random() * 76;
+          k.ty = 16 + Math.random() * 36;
+        } else {
+          const fart = k.id === "bi" ? 5.2 : 3.6; // % af skærmen pr. sekund (roligt og uafhængigt af 60/120Hz)
+          k.x += (dx / d) * fart * dt;
+          k.y += (dy / d) * fart * dt;
+          if (Math.abs(dx) > 1) k.vend = dx > 0 ? 1 : -1;
+        }
       }
-      const bob = Math.sin(t * 3.2 + k.tid) * 6;
+      const hviler = t < k.hvileTil;
+      const bob = Math.sin(t * (hviler ? 1.5 : 2.6) + k.tid) * (hviler ? 2.5 : 5);
       k.el.style.left = k.x + "%";
       k.el.style.top = k.y + "%";
       k.el.style.transform = `translate(-50%, calc(-50% + ${bob.toFixed(1)}px)) scaleX(${k.vend})`;
@@ -469,11 +479,10 @@
   /* ---------- Tegn potter, pynt, frøbakke og værktøj ---------- */
   function tegnPynt() {
     const b = tilstand.buketter;
-    const sv = $(".bh-pynt.svampehus"), fb = $(".bh-pynt.fuglebad"), ly = $(".bh-pynt.lygte"), lk = $(".bh-lyskaede");
+    const sv = $(".bh-pynt.svampehus"), fb = $(".bh-pynt.fuglebad"), ly = $(".bh-pynt.lygte");
     if (sv) sv.hidden = b < 1;
     if (fb) fb.hidden = b < 2;
     if (ly) ly.hidden = b < 3;
-    if (lk) lk.classList.toggle("vis", b >= 4);
     const tEl = $(".bh-taeller b");
     if (tEl) tEl.textContent = b;
   }
@@ -567,7 +576,7 @@
         <div class="bh-behov" hidden></div>
         <div class="bh-stoev" hidden><span style="left:18%;top:28%"></span><span style="right:20%;top:18%;animation-delay:.3s"></span><span style="left:45%;top:52%;animation-delay:.6s"></span></div>
         <div class="bh-plante-wrap"></div>
-        <div class="bh-pottesk"><div class="bh-jord"></div></div>
+        <img class="bh-pottesk-img" src="${IMG}potte.webp" alt="" draggable="false">
       </div>`).join("");
       baenk.querySelectorAll(".bh-potte").forEach(el => {
         el.addEventListener("click", () => trykPotte(Number(el.dataset.idx), el));
@@ -691,20 +700,19 @@
   function tegnBuketKort() {
     const vis = $(".bh-buket-vis");
     const raekke = $(".bh-sloejfe-raekke");
+    const modt = $(".bh-buket-modtager");
     if (!vis || !raekke) return;
-    const sObj = SLOEJFER.find(s => s.id === valgtSloejfe) || SLOEJFER[0];
+    if (modt && kunde) { modt.src = `${IMG}${kunde.id}.webp`; modt.alt = kunde.navn; }
     const vinkler = buketKurv.length === 2 ? [-16, 16] : [-24, 0, 24];
     const blomsterHtml = buketKurv.map((id, i) => {
       const ang = vinkler[i] || 0;
       return `<img class="bh-buket-blomst" src="${IMG}${id}.webp" alt="" style="transform:rotate(${ang}deg)">`;
     }).join("");
     vis.innerHTML = `${blomsterHtml}
-      <div class="bh-buket-papir"></div>
-      <div class="bh-buket-sloejfe" style="--sf:${sObj.farve};--sk:${sObj.kant}">
-        <div class="bh-sloejfe-oere"></div><div class="bh-sloejfe-knude"></div><div class="bh-sloejfe-oere"></div>
-      </div>`;
+      <img class="bh-buket-papir-img" src="${IMG}buket-papir.webp" alt="" draggable="false">
+      <img class="bh-buket-sloejfe-img" src="${IMG}sloejfe-${valgtSloejfe}.webp" alt="" draggable="false">`;
     raekke.innerHTML = SLOEJFER.map(s =>
-      `<button class="bh-sloejfe-knap${s.id === valgtSloejfe ? " valgt" : ""}" data-s="${s.id}" style="background:${s.farve}" aria-label="${s.id}"></button>`
+      `<button class="bh-sloejfe-knap${s.id === valgtSloejfe ? " valgt" : ""}" data-s="${s.id}" aria-label="${s.id}"><img src="${IMG}sloejfe-${s.id}.webp" alt="" draggable="false"></button>`
     ).join("");
     raekke.querySelectorAll(".bh-sloejfe-knap").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -734,7 +742,7 @@
     if (tEl) { tEl.classList.remove("pop"); void tEl.offsetWidth; tEl.classList.add("pop"); }
     Spil.sfx.fanfare();
     const nyPynt = (foer < 1 && tilstand.buketter >= 1) || (foer < 2 && tilstand.buketter >= 2) ||
-      (foer < 3 && tilstand.buketter >= 3) || (foer < 4 && tilstand.buketter >= 4);
+      (foer < 3 && tilstand.buketter >= 3);
     Spil.say("Tusind tak! Hvor er det en dejlig buket!", () => {
       if (nyPynt) {
         later(() => Spil.say("Se! Du har fået ny pynt til din have!", null, "bh-ny-pynt"), 250);
@@ -782,19 +790,6 @@
       const stjHtml = Array.from({ length: 18 }, (_, i) =>
         `<span class="bh-stj-prik" style="left:${(i * 19 + 7) % 94}%;top:${(i * 23 + 5) % 52}%;animation-delay:${(i * .35).toFixed(2)}s"></span>`
       ).join("");
-      // Lyskæde på en blød bue (parabel) mellem æbletræerne med synlig snor og hængende pærer
-      const paerePts = Array.from({ length: 9 }, (_, i) => {
-        const u = (i + 1) / 10, x = u * 1000, y = 14 + 4 * u * (1 - u) * 58;
-        return `<g class="bh-paere" style="animation-delay:${(i * .28).toFixed(2)}s">
-          <circle class="bh-paere-gloed" cx="${x.toFixed(1)}" cy="${(y + 10).toFixed(1)}" r="15" fill="#ffe785" opacity=".4"/>
-          <rect x="${(x - 3).toFixed(1)}" y="${(y + 1).toFixed(1)}" width="6" height="5" rx="1.5" fill="#4a354a"/>
-          <circle cx="${x.toFixed(1)}" cy="${(y + 10).toFixed(1)}" r="7" fill="#fff3b0" stroke="#4a354a" stroke-width="2"/>
-        </g>`;
-      }).join("");
-      const paererHtml = `<svg viewBox="0 0 1000 100" preserveAspectRatio="none">
-        <path d="M 0 14 Q 500 130 1000 14" fill="none" stroke="#4a354a" stroke-width="3.5" stroke-linecap="round"/>
-        ${paerePts}
-      </svg>`;
 
       rt.innerHTML = `<div class="bh${tilstand.nat ? " nat" : ""}">
         <div class="bh-bg-dag"></div>
@@ -807,7 +802,6 @@
           <button class="bh-nat-knap" aria-label="Dag og nat">${tilstand.nat ? "☀️" : "🌙"}</button>
         </div>
         <div class="bh-scene">
-          <div class="bh-lyskaede">${paererHtml}</div>
           <div class="bh-pynt svampehus" hidden><img src="${IMG}svampehus.webp" alt="" draggable="false"></div>
           <div class="bh-pynt fuglebad" hidden><img src="${IMG}fuglebad.webp" alt="" draggable="false"></div>
           <div class="bh-pynt lygte" hidden><img src="${IMG}lygte.webp" alt="" draggable="false"></div>
@@ -822,9 +816,12 @@
         <div class="bh-dock"></div>
         <div class="bh-buket-lag" hidden>
           <div class="bh-buket-kort">
-            <div class="bh-buket-vis"></div>
+            <div class="bh-buket-top">
+              <img class="bh-buket-modtager" src="${IMG}kanin.webp" alt="" draggable="false">
+              <div class="bh-buket-vis"></div>
+            </div>
             <div class="bh-sloejfe-raekke"></div>
-            <button class="bh-giv-knap" aria-label="Giv buket">💐✨</button>
+            <button class="bh-giv-knap" aria-label="Giv buket">🎁</button>
           </div>
         </div>
       </div>`;
