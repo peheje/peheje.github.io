@@ -136,22 +136,30 @@
     .bh-potte:active{transform:scale(.95)}
     .bh-potte.klar-pluk::before{content:"";position:absolute;inset:4px;border-radius:20px;
       box-shadow:0 0 0 4px #ffd23f,0 0 18px rgba(255,210,63,.7);animation:bh-puls 1.4s ease-in-out infinite;pointer-events:none}
-    .bh-plante-wrap{position:relative;width:100%;flex:1;display:flex;align-items:flex-end;justify-content:center;pointer-events:none;margin-bottom:-22px;z-index:2}
+    .bh-plante-wrap{position:relative;width:100%;flex:1;display:flex;align-items:flex-end;justify-content:center;pointer-events:none;margin-bottom:-24px;z-index:2}
     .bh-plante{max-height:clamp(95px,16.5vh,148px);max-width:96%;width:auto;object-fit:contain;display:block;
       transform-origin:bottom center;filter:drop-shadow(0 4px 5px rgba(45,30,45,.22));animation:bh-svaj 3.4s ease-in-out infinite}
     .bh-plante.voks{animation:bh-voks .55s cubic-bezier(.34,1.56,.64,1)}
     .bh-plante.spire{max-height:clamp(44px,7.5vh,68px)}
     .bh-plante.knop{max-height:clamp(74px,12.5vh,112px)}
-    .bh-pottesk-img{position:relative;z-index:1;width:clamp(84px,11.5vw,124px);height:auto;max-height:clamp(60px,9.2vh,84px);
-      object-fit:contain;display:block;pointer-events:none;transform-origin:bottom center;
-      filter:drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-pottesk-bag,.bh-pottesk-foran{width:clamp(84px,11.5vw,124px);height:auto;max-height:clamp(60px,9.2vh,84px);
+      object-fit:contain;display:block;pointer-events:none;transform-origin:bottom center}
+    .bh-pottesk-bag{position:relative;z-index:1;filter:drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    /* Forkanten af potten ligger foran stilken (z-index 3), så stilken altid går pænt ned I jorden bag kanten! */
+    .bh-pottesk-foran{position:absolute;bottom:4px;left:50%;z-index:3;clip-path:inset(21% 0 0 0)}
     /* Diskret håndlavet variation mellem de 6 potter (farvetone, størrelse, spejling af skrammer/lys) */
-    .bh-potte[data-idx="0"] .bh-pottesk-img{transform:scale(1.03) rotate(-.8deg)}
-    .bh-potte[data-idx="1"] .bh-pottesk-img{transform:scaleX(-1) scale(.96) rotate(.9deg);filter:hue-rotate(8deg) brightness(1.05) saturate(.94) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
-    .bh-potte[data-idx="2"] .bh-pottesk-img{transform:scale(1.01) rotate(.5deg);filter:hue-rotate(-7deg) brightness(.95) saturate(1.08) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
-    .bh-potte[data-idx="3"] .bh-pottesk-img{transform:scaleX(-1) scale(1.04) rotate(-.6deg);filter:hue-rotate(4deg) brightness(.98) saturate(1.04) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
-    .bh-potte[data-idx="4"] .bh-pottesk-img{transform:scale(.95) rotate(1.1deg);filter:hue-rotate(-5deg) brightness(1.06) saturate(.9) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
-    .bh-potte[data-idx="5"] .bh-pottesk-img{transform:scaleX(-1) scale(1.02) rotate(-.7deg);filter:hue-rotate(10deg) brightness(.94) saturate(1.05) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-potte[data-idx="0"] .bh-pottesk-bag{transform:scale(1.03) rotate(-.8deg)}
+    .bh-potte[data-idx="0"] .bh-pottesk-foran{transform:translateX(-50%) scale(1.03) rotate(-.8deg)}
+    .bh-potte[data-idx="1"] .bh-pottesk-bag{transform:scaleX(-1) scale(.96) rotate(.9deg);filter:hue-rotate(8deg) brightness(1.05) saturate(.94) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-potte[data-idx="1"] .bh-pottesk-foran{transform:translateX(-50%) scaleX(-1) scale(.96) rotate(.9deg);filter:hue-rotate(8deg) brightness(1.05) saturate(.94)}
+    .bh-potte[data-idx="2"] .bh-pottesk-bag{transform:scale(1.01) rotate(.5deg);filter:hue-rotate(-7deg) brightness(.95) saturate(1.08) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-potte[data-idx="2"] .bh-pottesk-foran{transform:translateX(-50%) scale(1.01) rotate(.5deg);filter:hue-rotate(-7deg) brightness(.95) saturate(1.08)}
+    .bh-potte[data-idx="3"] .bh-pottesk-bag{transform:scaleX(-1) scale(1.04) rotate(-.6deg);filter:hue-rotate(4deg) brightness(.98) saturate(1.04) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-potte[data-idx="3"] .bh-pottesk-foran{transform:translateX(-50%) scaleX(-1) scale(1.04) rotate(-.6deg);filter:hue-rotate(4deg) brightness(.98) saturate(1.04)}
+    .bh-potte[data-idx="4"] .bh-pottesk-bag{transform:scale(.95) rotate(1.1deg);filter:hue-rotate(-5deg) brightness(1.06) saturate(.9) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-potte[data-idx="4"] .bh-pottesk-foran{transform:translateX(-50%) scale(.95) rotate(1.1deg);filter:hue-rotate(-5deg) brightness(1.06) saturate(.9)}
+    .bh-potte[data-idx="5"] .bh-pottesk-bag{transform:scaleX(-1) scale(1.02) rotate(-.7deg);filter:hue-rotate(10deg) brightness(.94) saturate(1.05) drop-shadow(0 5px 5px rgba(45,30,45,.25))}
+    .bh-potte[data-idx="5"] .bh-pottesk-foran{transform:translateX(-50%) scaleX(-1) scale(1.02) rotate(-.7deg);filter:hue-rotate(10deg) brightness(.94) saturate(1.05)}
 
     /* Behov-boble over potten + støv/kilde-prikker */
     .bh-behov{position:absolute;top:2px;right:4px;z-index:4;width:clamp(38px,5.6vh,48px);height:clamp(38px,5.6vh,48px);
@@ -234,8 +242,8 @@
       .bh-plante{max-height:clamp(68px,11vh,94px)}
       .bh-plante.spire{max-height:38px}
       .bh-plante.knop{max-height:60px}
-      .bh-pottesk-img{width:76px;max-height:54px}
-      .bh-plante-wrap{margin-bottom:-16px}
+      .bh-pottesk-bag,.bh-pottesk-foran{width:76px;max-height:54px}
+      .bh-plante-wrap{margin-bottom:-17px}
       .bh-hegn{bottom:54%;height:11%}
       .bh-lyskaede{bottom:64%}
       .bh-pynt{bottom:47%}
@@ -576,7 +584,8 @@
         <div class="bh-behov" hidden></div>
         <div class="bh-stoev" hidden><span style="left:18%;top:28%"></span><span style="right:20%;top:18%;animation-delay:.3s"></span><span style="left:45%;top:52%;animation-delay:.6s"></span></div>
         <div class="bh-plante-wrap"></div>
-        <img class="bh-pottesk-img" src="${IMG}potte.webp" alt="" draggable="false">
+        <img class="bh-pottesk-bag" src="${IMG}potte.webp" alt="" draggable="false">
+        <img class="bh-pottesk-foran" src="${IMG}potte.webp" alt="" draggable="false">
       </div>`).join("");
       baenk.querySelectorAll(".bh-potte").forEach(el => {
         el.addEventListener("click", () => trykPotte(Number(el.dataset.idx), el));
