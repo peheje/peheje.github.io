@@ -78,20 +78,38 @@
     .bh-paere{animation:bh-glimt 2.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
     .bh.nat .bh-paere-gloed{opacity:.95}
 
-    /* Havepynt (låses op efter 1, 2, 3 buketter) */
-    .bh-pynt{position:absolute;pointer-events:none;bottom:40%;z-index:2;transition:transform .6s cubic-bezier(.34,1.56,.64,1),opacity .5s}
-    .bh-pynt img{display:block;height:clamp(84px,16vh,155px);width:auto;filter:drop-shadow(0 6px 8px rgba(45,30,45,.22))}
+    /* Havepynt (låses op efter 1, 2, 3 buketter) — forankret på græsset bag bænken med skygge, dag/nat-lys og klik-reaktion */
+    .bh-pynt{position:absolute;pointer-events:auto;cursor:pointer;bottom:34%;z-index:3;
+      transform-origin:bottom center;transition:transform .5s cubic-bezier(.34,1.56,.64,1),opacity .5s}
+    .bh-pynt::before{content:"";position:absolute;left:12%;right:12%;bottom:-4px;height:14px;border-radius:50%;
+      background:radial-gradient(ellipse,rgba(35,55,25,.42) 0%,rgba(35,55,25,0) 72%);z-index:-1;pointer-events:none}
+    .bh-pynt img{display:block;height:clamp(92px,17vh,160px);width:auto;
+      filter:drop-shadow(0 3px 4px rgba(45,30,45,.18));transition:filter .8s ease}
+    .bh.nat .bh-pynt img{filter:brightness(.72) contrast(1.06) saturate(.88) drop-shadow(0 3px 6px rgba(10,15,35,.45))}
+    .bh.nat .bh-pynt.lygte img{filter:brightness(.88) saturate(1.1) drop-shadow(0 0 12px rgba(255,220,110,.55))}
     .bh-pynt[hidden]{display:none}
-    .bh-pynt.svampehus{left:max(18px,4vw)}
-    .bh-pynt.fuglebad{right:max(18px,4vw)}
-    .bh-pynt.lygte{left:22%;bottom:43%}
-    .bh-pynt.lygte::after{content:"";position:absolute;left:50%;top:22%;width:90px;height:90px;transform:translate(-50%,-50%);
-      border-radius:50%;background:radial-gradient(circle,rgba(255,235,140,.75),rgba(255,215,90,0) 70%);opacity:.25;transition:opacity .8s;pointer-events:none}
-    .bh.nat .bh-pynt.lygte::after{opacity:1;width:150px;height:150px}
+    .bh-pynt:active{transform:scale(.95)}
+    .bh-pynt.hop img{animation:bh-hop .42s ease-in-out 2}
+    .bh-pynt.vrik img{animation:bh-vrik .5s ease-in-out}
+    .bh-pynt.svampehus{left:max(22px,4.5vw)}
+    /* Varmt vindueslys i svampehuset om natten */
+    .bh-pynt.svampehus::after{content:"";position:absolute;left:50%;bottom:24%;width:42%;height:34%;transform:translateX(-50%);
+      border-radius:50%;background:radial-gradient(circle,rgba(255,230,120,.82) 0%,rgba(255,195,80,.35) 45%,rgba(255,195,80,0) 74%);
+      opacity:0;transition:opacity .8s ease;pointer-events:none;mix-blend-mode:screen}
+    .bh.nat .bh-pynt.svampehus::after{opacity:1}
+    .bh-pynt.fuglebad{right:max(22px,4.5vw)}
+    .bh-pynt.lygte{left:20%;bottom:35%}
+    .bh-pynt.lygte::after{content:"";position:absolute;left:50%;top:28%;width:110px;height:110px;transform:translate(-50%,-50%);
+      border-radius:50%;background:radial-gradient(circle,rgba(255,238,145,.88) 0%,rgba(255,210,85,.35) 45%,rgba(255,210,85,0) 72%);
+      opacity:.18;transition:opacity .7s ease,transform .5s ease;pointer-events:none}
+    .bh.nat .bh-pynt.lygte::after,.bh-pynt.lygte.taendt::after{opacity:1;transform:translate(-50%,-50%) scale(1.38)}
 
     /* Besøgende dyr ved havelågen */
-    .bh-kunde{position:absolute;left:50%;bottom:43%;transform:translateX(-50%);z-index:4;
+    .bh-kunde{position:absolute;left:50%;bottom:35%;transform:translateX(-50%);z-index:4;
       display:flex;align-items:flex-end;gap:10px;cursor:pointer;transition:transform .45s cubic-bezier(.34,1.56,.64,1),opacity .4s}
+    .bh-kunde::before{content:"";position:absolute;left:10px;bottom:-4px;width:clamp(80px,13vh,120px);height:14px;border-radius:50%;
+      background:radial-gradient(ellipse,rgba(35,55,25,.38) 0%,rgba(35,55,25,0) 72%);z-index:-1;pointer-events:none}
+    .bh.nat .bh-kunde-dyr{filter:brightness(.82) saturate(.92) drop-shadow(0 4px 6px rgba(10,15,35,.4))}
     .bh-kunde.skjult{opacity:0;transform:translateX(-50%) translateY(30px) scale(.85);pointer-events:none}
     .bh-kunde-dyr{height:clamp(108px,19vh,175px);width:auto;display:block;filter:drop-shadow(0 6px 8px rgba(45,30,45,.22));
       animation:bh-nik 3.2s ease-in-out infinite}
@@ -219,12 +237,12 @@
       .bh-pottesk{width:68px;height:40px}
       .bh-hegn{bottom:54%;height:11%}
       .bh-lyskaede{bottom:64%}
-      .bh-pynt{bottom:51%}
-      .bh-pynt img{height:clamp(58px,10.5vh,84px)}
+      .bh-pynt{bottom:47%}
+      .bh-pynt img{height:clamp(60px,10.5vh,86px)}
       .bh-pynt.svampehus{left:4px}
-      .bh-pynt.lygte{left:20%;bottom:53%}
+      .bh-pynt.lygte{left:20%;bottom:48%}
       .bh-pynt.fuglebad{right:4px}
-      .bh-kunde{bottom:52%}
+      .bh-kunde{bottom:48%}
       .bh-kunde-dyr{height:clamp(80px,13vh,112px)}
       .bh-oenske{margin-bottom:32px;padding:6px 9px}
       .bh-oenske-slot{width:34px;height:34px}
@@ -240,6 +258,7 @@
     @keyframes bh-pop{40%{transform:scale(1.28)}}
     @keyframes bh-nik{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-5px) rotate(1.5deg)}}
     @keyframes bh-hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
+    @keyframes bh-vrik{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg) scale(1.06)}75%{transform:rotate(8deg) scale(1.06)}}
     @keyframes bh-flaks{0%{transform:scaleY(1) rotate(-4deg)}100%{transform:scaleY(.86) rotate(4deg)}}
     @keyframes bh-snur{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(1.25)}100%{transform:rotate(360deg) scale(1)}}
     @keyframes bh-glimt{0%,100%{opacity:.45;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
@@ -320,6 +339,21 @@
         Spil.tone([587.33, 880], .07, "sine");
       } else if (type === "kryb") {
         Spil.tone([880, 1174.66, 1318.5], .06, "sine");
+      } else if (type === "fugl") {
+        // Sød dobbelt fugle-pip
+        for (const t0 of [nu, nu + .15]) {
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type = "sine"; o.frequency.setValueAtTime(1450, t0);
+          o.frequency.exponentialRampToValueAtTime(2200, t0 + .06);
+          o.frequency.exponentialRampToValueAtTime(1750, t0 + .12);
+          g.gain.setValueAtTime(.0001, t0); g.gain.linearRampToValueAtTime(.11, t0 + .015);
+          g.gain.exponentialRampToValueAtTime(.0001, t0 + .13);
+          o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + .14);
+        }
+      } else if (type === "svamp") {
+        Spil.tone([659.25, 880, 1046.5, 1318.5], .07, "triangle");
+      } else if (type === "lygte") {
+        Spil.tone([523.25, 783.99, 1046.5], .08, "sine");
       }
     } catch (e) {}
   }
@@ -798,6 +832,24 @@
       root = rt.querySelector(".bh");
       $(".bh-nat-knap").addEventListener("click", skiftDagNat);
       $(".bh-giv-knap").addEventListener("click", givBuket);
+      // Interaktive have-props: fuglebad, svampehus og lygte reagerer med lyd, bevægelse og glimmer!
+      const svEl = $(".bh-pynt.svampehus"), fbEl = $(".bh-pynt.fuglebad"), lyEl = $(".bh-pynt.lygte");
+      if (svEl) svEl.addEventListener("click", e => {
+        e.stopPropagation(); haveLyd("svamp");
+        svEl.classList.remove("vrik"); void svEl.offsetWidth; svEl.classList.add("vrik");
+        if (!roligt()) Spil.burstAt(svEl, "✨🍄⭐✨");
+      });
+      if (fbEl) fbEl.addEventListener("click", e => {
+        e.stopPropagation(); haveLyd("fugl");
+        fbEl.classList.remove("hop"); void fbEl.offsetWidth; fbEl.classList.add("hop");
+        if (!roligt()) Spil.burstAt(fbEl, "💧🐦✨💧");
+      });
+      if (lyEl) lyEl.addEventListener("click", e => {
+        e.stopPropagation(); haveLyd("lygte");
+        lyEl.classList.toggle("taendt");
+        lyEl.classList.remove("vrik"); void lyEl.offsetWidth; lyEl.classList.add("vrik");
+        if (!roligt()) Spil.burstAt(lyEl, "✨💛⭐✨");
+      });
       $(".bh-kunde").addEventListener("click", () => {
         if (!kunde) return;
         Spil.sfx.click();
