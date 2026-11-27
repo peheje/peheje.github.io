@@ -702,7 +702,7 @@
   }
 
   Spil.register({
-    id: "blomsterhaven", navn: "Blomsterhaven", ikon: "🌷", farve: "#d9f2cc",
+    id: "blomsterhaven", navn: "Haven", ikon: "🌷", farve: "#d9f2cc",
     start(rt) {
       alive = true; timers = []; kryb = []; sagt = {};
       tilstand = indlaes();
