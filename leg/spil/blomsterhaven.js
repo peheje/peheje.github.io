@@ -71,12 +71,12 @@
       background:repeating-linear-gradient(90deg,#e9d5b8 0 26px,#d4b690 26px 28px,transparent 28px 46px);
       opacity:.9;border-top:5px solid #d4b690;border-bottom:5px solid #c4a076}
     .bh.nat .bh-hegn{filter:brightness(.58) saturate(.8)}
-    .bh-lyskaede{position:absolute;left:4%;right:4%;bottom:57%;height:26px;display:flex;justify-content:space-around;align-items:center;
-      pointer-events:none;opacity:0;transition:opacity .6s}
+    /* Lyskæde i blød bue mellem æbletræerne (låses op efter 4 buketter) */
+    .bh-lyskaede{position:absolute;left:12%;right:12%;top:8%;height:14%;pointer-events:none;opacity:0;transition:opacity .6s;z-index:2}
     .bh-lyskaede.vis{opacity:1}
-    .bh-paere{width:13px;height:13px;border-radius:50%;background:#ffe785;box-shadow:0 0 10px 3px rgba(255,230,120,.75);
-      animation:bh-glimt 2.2s ease-in-out infinite}
-    .bh.nat .bh-paere{box-shadow:0 0 18px 6px rgba(255,225,100,.95)}
+    .bh-lyskaede svg{width:100%;height:100%;overflow:visible;display:block}
+    .bh-paere{animation:bh-glimt 2.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+    .bh.nat .bh-paere-gloed{opacity:.95}
 
     /* Havepynt (låses op efter 1, 2, 3 buketter) */
     .bh-pynt{position:absolute;pointer-events:none;bottom:40%;z-index:2;transition:transform .6s cubic-bezier(.34,1.56,.64,1),opacity .5s}
@@ -748,9 +748,19 @@
       const stjHtml = Array.from({ length: 18 }, (_, i) =>
         `<span class="bh-stj-prik" style="left:${(i * 19 + 7) % 94}%;top:${(i * 23 + 5) % 52}%;animation-delay:${(i * .35).toFixed(2)}s"></span>`
       ).join("");
-      const paererHtml = Array.from({ length: 10 }, (_, i) =>
-        `<span class="bh-paere" style="animation-delay:${(i * .28).toFixed(2)}s"></span>`
-      ).join("");
+      // Lyskæde på en blød bue (parabel) mellem æbletræerne med synlig snor og hængende pærer
+      const paerePts = Array.from({ length: 9 }, (_, i) => {
+        const u = (i + 1) / 10, x = u * 1000, y = 14 + 4 * u * (1 - u) * 58;
+        return `<g class="bh-paere" style="animation-delay:${(i * .28).toFixed(2)}s">
+          <circle class="bh-paere-gloed" cx="${x.toFixed(1)}" cy="${(y + 10).toFixed(1)}" r="15" fill="#ffe785" opacity=".4"/>
+          <rect x="${(x - 3).toFixed(1)}" y="${(y + 1).toFixed(1)}" width="6" height="5" rx="1.5" fill="#4a354a"/>
+          <circle cx="${x.toFixed(1)}" cy="${(y + 10).toFixed(1)}" r="7" fill="#fff3b0" stroke="#4a354a" stroke-width="2"/>
+        </g>`;
+      }).join("");
+      const paererHtml = `<svg viewBox="0 0 1000 100" preserveAspectRatio="none">
+        <path d="M 0 14 Q 500 130 1000 14" fill="none" stroke="#4a354a" stroke-width="3.5" stroke-linecap="round"/>
+        ${paerePts}
+      </svg>`;
 
       rt.innerHTML = `<div class="bh${tilstand.nat ? " nat" : ""}">
         <div class="bh-bg-dag"></div>
