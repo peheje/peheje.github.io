@@ -636,6 +636,31 @@
         "text": "Put the kettle on before the dark finishes arriving, and the evening will mind its manners.",
         "source": "Unsigned"
       }
+    },
+    {
+      "date": "2026-11-27",
+      "text": "I still owe the mole next door for yesterday's pinch of salt. Shall I leave a spoonful of plum jam by his door, or two oat biscuits?",
+      "extras": [
+        "The waning moon hangs high and bright, only slightly pared down on one side like an apple with a single bite gone.",
+        "Friday slipped indoors before four o'clock, bringing the wet, quiet chill that makes a woollen sock feel heroic.",
+        "The folded recipe slip sits neatly under the chipped blue teacup, keeping watch beside the two sealed envelopes.",
+        "The middle stair gave a cautious little creak as I fetched kindling, as if testing how cold the evening meant to be.",
+        "Along the lane, the beech hedge keeps its last bronze leaves clutched tight, rattling softly whenever the wind turns."
+      ],
+      "choice": {
+        "options": [
+          {
+            "label": "Plum jam",
+            "reply": "Plum jam it is, in a tiny eggcup with a saucer on top. The mole reads best by taste, and plum is a very civil word.",
+            "later": "The eggcup came back washed and dry by morning, with three clover leaves tucked inside. I believe he liked the plum."
+          },
+          {
+            "label": "Oat biscuits",
+            "reply": "Two oat biscuits, wrapped in clean butter paper. They will travel nicely through the hedge without catching damp.",
+            "later": "Only a smudge of oat crumbs remained on the butter paper this morning, and a neat tap on the wall after breakfast."
+          }
+        ]
+      }
     }
   ]
 }
