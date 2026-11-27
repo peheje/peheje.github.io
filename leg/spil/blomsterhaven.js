@@ -130,7 +130,7 @@
       padding:10px 14px 12px;border-radius:28px 28px 18px 18px;
       background:linear-gradient(180deg,#d8a878 0%,#c48e5d 52%,#a77346 100%);
       box-shadow:0 8px 0 #7f5330,0 12px 24px rgba(45,30,45,.22);border:3px solid #6b4325}
-    .bh-potte{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+    .bh-potte{touch-action:none;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
       height:clamp(145px,24vh,215px);cursor:pointer;touch-action:manipulation;border-radius:20px;padding:4px;
       transition:transform .16s ease-out}
     .bh-potte:active{transform:scale(.95)}
@@ -678,24 +678,89 @@
     }
 
     if (valgtTool === "buket") {
-      if (p.trin === 3 && p.sort) {
-        haveLyd("pluk");
-        buketKurv.push(p.sort);
-        if (!roligt()) Spil.burstAt(el, SORT_MAP[p.sort].ikon + "✨");
-        // Efter plukning står en frisk knop tilbage, så haven aldrig bliver tom!
-        p.trin = 2;
-        p.behov = "sol";
-        gem();
-        tegnPotter(idx); tegnKunde(); tegnDock();
-        if (buketKurv.length >= 2) {
-          later(() => aabnBuketVaerksted(), 350);
-        }
-      } else {
-        Spil.sfx.pop();
-      }
+      if (p.trin === 3 && p.sort) plukPotte(idx, el);
+      else Spil.sfx.pop();
     }
   }
 
+  // Pluk den færdige blomst i en potte og læg den i buketten (bruges af tryk, træk og klik på dyret)
+  function plukPotte(idx, el) {
+    const p = tilstand.potter[idx];
+    if (!p || p.trin !== 3 || !p.sort) return false;
+    haveLyd("pluk");
+    buketKurv.push(p.sort);
+    if (!roligt()) Spil.burstAt(el, SORT_MAP[p.sort].ikon + "✨");
+    // Efter plukning er potten tom, og man skal selv plante et nyt frø
+    p.sort = null;
+    p.trin = 0;
+    p.behov = "froe";
+    gem();
+    tegnPotter(idx); tegnKunde(); tegnDock();
+    if (buketKurv.length >= 2) later(() => aabnBuketVaerksted(), 350);
+    return true;
+  }
+
+  // Klik på dyret: pluk en klar blomst til det (helst en den ønsker sig). Giver false hvis ingen er klar.
+  function plukTilKunde() {
+    if (!kunde || buketKurv.length >= 2) return false;
+    const klar = tilstand.potter.map((p, i) => ({ p, i })).filter(x => x.p.trin === 3 && x.p.sort);
+    if (!klar.length) return false;
+    const kurv = [...buketKurv];
+    const oensker = [...kunde.oensker];
+    kurv.forEach(id => { const j = oensker.indexOf(id); if (j >= 0) oensker.splice(j, 1); });
+    const valg = klar.find(x => oensker.includes(x.p.sort)) || klar[0];
+    const potEl = root.querySelectorAll(".bh-potte")[valg.i];
+    return plukPotte(valg.i, potEl);
+  }
+
+  // Træk en færdig blomst op til dyret
+  let traek = null;
+  function traekNed(e) {
+    const potEl = e.target.closest && e.target.closest(".bh-potte");
+    if (!potEl || !kunde) return;
+    const idx = Number(potEl.dataset.idx), p = tilstand.potter[idx];
+    if (!p || p.trin !== 3 || !p.sort) return;
+    traek = { idx, potEl, id: e.pointerId, x0: e.clientX, y0: e.clientY, spoger: null };
+  }
+  function traekFlyt(e) {
+    if (!traek || e.pointerId !== traek.id) return;
+    if (!traek.spoger) {
+      if (Math.hypot(e.clientX - traek.x0, e.clientY - traek.y0) < 14) return;
+      const g = document.createElement("img");
+      g.src = `${IMG}${tilstand.potter[traek.idx].sort}.webp`;
+      g.draggable = false;
+      g.style.cssText = "position:fixed;z-index:30;pointer-events:none;height:clamp(90px,16vh,140px);transform:translate(-50%,-70%) scale(1.1);filter:drop-shadow(0 8px 8px rgba(45,30,45,.3))";
+      document.body.appendChild(g);
+      traek.spoger = g;
+      const k = $(".bh-kunde"); if (k) k.style.filter = "drop-shadow(0 0 14px #ffd23f)";
+    }
+    traek.spoger.style.left = e.clientX + "px";
+    traek.spoger.style.top = e.clientY + "px";
+    e.preventDefault();
+  }
+  function traekOp(e) {
+    if (!traek || e.pointerId !== traek.id) return;
+    const t = traek; traek = null;
+    const k = $(".bh-kunde"); if (k) k.style.filter = "";
+    if (!t.spoger) return;
+    t.spoger.remove();
+    const r = k && k.getBoundingClientRect();
+    const paaDyr = r && e.clientX >= r.left - 20 && e.clientX <= r.right + 20 && e.clientY >= r.top - 20 && e.clientY <= r.bottom + 20;
+    if (paaDyr) plukPotte(t.idx, t.potEl);
+    else Spil.sfx.pop();
+    // Undgå at slippet også tæller som et tryk på potten
+    const stop = ev => { ev.stopPropagation(); };
+    window.addEventListener("click", stop, { capture: true, once: true });
+    later(() => window.removeEventListener("click", stop, true), 50);
+  }
+  function traekRyd() {
+    window.removeEventListener("pointerdown", traekNed);
+    window.removeEventListener("pointermove", traekFlyt);
+    window.removeEventListener("pointerup", traekOp);
+    window.removeEventListener("pointercancel", traekOp);
+    if (traek && traek.spoger) traek.spoger.remove();
+    traek = null;
+  }
   /* ---------- Buket-værksted: vælg sløjfe og giv buketten til dyret ---------- */
   function aabnBuketVaerksted() {
     const lag = $(".bh-buket-lag");
@@ -858,12 +923,17 @@
       });
       $(".bh-kunde").addEventListener("click", () => {
         if (!kunde) return;
+        if (plukTilKunde()) return;
         Spil.sfx.click();
         valgtTool = "buket";
         tegnDock(); tegnFroeBakke(); tegnPotter();
         Spil.say(kunde.tekst, null, kunde.key);
       });
 
+      window.addEventListener("pointerdown", traekNed);
+      window.addEventListener("pointermove", traekFlyt, { passive: false });
+      window.addEventListener("pointerup", traekOp);
+      window.addEventListener("pointercancel", traekOp);
       tegnPynt();
       tegnPotter();
       opdaterKryb();
@@ -901,6 +971,7 @@
       alive = false;
       timers.forEach(clearTimeout);
       cancelAnimationFrame(raf);
+      traekRyd();
       kryb = [];
     }
   });
