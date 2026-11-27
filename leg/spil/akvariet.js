@@ -108,6 +108,11 @@
       "Hvalen er ikke en fisk. Hvalungen drikker mælk fra sin mor."],
   };
   const faktaNr = {};
+  // Et fakta må ikke afbrydes af små replikker (perletal, hints). faktaSlut er en øvre grænse for, hvornår det er færdigt (≈ 80 ms pr. tegn
+  // + lidt luft), og nulstilles, når stemmen rent faktisk er færdig. Små replikker springes over eller venter, mens et fakta læses.
+  let faktaSlut = 0;
+  const faktaSpiller = () => faktaSlut > Date.now() && Spil.isTalking();
+  const sagtFakta = tekst => { faktaSlut = Date.now() + 1500 + tekst.length * 80; };
   const START = ARTER.slice(0, 3).map(a => a.k);
   // Faste punkter i billederne (brøkdel af bredde og højde, billedet vender mod venstre)
   const ANKER = {
@@ -1146,7 +1151,12 @@
       paaVej--; gem.perler++; gemNu(); tegnPerler(gem.perler - 1);
       LYD.ding(gem.perler);
       const nyt = ARTER.some(a => !gem.fundet.includes(a.k));
-      if (gem.perler >= PERLER) { Spil.say(nyt ? "Fem perler! Skattekisten åbner sig!" : "Fem perler!", null, nyt ? ["tal-5", "akva-kiste"] : "tal-5"); later(aabnKiste, 700); }
+      if (gem.perler >= PERLER) {
+        // kisten åbner først, når et igangværende fakta er læst færdigt (ellers afbryder afsløringen det)
+        const aabn = () => { Spil.say(nyt ? "Fem perler! Skattekisten åbner sig!" : "Fem perler!", null, nyt ? ["tal-5", "akva-kiste"] : "tal-5"); later(aabnKiste, 700); };
+        if (faktaSpiller()) naarStille(aabn, 12000); else aabn();
+      }
+      else if (faktaSpiller()) { if (gem.perler === 1 && !gem.perleSagt) naarStille(() => { if (!scene && !gem.perleSagt) { gem.perleSagt = 1; gemNu(); Spil.say("Én! En perle! Saml fem perler, så åbner skattekisten!", null, ["tal-1", "akva-perle"]); } }, 12000); } // ellers: kun lyden og perlen, ikke tallet
       else if (gem.perler === 1 && !gem.perleSagt) { gem.perleSagt = 1; gemNu(); Spil.say("Én! En perle! Saml fem perler, så åbner skattekisten!", null, ["tal-1", "akva-perle"]); }
       else Spil.say(String(gem.perler), null, "tal-" + gem.perler);
     };
@@ -1245,7 +1255,13 @@
       if (!f.a.front && Math.abs(hx - s.x0) > 4) { f.dir = hx > s.x0 ? 1 : -1; }
       if (s.kind === "kiste" && !s.sagt && t - s.t0 > .5) {
         s.sagt = 1; visNavn(f.a.navn);
-        Spil.say((f.a.fisk ? "En ny fisk! Det er " : "Et nyt havdyr! Det er ") + f.a.best + "!", null, "akva-ny-" + f.k);
+        // Navnet, så ét fakta i fuld længde. Scenen (og dermed låsningen af tryk) varer kun til halvdelen af faktaet er sagt;
+        // resten læses færdigt, mens barnet allerede kan lege videre (stemmen afbrydes først af næste tryk, der siger noget).
+        const fl = FAKTA[f.k] || [], fakt = fl[0];
+        Spil.say((f.a.fisk ? "En ny fisk! Det er " : "Et nyt havdyr! Det er ") + f.a.best + "!", null,
+          fakt ? ["akva-ny-" + f.k, "fakta-" + f.k + "-0"] : "akva-ny-" + f.k);
+        gem.faktaMed = gem.faktaMed || []; if (fakt && !gem.faktaMed.includes(f.k)) { gem.faktaMed.push(f.k); gemNu(); }
+        if (fakt) { s.laasTil = t + 2.5 + fakt.length * .065 * .5; sagtFakta(fakt); faktaSlut += 2500; } // navn ≈ 2,5 s + halvdelen af faktaet (≈ 65 ms pr. tegn)
         LYD.glimt();
       }
       if (Math.random() < dt * 5) gnist(f.x + rnd(-.6, .6) * f.w, f.y + rnd(-.5, .5) * f.h, S * .16);
@@ -1255,7 +1271,7 @@
         if (f.trick && f.trick.def.flyt) { f.spotT = .22; f.spot = Math.min(f.spot, .55); dimT = .2; }
       }
     } else if (s.fase === 2) {
-      if (!f.trick) {
+      if (!f.trick && t >= (s.laasTil || 0)) {
         s.fase = 3; s.t3 = t; f.scene = false; f.spotT = 0; visNavn("");
         kiste.openT = 0; kiste.glow = 0; nytMaal(f); f.tz = rnd(.5, .9);
       }
@@ -1390,6 +1406,17 @@
     if (f.trick) { f.eatT = .3; LYD.blop(); return; }
     const forste = !hoert.has(f.k); hoert.add(f.k);
     startTrick(f, forste);
+    // Startdyrene (og alle, der ikke fik deres fakta ved kisten) fortæller ét fakta første gang, man trykker på dem:
+    // først navnet, så tricket, og så faktaet, så snart stemmen er stille. Gemmes, så det kun sker én gang pr. dyr.
+    gem.faktaMed = gem.faktaMed || []; gem.tryk = gem.tryk || {}; gem.faktaNr = gem.faktaNr || {};
+    const fl = FAKTA[f.k], n = gem.tryk[f.k] = (gem.tryk[f.k] || 0) + 1;
+    let i = -1;
+    if (fl && fl.length) {
+      if (!gem.faktaMed.includes(f.k)) { gem.faktaMed.push(f.k); i = 0; gem.faktaNr[f.k] = 1 % fl.length; }
+      else if (n % 2 === 0) { i = gem.faktaNr[f.k] ?? 1; gem.faktaNr[f.k] = (i + 1) % fl.length; } // hvert 2. tryk: næste fakta, rundt og rundt
+    }
+    gemNu();
+    if (i >= 0) naarStille(() => { if (!scene && !bogOpen) { sagtFakta(fl[i]); Spil.say(fl[i], () => { faktaSlut = 0; }, "fakta-" + f.k + "-" + i); } }, 8000);
   }
 
   function trykPynt(d) {
@@ -2245,7 +2272,8 @@
       if (f.x < -f.w * 1.2 || f.x > W + f.w * 1.2) continue; // uden for billedet
       // i spotlyset tegnes dyret øverst — men ikke under et trick, hvor det svømmer rundt (fx gemmer sig i koralen)
       const flytter = f.trick && f.trick.startet && f.trick.def.flyt;
-      if ((f.scene && !flytter) || f.spot > .3) helt.push(f); else if (f.over) over.push(f); else sorteret.push(f);
+      // søstjernen hopper helt op til glasset under tricket, så den (og alt andet foran glasset) skal ligge over kisten
+      if ((f.scene && (!flytter || f.z > 1 || f.a.slags === "stjerne")) || f.spot > .3) helt.push(f); else if (f.over) over.push(f); else sorteret.push(f);
     }
     sorteret.sort((a, b) => a.z - b.z);
     tegnSand();
