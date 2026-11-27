@@ -860,16 +860,33 @@
 
       tegnPynt();
       tegnPotter();
-      tegnFroeBakke();
-      tegnDock();
       opdaterKryb();
       nyKunde(true);
+
+      // Vælg start-værktøj og velkomstreplik efter hvad haven faktisk mangler lige nu (så hun aldrig beder om at plante når alle potter er fulde!)
+      const harTom = tilstand.potter.some(p => p.trin === 0);
+      const harBlomst = tilstand.potter.some(p => p.trin === 3);
+      const harVand = tilstand.potter.some(p => p.behov === "vand");
+      const harSol = tilstand.potter.some(p => p.behov === "sol");
+      const harBoerste = tilstand.potter.some(p => p.behov === "boerste");
+      if (!harTom) {
+        valgtTool = harBlomst ? "buket" : harVand ? "vand" : harBoerste ? "boerste" : harSol ? "sol" : "froe";
+      }
+      tegnFroeBakke();
+      tegnDock();
+      tegnPotter();
 
       if (Spil.dyb === "buket") {
         buketKurv = ["solsikke", "tulipan", "regnbue"];
         aabnBuketVaerksted();
       } else if (!Spil.dyb) {
-        later(() => Spil.say("Velkommen til din blomsterhave! Plant et frø i en potte.", null, "bh-hej"), 500);
+        later(() => {
+          if (harTom) Spil.say("Velkommen til din blomsterhave! Plant et frø i en potte.", null, "bh-hej");
+          else if (harBlomst && kunde) Spil.say(kunde.tekst, null, kunde.key);
+          else if (harBlomst) Spil.say("Pluk blomsterne til buketten!", null, "bh-pluk");
+          else if (harVand) Spil.say("Flot! Giv nu frøet lidt vand.", null, "bh-plant");
+          else if (harSol) Spil.say("Dejligt! Nu vokser din blomst.", null, "bh-vand");
+        }, 500);
       }
 
       raf = requestAnimationFrame(krybLoop);
