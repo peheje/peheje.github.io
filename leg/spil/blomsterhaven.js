@@ -41,24 +41,17 @@
 
   Spil.css("css-blomsterhaven", `
     .bh{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column;
-      background:linear-gradient(180deg,#89ccf5 0%,#cceeff 44%,#fff4d8 64%,#a7dc7c 64%,#7ec469 100%);
-      transition:background .8s ease;font-family:var(--display,system-ui);user-select:none;-webkit-user-select:none}
-    .bh.nat{background:linear-gradient(180deg,#1e2a5a 0%,#394885 44%,#5c5a8a 64%,#3c6b4b 64%,#294d38 100%)}
+      background:#a7dc7c;font-family:var(--display,system-ui);user-select:none;-webkit-user-select:none}
+    .bh-bg-dag,.bh-bg-nat{position:absolute;inset:0;background-size:cover;background-position:center 46%;pointer-events:none;transition:opacity .9s ease}
+    .bh-bg-dag{background-image:url("${IMG}baggrund-dag.webp");opacity:1}
+    .bh-bg-nat{background-image:url("${IMG}baggrund-nat.webp");opacity:0}
+    .bh.nat .bh-bg-nat{opacity:1}
 
-    /* Himmel: sol/måne, skyer, stjerner, lyskæde */
-    .bh-himmel{position:absolute;inset:0 0 36% 0;pointer-events:none;overflow:hidden}
-    .bh-stjerner{position:absolute;inset:0;opacity:0;transition:opacity .8s}
-    .bh.nat .bh-stjerner{opacity:1}
+    /* Blidt stjerneglimt om natten oven på nat-baggrunden */
+    .bh-himmel{position:absolute;inset:0 0 42% 0;pointer-events:none;overflow:hidden}
+    .bh-stjerner{position:absolute;inset:0;opacity:0;transition:opacity .9s}
+    .bh.nat .bh-stjerner{opacity:.85}
     .bh-stj-prik{position:absolute;width:4px;height:4px;border-radius:50%;background:#fff8cc;box-shadow:0 0 8px #fff5aa;animation:bh-glimt 2.8s ease-in-out infinite}
-    .bh-sky{position:absolute;width:120px;height:42px;border-radius:40px;background:rgba(255,255,255,.85);
-      box-shadow:34px -12px 0 8px rgba(255,255,255,.85), -26px -6px 0 4px rgba(255,255,255,.85);
-      animation:bh-sky-driv 42s linear infinite;opacity:.9;transition:opacity .8s}
-    .bh.nat .bh-sky{opacity:.18}
-    .bh-himmel-lys{position:absolute;top:calc(2vh + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);
-      width:68px;height:68px;border-radius:50%;background:radial-gradient(circle,#fff9cc 30%,#ffd23f 70%,rgba(255,210,63,0) 72%);
-      box-shadow:0 0 40px rgba(255,215,90,.65);transition:all .8s}
-    .bh.nat .bh-himmel-lys{background:radial-gradient(circle at 35% 35%,#fffce0 45%,#f2e2a0 70%,rgba(242,226,160,0) 72%);
-      box-shadow:0 0 32px rgba(255,248,196,.55)}
 
     /* Øverste bar: buket-tæller + dag/nat knap */
     .bh-top{position:absolute;top:calc(2vh + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));
@@ -760,18 +753,16 @@
       ).join("");
 
       rt.innerHTML = `<div class="bh${tilstand.nat ? " nat" : ""}">
+        <div class="bh-bg-dag"></div>
+        <div class="bh-bg-nat"></div>
         <div class="bh-himmel">
           <div class="bh-stjerner">${stjHtml}</div>
-          <div class="bh-himmel-lys"></div>
-          <div class="bh-sky" style="top:14%;animation-delay:-8s"></div>
-          <div class="bh-sky" style="top:28%;animation-delay:-26s;transform:scale(.82)"></div>
         </div>
         <div class="bh-top">
           <div class="bh-taeller" aria-label="Buketter">💐 <b>${tilstand.buketter}</b></div>
           <button class="bh-nat-knap" aria-label="Dag og nat">${tilstand.nat ? "☀️" : "🌙"}</button>
         </div>
         <div class="bh-scene">
-          <div class="bh-hegn"></div>
           <div class="bh-lyskaede">${paererHtml}</div>
           <div class="bh-pynt svampehus" hidden><img src="${IMG}svampehus.webp" alt="" draggable="false"></div>
           <div class="bh-pynt fuglebad" hidden><img src="${IMG}fuglebad.webp" alt="" draggable="false"></div>
