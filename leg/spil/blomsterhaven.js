@@ -67,7 +67,9 @@
       font:800 clamp(20px,3.4vh,30px)/1.1 var(--display,system-ui);color:#6e4326;display:flex;align-items:center;gap:6px}
     .bh-taeller.pop{animation:bh-pop .5s ease-out}
     .bh-nat-knap{width:clamp(54px,7.6vh,68px);aspect-ratio:1;border-radius:50%;background:rgba(255,252,242,.88);
-      box-shadow:0 4px 0 rgba(61,43,61,.2);font-size:clamp(26px,4vh,34px);display:flex;align-items:center;justify-content:center}
+      box-shadow:0 4px 0 rgba(61,43,61,.2);font-size:clamp(26px,4vh,34px);line-height:1;padding:0;
+      font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif;
+      display:flex;align-items:center;justify-content:center}
     .bh-nat-knap:active{transform:translateY(3px)}
 
     /* Baggrund: havehegn, pynt og besøgende dyr */
@@ -148,7 +150,8 @@
 
     /* Behov-boble over potten + støv/kilde-prikker */
     .bh-behov{position:absolute;top:2px;right:4px;z-index:4;width:clamp(38px,5.6vh,48px);height:clamp(38px,5.6vh,48px);
-      border-radius:50%;background:#fffdf6;border:3px solid #4a354a;box-shadow:0 3px 0 rgba(61,43,61,.22);
+      border-radius:50%;background:#fffdf6;border:3px solid #4a354a;box-shadow:0 3px 0 rgba(61,43,61,.22);padding:0;
+      font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif;line-height:1;
       display:flex;align-items:center;justify-content:center;font-size:clamp(20px,3.2vh,26px);
       animation:bh-svaev 1.8s ease-in-out infinite;pointer-events:none}
     .bh-behov[hidden]{display:none}
@@ -162,7 +165,7 @@
     /* Frø-bakke (åbnes når frøpose er valgt) */
     .bh-froe-bakke{position:relative;z-index:11;display:flex;justify-content:center;gap:10px;padding:6px 12px 2px;flex-wrap:wrap}
     .bh-froe-bakke[hidden]{display:none}
-    .bh-froe-knap{width:clamp(60px,8.5vh,76px);height:clamp(60px,8.5vh,76px);border-radius:20px;
+    .bh-froe-knap{width:clamp(60px,8.5vh,76px);height:clamp(60px,8.5vh,76px);border-radius:20px;box-sizing:border-box;
       background:#fffdf6;border:3px solid #4a354a;box-shadow:0 4px 0 rgba(61,43,61,.22);
       display:flex;align-items:center;justify-content:center;padding:5px;position:relative;transition:transform .14s}
     .bh-froe-knap img{width:100%;height:100%;object-fit:contain;display:block}
@@ -175,8 +178,9 @@
       padding:8px max(12px,env(safe-area-inset-left,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-right,0px));
       background:linear-gradient(180deg,rgba(255,250,238,0),rgba(255,250,238,.85) 35%)}
     .bh.nat .bh-dock{background:linear-gradient(180deg,rgba(30,42,90,0),rgba(30,42,90,.75) 35%)}
-    .bh-tool{width:clamp(66px,10vh,86px);height:clamp(66px,10vh,86px);border-radius:50%;
+    .bh-tool{width:clamp(66px,10vh,86px);height:clamp(66px,10vh,86px);border-radius:50%;padding:0;box-sizing:border-box;
       background:#fffdf6;border:3px solid #4a354a;box-shadow:0 5px 0 rgba(61,43,61,.25);
+      font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif;
       display:flex;align-items:center;justify-content:center;font-size:clamp(32px,5vh,44px);line-height:1;
       position:relative;transition:transform .15s,background .2s}
     .bh-tool:active{transform:translateY(3px)}
@@ -451,19 +455,23 @@
     const bakke = $(".bh-froe-bakke");
     if (!bakke) return;
     bakke.hidden = valgtTool !== "froe";
-    bakke.innerHTML = SORTER.map(s => {
-      const laast = tilstand.buketter < s.krav;
-      const valgt = valgtFroe === s.id && !laast;
-      return `<button class="bh-froe-knap${valgt ? " valgt" : ""}${laast ? " laast" : ""}" data-sort="${s.id}" aria-label="${s.navn}">
+    if (!bakke.children.length) {
+      bakke.innerHTML = SORTER.map(s => `<button class="bh-froe-knap" data-sort="${s.id}" aria-label="${s.navn}">
         <img src="${IMG}${s.id}.webp" alt="${s.navn}" draggable="false">
-      </button>`;
-    }).join("");
-    bakke.querySelectorAll(".bh-froe-knap").forEach(btn => {
-      btn.addEventListener("click", () => {
-        Spil.sfx.click();
-        valgtFroe = btn.dataset.sort;
-        tegnFroeBakke();
+      </button>`).join("");
+      bakke.querySelectorAll(".bh-froe-knap").forEach(btn => {
+        btn.addEventListener("click", () => {
+          Spil.sfx.click();
+          valgtFroe = btn.dataset.sort;
+          tegnFroeBakke();
+        });
       });
+    }
+    bakke.querySelectorAll(".bh-froe-knap").forEach(btn => {
+      const s = SORT_MAP[btn.dataset.sort];
+      const laast = tilstand.buketter < s.krav;
+      btn.classList.toggle("laast", laast);
+      btn.classList.toggle("valgt", valgtFroe === s.id && !laast);
     });
   }
 
@@ -471,23 +479,33 @@
     const dock = $(".bh-dock");
     if (!dock) return;
     const harBlomst = tilstand.potter.some(p => p.trin === 3);
-    dock.innerHTML = VAERKTOEJ.map(v => {
-      const valgt = valgtTool === v.id;
-      const klar = v.id === "buket" && harBlomst && !valgt && buketKurv.length < 2;
-      const badge = v.id === "buket" && buketKurv.length > 0 ? `<span class="bh-tool-badge">${buketKurv.length}</span>` : `<span class="bh-tool-badge" hidden></span>`;
-      return `<button class="bh-tool${valgt ? " valgt" : ""}${klar ? " klar" : ""}" data-tool="${v.id}" aria-label="${v.navn}">${v.ikon}${badge}</button>`;
-    }).join("");
-    dock.querySelectorAll(".bh-tool").forEach(btn => {
-      btn.addEventListener("click", () => {
-        Spil.sfx.click();
-        const id = btn.dataset.tool;
-        if (id === "buket" && buketKurv.length >= 2) { aabnBuketVaerksted(); return; }
-        valgtTool = id;
-        tegnDock(); tegnFroeBakke(); tegnPotter();
-        if (id === "buket" && !sagt.pluk && harBlomst && !Spil.isTalking()) {
-          sagt.pluk = true; Spil.say("Pluk blomsterne til buketten!", null, "bh-pluk");
-        }
+    if (!dock.children.length) {
+      dock.innerHTML = VAERKTOEJ.map(v =>
+        `<button class="bh-tool" data-tool="${v.id}" aria-label="${v.navn}">${v.ikon}<span class="bh-tool-badge" hidden></span></button>`
+      ).join("");
+      dock.querySelectorAll(".bh-tool").forEach(btn => {
+        btn.addEventListener("click", () => {
+          Spil.sfx.click();
+          const id = btn.dataset.tool;
+          if (id === "buket" && buketKurv.length >= 2) { aabnBuketVaerksted(); return; }
+          valgtTool = id;
+          tegnDock(); tegnFroeBakke(); tegnPotter();
+          if (id === "buket" && !sagt.pluk && tilstand.potter.some(p => p.trin === 3) && !Spil.isTalking()) {
+            sagt.pluk = true; Spil.say("Pluk blomsterne til buketten!", null, "bh-pluk");
+          }
+        });
       });
+    }
+    dock.querySelectorAll(".bh-tool").forEach(btn => {
+      const id = btn.dataset.tool, valgt = valgtTool === id;
+      btn.classList.toggle("valgt", valgt);
+      btn.classList.toggle("klar", id === "buket" && harBlomst && !valgt && buketKurv.length < 2);
+      const badge = btn.querySelector(".bh-tool-badge");
+      if (badge) {
+        const vis = id === "buket" && buketKurv.length > 0;
+        badge.hidden = !vis;
+        if (vis) badge.textContent = String(buketKurv.length);
+      }
     });
   }
 
@@ -495,30 +513,41 @@
     return b === "froe" ? "🌱" : b === "vand" ? "💧" : b === "sol" ? "☀️" : b === "boerste" ? "🐞" : "";
   }
 
+  function opdaterPotte(el, p, voks) {
+    el.classList.toggle("klar-pluk", valgtTool === "buket" && p.trin === 3);
+    const bEl = el.querySelector(".bh-behov"), bIkon = behovIkon(p.behov);
+    if (bEl.textContent !== bIkon) bEl.textContent = bIkon;
+    bEl.hidden = !bIkon;
+    const stoevEl = el.querySelector(".bh-stoev");
+    stoevEl.hidden = p.behov !== "boerste";
+    // Opdatér kun selve plante-billedet når art eller væksttrin faktisk har ændret sig, så svaj-animationen ikke starter forfra
+    const noegle = `${p.trin}:${p.sort || ""}`;
+    const wrap = el.querySelector(".bh-plante-wrap");
+    if (wrap.dataset.noegle !== noegle || voks) {
+      wrap.dataset.noegle = noegle;
+      if (p.trin === 1) wrap.innerHTML = `<img class="bh-plante spire${voks ? " voks" : ""}" src="${IMG}spire.webp" alt="" draggable="false">`;
+      else if (p.trin === 2) wrap.innerHTML = `<img class="bh-plante knop${voks ? " voks" : ""}" src="${IMG}knop.webp" alt="" draggable="false">`;
+      else if (p.trin === 3 && p.sort) wrap.innerHTML = `<img class="bh-plante${voks ? " voks" : ""}" src="${IMG}${p.sort}.webp" alt="" draggable="false">`;
+      else wrap.innerHTML = "";
+    }
+  }
+
   function tegnPotter(voksIdx = -1) {
     const baenk = $(".bh-baenk");
     if (!baenk) return;
-    baenk.innerHTML = tilstand.potter.map((p, idx) => {
-      let planteHtml = "";
-      if (p.trin === 1) planteHtml = `<img class="bh-plante spire${voksIdx === idx ? " voks" : ""}" src="${IMG}spire.webp" alt="" draggable="false">`;
-      else if (p.trin === 2) planteHtml = `<img class="bh-plante knop${voksIdx === idx ? " voks" : ""}" src="${IMG}knop.webp" alt="" draggable="false">`;
-      else if (p.trin === 3 && p.sort) planteHtml = `<img class="bh-plante${voksIdx === idx ? " voks" : ""}" src="${IMG}${p.sort}.webp" alt="" draggable="false">`;
-
-      const stoevHtml = p.behov === "boerste"
-        ? `<div class="bh-stoev"><span style="left:18%;top:28%"></span><span style="right:20%;top:18%;animation-delay:.3s"></span><span style="left:45%;top:52%;animation-delay:.6s"></span></div>`
-        : "";
-      const klarPluk = valgtTool === "buket" && p.trin === 3;
-      const bIkon = behovIkon(p.behov);
-      return `<div class="bh-potte${klarPluk ? " klar-pluk" : ""}" data-idx="${idx}" role="button" tabindex="0" aria-label="Potte ${idx + 1}">
-        <div class="bh-behov"${bIkon ? "" : " hidden"}>${bIkon}</div>
-        ${stoevHtml}
-        <div class="bh-plante-wrap">${planteHtml}</div>
+    if (!baenk.children.length) {
+      baenk.innerHTML = tilstand.potter.map((_, idx) => `<div class="bh-potte" data-idx="${idx}" role="button" tabindex="0" aria-label="Potte ${idx + 1}">
+        <div class="bh-behov" hidden></div>
+        <div class="bh-stoev" hidden><span style="left:18%;top:28%"></span><span style="right:20%;top:18%;animation-delay:.3s"></span><span style="left:45%;top:52%;animation-delay:.6s"></span></div>
+        <div class="bh-plante-wrap"></div>
         <div class="bh-pottesk"><div class="bh-jord"></div></div>
-      </div>`;
-    }).join("");
-
-    baenk.querySelectorAll(".bh-potte").forEach(el => {
-      el.addEventListener("click", () => trykPotte(Number(el.dataset.idx), el));
+      </div>`).join("");
+      baenk.querySelectorAll(".bh-potte").forEach(el => {
+        el.addEventListener("click", () => trykPotte(Number(el.dataset.idx), el));
+      });
+    }
+    baenk.querySelectorAll(".bh-potte").forEach((el, idx) => {
+      opdaterPotte(el, tilstand.potter[idx], voksIdx === idx);
     });
   }
 
