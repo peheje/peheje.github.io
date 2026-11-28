@@ -10,20 +10,21 @@
   const KOMBO_IDS = ["jojo", "damp", "sursoed", "sovehop", "regnbue"];
 
   const DRINKS = [
-    { id: "sour",    label: "Sur citron",  ico: "🍋", color: "#ffe135", pose: "sour",   colFx: "sv-col-sour",   motFx: "sv-mot-sour",   key: "sv-sur",    say: "Uuuuh! Den er helt vildt sur!",       tag: "Uuuuh, SUR! 🍋",   sfx: "sour" },
-    { id: "sugar",   label: "Sukker-chok", ico: "🍬", color: "#ff66b5", pose: "happy",  colFx: "sv-col-pink",   motFx: "sv-mot-sugar",  key: "sv-sukker", say: "Wiiii! Jeg kan slet ikke stå stille!", tag: "WIIII! 🍬⚡",      sfx: "sugar" },
-    { id: "spicy",   label: "Chili-ild",   ico: "🌶️", color: "#ff4f38", pose: "sour",   colFx: "sv-col-spicy",  motFx: "sv-mot-spicy",  key: "sv-chili",  say: "Puha! Den er stærk! Vand, vand!",      tag: "PUHA, STÆRK! 🌶️", sfx: "spicy" },
-    { id: "cold",    label: "Is-brus",     ico: "❄️", color: "#5cd4ff", pose: "sour",   colFx: "sv-col-cold",   motFx: "sv-mot-cold",   key: "sv-is",     say: "Brrrr! Jeg fryser helt vildt!",        tag: "Brrrr! ❄️",        sfx: "cold" },
-    { id: "sleepy",  label: "Sove-kakao",  ico: "😴", color: "#a58bff", pose: "sleepy", colFx: "sv-col-sleepy", motFx: "sv-mot-sleepy", key: "sv-sove",   say: "Gaaab... jeg bliver helt søvnig!",     tag: "Gaaab... 💤",      sfx: "sleepy" },
-    { id: "giant",   label: "Kæmpe-melon", ico: "🍉", color: "#52cc62", pose: "happy",  colFx: "sv-col-green",  sizeFx: "sv-giant",     key: "sv-kaempe", say: "Whoa! Jeg er blevet kæmpestor!",       tag: "KÆMPESTOR! 🍉",    sfx: "giant" },
-    { id: "tiny",    label: "Blåbær-mini", ico: "🫐", color: "#4d96ff", pose: "idle",   colFx: "sv-col-blue",   sizeFx: "sv-tiny",      key: "sv-mini",   say: "Hov! Jeg er blevet helt lillebitte!",  tag: "Lillebitte! 🫐",   sfx: "tiny" },
-    { id: "bubbles", label: "Boble-te",    ico: "🧋", color: "#5ce1e6", pose: "drink",  motFx: "sv-mot-float",  key: "sv-bobler",      say: "Bøvs! Jeg svæver med bobler!",         tag: "Bøvs! 🧋🫧",       sfx: "bubbles", bubbles: true }
+    { id: "sour",    label: "Sur citron",  nameKey: "sv-navn-sur",    ico: "🍋", color: "#ffe135", pose: "sour",   colFx: "sv-col-sour",   motFx: "sv-mot-sour",   key: "sv-sur",    say: "Uuuuh! Den er helt vildt sur!",       tag: "Uuuuh, SUR! 🍋",   sfx: "sour" },
+    { id: "sugar",   label: "Sukker-chok", nameKey: "sv-navn-sukker", ico: "🍬", color: "#ff66b5", pose: "happy",  colFx: "sv-col-pink",   motFx: "sv-mot-sugar",  key: "sv-sukker", say: "Wiiii! Jeg kan slet ikke stå stille!", tag: "WIIII! 🍬⚡",      sfx: "sugar" },
+    { id: "spicy",   label: "Chili-ild",   nameKey: "sv-navn-chili",  ico: "🌶️", color: "#ff4f38", pose: "sour",   colFx: "sv-col-spicy",  motFx: "sv-mot-spicy",  key: "sv-chili",  say: "Puha! Den er stærk! Vand, vand!",      tag: "PUHA, STÆRK! 🌶️", sfx: "spicy" },
+    { id: "cold",    label: "Is-brus",     nameKey: "sv-navn-is",     ico: "❄️", color: "#5cd4ff", pose: "sour",   colFx: "sv-col-cold",   motFx: "sv-mot-cold",   key: "sv-is",     say: "Brrrr! Jeg fryser helt vildt!",        tag: "Brrrr! ❄️",        sfx: "cold" },
+    { id: "sleepy",  label: "Sove-kakao",  nameKey: "sv-navn-sove",   ico: "😴", color: "#a58bff", pose: "sleepy", colFx: "sv-col-sleepy", motFx: "sv-mot-sleepy", key: "sv-sove",   say: "Gaaab... jeg bliver helt søvnig!",     tag: "Gaaab... 💤",      sfx: "sleepy" },
+    { id: "giant",   label: "Kæmpe-melon", nameKey: "sv-navn-kaempe", ico: "🍉", color: "#52cc62", pose: "happy",  colFx: "sv-col-green",  sizeFx: "sv-giant",     key: "sv-kaempe", say: "Whoa! Jeg er blevet kæmpestor!",       tag: "KÆMPESTOR! 🍉",    sfx: "giant" },
+    { id: "tiny",    label: "Blåbær-mini", nameKey: "sv-navn-mini",   ico: "🫐", color: "#4d96ff", pose: "idle",   colFx: "sv-col-blue",   sizeFx: "sv-tiny",      key: "sv-mini",   say: "Hov! Jeg er blevet helt lillebitte!",  tag: "Lillebitte! 🫐",   sfx: "tiny" },
+    { id: "bubbles", label: "Boble-te",    nameKey: "sv-navn-bobler", ico: "🧋", color: "#5ce1e6", pose: "drink",  motFx: "sv-mot-float",  key: "sv-bobler",      say: "Bøvs! Jeg svæver med bobler!",         tag: "Bøvs! 🧋🫧",       sfx: "bubbles", bubbles: true }
   ];
 
   const ALL_KEYS = [
     "sv-hej", "sv-mikser", "sv-cafe", "sv-kat-toerstig", "sv-hund-toerstig", "sv-vand", "sv-alle-kombo",
     "sv-kombo-jojo", "sv-kombo-damp", "sv-kombo-sursoed", "sv-kombo-sovehop", "sv-kombo-regnbue",
-    ...DRINKS.map(d => d.key)
+    ...DRINKS.map(d => d.key),
+    ...DRINKS.map(d => d.nameKey)
   ];
 
   const MACHINES = [
@@ -681,7 +682,7 @@
     }
   `);
 
-  const MAX_SIPS = 4;
+  const MAX_SIPS = 2;
   let root, alive, timers, intervals, mix, mixMethod, sipsLeft, saidForDrink, saidMixerIntro, pouring, mixing, scene, saved, dragState;
   const petTimers = { kat: {}, hund: {} };
   const drinkingPet = { kat: false, hund: false };
@@ -847,16 +848,23 @@
     }
     const fill = (i) => isRb ? `url(#${prefix}-rb)` : blended ? `url(#${prefix}-blend)` : mix[i].color;
 
-    // I caféen synker væsken jævnt ned i takt med de 4 slurke (100% -> 75% -> 50% -> 25% -> 0%)
+    // I caféen synker væsken tydeligt ned i takt med de 2 slurke (100% -> 50% -> 0%)
     const frac = isCafe ? (sipsLeft / MAX_SIPS) : 1;
-    const drop = Math.round((1 - frac) * 58);
-    l0.setAttribute("y", String(Math.min(106, 86 + Math.round(drop * 0.35)))); l0.setAttribute("fill", fill(0));
-    if (mix.length >= 2) { l1.setAttribute("y", String(Math.min(112, 60 + Math.round(drop * 0.72)))); l1.setAttribute("fill", fill(1)); }
-    else l1.setAttribute("y", "116");
-    if (mix.length >= 3) { l2.setAttribute("y", String(Math.min(114, 32 + drop))); l2.setAttribute("fill", fill(2)); }
-    else l2.setAttribute("y", "116");
+    l0.setAttribute("y", String(Math.round(113 - 27 * frac)));
+    l0.setAttribute("height", "30");
+    l0.setAttribute("fill", fill(0));
+    if (mix.length >= 2) {
+      l1.setAttribute("y", String(Math.round(113 - 53 * frac)));
+      l1.setAttribute("height", String(Math.ceil(27 * frac) + 2));
+      l1.setAttribute("fill", fill(1));
+    } else l1.setAttribute("y", "116");
+    if (mix.length >= 3) {
+      l2.setAttribute("y", String(Math.round(113 - 81 * frac)));
+      l2.setAttribute("height", String(Math.ceil(29 * frac) + 2));
+      l2.setAttribute("fill", fill(2));
+    } else l2.setAttribute("y", "116");
 
-    if (foam) foam.setAttribute("opacity", (!isLab && (mixMethod === "blender" || mixMethod === "shaker") && (!isCafe || sipsLeft >= 3)) ? "1" : "0");
+    if (foam) foam.setAttribute("opacity", (!isLab && (mixMethod === "blender" || mixMethod === "shaker") && (!isCafe || sipsLeft >= MAX_SIPS)) ? "1" : "0");
     if (fizz) fizz.setAttribute("opacity", (!isLab && (mixMethod === "brus" || mixMethod === "shaker")) ? "1" : "0");
   }
 
@@ -1496,6 +1504,7 @@
     if (!alive || pouring) return;
     pouring = true;
     if (mix.length >= 3) mix = [];
+    Spil.say(drink.label + "!", null, drink.nameKey);
 
     const lab = root.querySelector(".sv-lab");
     const cupEl = root.querySelector(".sv-lab-cup");
@@ -1787,7 +1796,7 @@
     const cup = root.querySelector(".sv-cup");
 
     drinkingPet[pet] = true;
-    sipCooldown[pet] = Date.now() + 1150;
+    sipCooldown[pet] = Date.now() + 700;
     const currentMix = [...mix];
     sipsLeft -= 1;
     if (sipsLeft <= 0) {
@@ -1805,14 +1814,14 @@
     slot.classList.add("drinking");
     setPose(pet, "drink");
     playGulp();
-    later(() => playGulp(), 280);
+    later(() => playGulp(), 180);
 
     later(() => {
       slot.classList.remove("drinking");
       applyMix(pet, currentMix);
       drinkingPet[pet] = false;
       syncAllUI();
-    }, 640);
+    }, 420);
   }
 
   function applyMix(pet, drinks) {
