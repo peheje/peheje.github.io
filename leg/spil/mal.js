@@ -896,7 +896,7 @@
     hideConfirm();
     saveDrawing();
     Spil.sfx.pop();
-    wipe(() => Spil.say("Tada! En helt ny tegning!", null, "mal-nyt"));
+    wipe(() => Spil.say("Klar! En helt ny tegning!", null, "mal-nyt"));
   }
 
   /* ---------- Galleri ---------- */
