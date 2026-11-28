@@ -500,9 +500,9 @@
   const plop = () => blip([640, 300], .075, "sine", .13);
   function twinkle() {
     const now = performance.now();
-    if (now - lastTwinkle < 110) return;
+    if (now - lastTwinkle < 240) return;
     lastTwinkle = now;
-    blip([1900 + Math.random() * 1300], .05, "sine", .045);
+    blip([1100 + Math.random() * 500], .04, "sine", .012);
   }
 
   function noiseBuffer() {
@@ -1085,7 +1085,7 @@
       };
       syncMus();
       musBtn.onclick = () => { Spil.sfx.click(); Spil.music && Spil.music.toggle(); syncMus(); };
-      Spil.music && Spil.music.play("lyd/musik-mal.mp3", .28);
+      Spil.music && Spil.music.play("lyd/musik-mal.mp3", .14);
 
       if (window.ResizeObserver) {
         ro = new ResizeObserver(() => fit());
