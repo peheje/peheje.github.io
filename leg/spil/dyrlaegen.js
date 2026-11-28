@@ -71,19 +71,19 @@
 
   const GODBIDDER = ["🦴", "🍎", "🥕", "🍌", "🐟", "🍓", "🌿", "🥜"];
 
-  // De 6 redskaber i bakken
+  // De 6 redskaber i bakken (alle har håndmalet WebP-sprite i billeder/dyrlaegen/)
   const REDSKABER = [
-    { id: "roentgen", ikon: "🔍", navn: "Røntgen", farve: "#e4e2ff",
+    { id: "roentgen", ikon: "🔍", billede: "billeder/dyrlaegen/roentgen.webp", navn: "Røntgen", farve: "#e4e2ff",
       hintKey: "dyrl-hint-roentgen", hintTekst: "Prøv røntgen-luppen! Tryk på forstørrelsesglasset nede i bunden." },
     { id: "pincet", ikon: "🤏", billede: "billeder/dyrlaegen/pincet.webp", navn: "Pincet", farve: "#ffe8f0",
       hintKey: "dyrl-hint-pincet", hintTekst: "Prøv pincetten! Tryk på pincetten nede i bunden." },
-    { id: "plaster", ikon: "🩹", navn: "Plaster", farve: "#ffe4d6",
+    { id: "plaster", ikon: "🩹", billede: "billeder/dyrlaegen/plaster.webp", navn: "Plaster", farve: "#ffe4d6",
       hintKey: "dyrl-hint-plaster", hintTekst: "Prøv plasteret! Tryk på plasteret nede i bunden." },
-    { id: "stetoskop", ikon: "🩺", navn: "Stetoskop", farve: "#dceeff",
+    { id: "stetoskop", ikon: "🩺", billede: "billeder/dyrlaegen/stetoskop.webp", navn: "Stetoskop", farve: "#dceeff",
       hintKey: "dyrl-hint-stetoskop", hintTekst: "Prøv stetoskopet! Tryk på stetoskopet nede i bunden." },
-    { id: "klud", ikon: "🧊", navn: "Isterning", farve: "#d6f5ff",
+    { id: "klud", ikon: "🧊", billede: "billeder/dyrlaegen/isterning.webp", navn: "Isterning", farve: "#d6f5ff",
       hintKey: "dyrl-hint-klud", hintTekst: "Prøv isterningen! Tryk på isterningen nede i bunden." },
-    { id: "papir", ikon: "🧻", navn: "Lommetørklæde", farve: "#fff3d1",
+    { id: "papir", ikon: "🧻", billede: "billeder/dyrlaegen/lommetoerklaede.webp", navn: "Lommetørklæde", farve: "#fff3d1",
       hintKey: "dyrl-hint-papir", hintTekst: "Prøv lommetørklædet! Tryk på papiret nede i bunden." }
   ];
 
@@ -97,7 +97,7 @@
 
   const OPGAVE_INFO = {
     splint: {
-      ikon: "🩹",
+      ikon: "🩹", billede: "billeder/dyrlaegen/plaster.webp",
       startKey: "dyrl-splint", startTekst: "Uha! Der sidder en lille splint i poten! Brug pincetten først, og træk den ud!",
       trin2Key: "dyrl-splint-ud", trin2Tekst: "Svup! Splinten er ude! Nu skal der et fint plaster på!",
       okKey: "dyrl-plaster-ok", okTekst: "Så kom der et fint plaster på!"
@@ -119,7 +119,7 @@
       okKey: "dyrl-snue-ok", okTekst: "Så er næsen helt ren og tør!"
     },
     hjerte: {
-      ikon: "🩺",
+      ikon: "🩺", billede: "billeder/dyrlaegen/stetoskop.webp",
       startKey: "dyrl-hjerte", startTekst: "Lad os lytte til hjertet! Vælg stetoskopet, og hold det på maven!",
       okKey: "dyrl-hjerte-ok", okTekst: "Hjertet slår så fint!"
     }
@@ -127,26 +127,9 @@
 
   Spil.css("css-dyrlaegen", `
     .dl{position:relative;height:100%;overflow:hidden;touch-action:none;
-      background:linear-gradient(180deg,#dff6ee 0%,#eefaf5 58%,#f8f2e4 58%,#eedfc5 100%)}
+      background:url("billeder/dyrlaegen/bg-klinik.webp") center bottom / cover no-repeat,
+        linear-gradient(180deg,#dff6ee 0%,#eefaf5 58%,#f8f2e4 58%,#eedfc5 100%)}
     .dl *{touch-action:none}
-
-    /* Klinik-baggrund: vindue, rødt kors og undersøgelsesbord */
-    .dl-vindue{position:absolute;left:max(18px,6%);top:clamp(74px,12vh,118px);
-      width:clamp(74px,13vw,144px);aspect-ratio:1.1;border-radius:20px;pointer-events:none;
-      background:linear-gradient(#9bd7f7,#d7f1ff 72%,#b5e39e 72%);border:7px solid #fff;
-      box-shadow:0 6px 0 rgba(31,58,95,.1),inset 0 0 0 3px rgba(31,58,95,.07)}
-    .dl-vindue::before{content:"";position:absolute;inset:0;
-      background:linear-gradient(90deg,transparent 47%,#fff 47% 53%,transparent 53%),
-        linear-gradient(0deg,transparent 47%,#fff 47% 53%,transparent 53%)}
-    .dl-vindue::after{content:"";position:absolute;right:14%;top:14%;width:22%;aspect-ratio:1;border-radius:50%;
-      background:#ffe066;box-shadow:0 0 12px #ffe066}
-
-    .dl-kors{position:absolute;right:max(18px,6%);top:clamp(76px,13vh,122px);
-      width:clamp(52px,8vw,80px);aspect-ratio:1;border-radius:20px;background:#fff;pointer-events:none;
-      box-shadow:0 5px 0 rgba(31,58,95,.1);display:flex;align-items:center;justify-content:center}
-    .dl-kors::before,.dl-kors::after{content:"";position:absolute;background:#ff6b6b;border-radius:6px}
-    .dl-kors::before{width:54%;height:20%}
-    .dl-kors::after{width:20%;height:54%}
 
     /* Raske-venner-knap øverst til højre */
     .dl-raske{position:absolute;z-index:12;top:calc(2vh + env(safe-area-inset-top,0px));
@@ -214,6 +197,7 @@
     .dl-opg{width:clamp(54px,8vh,74px);aspect-ratio:1;border-radius:50%;background:var(--card);
       box-shadow:0 5px 0 rgba(31,58,95,.18);display:flex;align-items:center;justify-content:center;
       font-size:clamp(28px,4.5vh,42px);position:relative;transition:transform .25s,background .25s}
+    .dl-opg img{width:68%;height:68%;object-fit:contain;pointer-events:none}
     .dl-opg.aktiv{outline:4px solid #ff9f43;transform:scale(1.08)}
     .dl-opg.klar{background:#c9f5cf;transform:scale(.95)}
     .dl-opg.klar::after{content:"✓";position:absolute;right:-4px;bottom:-4px;width:24px;height:24px;border-radius:50%;
@@ -280,19 +264,21 @@
 
     /* Venteværelse (vælg mellem 3 dyr!) */
     .dl-vente{position:absolute;inset:0;z-index:15;
-      background:linear-gradient(180deg,#dff6ee 0%,#eefaf5 62%,#f4e6cc 62%,#e8d3ad 100%);
+      background:linear-gradient(rgba(255,253,247,.26),rgba(255,253,247,.34)),
+        url("billeder/dyrlaegen/bg-klinik.webp") center bottom / cover no-repeat;
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(18px,3.5vh,34px);
       padding:calc(68px + env(safe-area-inset-top,0px)) 16px calc(24px + env(safe-area-inset-bottom,0px));box-sizing:border-box}
     .dl-vente[hidden]{display:none}
     .dl-vente-baenk{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(14px,3vw,32px);max-width:920px}
     .dl-patient-kort{position:relative;width:clamp(148px,26vw,250px);aspect-ratio:.9;border-radius:34px;
-      background:var(--card);box-shadow:0 10px 0 rgba(31,58,95,.18);padding:14px 12px 10px;
+      background:rgba(255,253,247,.95);box-shadow:0 10px 0 rgba(31,58,95,.18);padding:14px 12px 10px;
       display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .16s}
     .dl-patient-kort:active{transform:translateY(6px);box-shadow:0 4px 0 rgba(31,58,95,.18)}
     .dl-patient-kort img{width:84%;height:84%;object-fit:contain;pointer-events:none}
     .dl-patient-boble{position:absolute;top:-12px;right:-10px;min-width:48px;height:48px;padding:0 10px;border-radius:99px;
       background:#fff;box-shadow:0 4px 0 rgba(31,58,95,.18);border:3px solid #ff9f43;
       display:flex;align-items:center;justify-content:center;gap:4px;font-size:24px}
+    .dl-patient-boble img{width:28px;height:28px;object-fit:contain;pointer-events:none}
 
     /* Raske venner-galleri */
     .dl-gal{position:absolute;inset:0;z-index:18;background:rgba(223,246,238,.97);
@@ -312,8 +298,6 @@
 
     /* Telefon på højkant: 2 rækker á 3 store redskaber */
     @media (max-aspect-ratio:1/1){
-      .dl-vindue{top:clamp(68px,10vh,96px);width:clamp(64px,17vw,96px)}
-      .dl-kors{top:clamp(74px,11vh,102px);width:clamp(46px,12vw,64px)}
       .dl-termo{right:12px;top:27%}
       .dl-bord{width:92vw;bottom:clamp(218px,28vh,268px)}
       .dl-scene{width:min(78vw,38vh);bottom:clamp(238px,30.5vh,294px)}
@@ -534,7 +518,7 @@
     ob.innerHTML = opgaver.map(o => {
       const ikon = o.type === "roentgen" && tilstand.roentgenTrin === 2 && tilstand.slugt
         ? tilstand.slugt.ikon
-        : OPGAVE_INFO[o.type].ikon;
+        : redskabIkon(OPGAVE_INFO[o.type]);
       const cls = o.klar ? "klar" : (o.type === aType ? "aktiv" : "");
       return `<div class="dl-opg ${cls}">${ikon}</div>`;
     }).join("");
@@ -596,7 +580,7 @@
     const v = $(".dl-vente");
     v.hidden = false;
     $(".dl-vente-baenk").innerHTML = ventePatienter.map((p, i) => {
-      const ikoner = p.opgaver.map(t => OPGAVE_INFO[t].ikon).join("");
+      const ikoner = p.opgaver.map(t => redskabIkon(OPGAVE_INFO[t])).join("");
       return `<button class="dl-patient-kort" data-idx="${i}" aria-label="${p.dyr.navn}">
         <div class="dl-patient-boble">${ikoner}</div>
         <img src="billeder/dyrlaegen/${p.dyr.id}.webp" alt="${p.dyr.navn}">
@@ -1027,8 +1011,6 @@
       ]);
 
       r.innerHTML = `<div class="dl">
-        <div class="dl-vindue" aria-hidden="true"></div>
-        <div class="dl-kors" aria-hidden="true"></div>
         <div class="dl-opgaver" aria-hidden="true"></div>
         <button class="dl-raske" aria-label="Raske venner">💚 <span>${gem.antal}</span></button>
         <div class="dl-bord" aria-hidden="true"></div>
