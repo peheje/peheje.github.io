@@ -283,6 +283,14 @@
     .ma-mus.off{opacity:.55;filter:grayscale(1)}
     .ma-mus:active{transform:translateY(3px) scale(.95)}
     .ma-wrap.nat .ma-mus{background:rgba(255,255,255,.16);color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.3)}
+    .ma-mus-pop{position:absolute;z-index:5;top:calc(clamp(10px,1.6vh,16px) + clamp(46px,7vh,62px) + 8px);right:clamp(10px,1.6vh,16px);
+      display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:20px;background:rgba(255,255,255,.95);
+      box-shadow:0 10px 28px rgba(31,58,95,.22)}
+    .ma-mus-pop[hidden]{display:none}
+    .ma-wrap.nat .ma-mus-pop{background:rgba(25,36,64,.95);color:#fff;box-shadow:0 10px 28px rgba(0,0,0,.45)}
+    .ma-mus-ico{width:44px;height:44px;border-radius:50%;background:#eef4ff;font-size:22px;display:grid;place-items:center;padding:0;flex:none}
+    .ma-wrap.nat .ma-mus-ico{background:rgba(255,255,255,.14);color:#fff}
+    .ma-mus-rng{width:clamp(120px,20vw,180px);height:36px;accent-color:#5ec2e6;cursor:pointer;margin:0}
     .ma-rail{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(5px,1.4vh,14px);flex:none}
     .ma-colors,.ma-tools{display:grid;grid-template-columns:repeat(2,auto);gap:clamp(4px,1vh,9px);justify-content:center}
     .ma-color,.ma-tool{width:var(--sz);height:var(--sz);display:grid;place-items:center;padding:0;
@@ -1029,7 +1037,11 @@
         <div class="ma-wrap">
           <canvas class="ma-canvas" aria-label="Tegning"></canvas>
           <div class="ma-outline" aria-hidden="true"></div>
-          <button class="ma-mus" aria-label="Musik til og fra">🎵</button>
+          <button class="ma-mus" aria-label="Musik og lydstyrke">🎵</button>
+          <div class="ma-mus-pop" hidden>
+            <button class="ma-mus-ico" aria-label="Musik til og fra">🔇</button>
+            <input class="ma-mus-rng" type="range" min="0" max="100" step="5" value="100" aria-label="Musikstyrke">
+          </div>
           <div class="ma-cur" hidden></div>
           <div class="ma-confirm" hidden><button class="ma-yes" aria-label="Ja, lav en ny tegning">✓</button></div>
           <div class="ma-wipe" hidden></div>
@@ -1077,14 +1089,21 @@
       root.querySelectorAll(".ma-color").forEach(b => b.onclick = () => chooseColor(COLORS.find(c => c.c === b.dataset.c)));
       root.querySelectorAll(".ma-tool").forEach(b => b.onclick = () => chooseTool(b.dataset.tool));
       q(".ma-yes").onclick = doNew;
-      const musBtn = q(".ma-mus");
+      const musBtn = q(".ma-mus"), musPop = q(".ma-mus-pop"), musIco = q(".ma-mus-ico"), musRng = q(".ma-mus-rng");
       const syncMus = () => {
+        const vol = Spil.music ? Spil.music.getVolume() : 1;
         const off = Spil.music && Spil.music.isMuted();
         musBtn.textContent = off ? "🔇" : "🎵";
         musBtn.classList.toggle("off", !!off);
+        musIco.textContent = off ? "🔇" : "🔊";
+        musRng.value = String(Math.round((off ? 0 : vol) * 100));
       };
       syncMus();
-      musBtn.onclick = () => { Spil.sfx.click(); Spil.music && Spil.music.toggle(); syncMus(); };
+      musBtn.onclick = ev => { ev.stopPropagation(); Spil.sfx.click(); musPop.hidden = !musPop.hidden; syncMus(); };
+      musPop.addEventListener("pointerdown", ev => ev.stopPropagation());
+      musIco.onclick = () => { Spil.sfx.click(); Spil.music && Spil.music.toggle(); syncMus(); };
+      musRng.oninput = () => { Spil.music && Spil.music.setVolume(Number(musRng.value) / 100); syncMus(); };
+      canvas.addEventListener("pointerdown", () => { if (!musPop.hidden) musPop.hidden = true; });
       Spil.music && Spil.music.play("lyd/musik-mal.mp3", .14);
 
       if (window.ResizeObserver) {

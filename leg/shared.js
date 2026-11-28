@@ -179,12 +179,21 @@
 
   /* ---------- Baggrundsmusik (Web Audio, så volumen og ducking virker på iPad Safari) ---------- */
   const musikBufs = {};
-  let mSrc = null, mGain = null, mVol = .26, mTok = 0, mUrl = null, mMuted = false;
-  try { mMuted = localStorage.getItem("lk-musik") === "0"; } catch (e) {}
-  function musikTarget() { return mMuted ? .0001 : (talking ? mVol * .26 : mVol); }
+  let mSrc = null, mGain = null, mVol = .26, mScale = 1, mTok = 0, mUrl = null, mMuted = false;
+  try {
+    mMuted = localStorage.getItem("lk-musik") === "0";
+    const sv = parseFloat(localStorage.getItem("lk-musik-vol"));
+    if (Number.isFinite(sv)) mScale = Math.max(0, Math.min(1, sv));
+    if (mScale <= 0) mMuted = true;
+  } catch (e) {}
+  function musikTarget(on = talking) {
+    if (mMuted || mScale <= 0) return .0001;
+    const eff = mVol * mScale;
+    return on ? eff * .26 : eff;
+  }
   function duckMusic(on) {
     if (!mGain || !actx) return;
-    try { mGain.gain.setTargetAtTime(mMuted ? .0001 : (on ? mVol * .26 : mVol), actx.currentTime, .15); } catch (e) {}
+    try { mGain.gain.setTargetAtTime(musikTarget(on), actx.currentTime, .15); } catch (e) {}
   }
   function stopMusic() {
     mTok++; mUrl = null;
@@ -212,13 +221,28 @@
       mSrc = s; mGain = g;
     }).catch(() => {});
   }
+  function setMusicVolume(v) {
+    const val = Math.max(0, Math.min(1, Number(v) || 0));
+    mScale = val;
+    mMuted = val <= 0.001;
+    try {
+      localStorage.setItem("lk-musik", mMuted ? "0" : "1");
+      localStorage.setItem("lk-musik-vol", String(val));
+    } catch (e) {}
+    duckMusic(talking);
+    return val;
+  }
   function toggleMusic() {
     mMuted = !mMuted;
-    try { localStorage.setItem("lk-musik", mMuted ? "0" : "1"); } catch (e) {}
+    if (!mMuted && mScale <= 0) mScale = 1;
+    try {
+      localStorage.setItem("lk-musik", mMuted ? "0" : "1");
+      localStorage.setItem("lk-musik-vol", String(mMuted ? 0 : mScale));
+    } catch (e) {}
     duckMusic(talking);
     return !mMuted;
   }
-  const music = { play: playMusic, stop: stopMusic, toggle: toggleMusic, isMuted: () => mMuted };
+  const music = { play: playMusic, stop: stopMusic, toggle: toggleMusic, setVolume: setMusicVolume, getVolume: () => mMuted ? 0 : mScale, isMuted: () => mMuted };
 
   Object.assign(Spil, { three, say, stopTalking, isTalking, preload, key, jaDyr, audio: ctx, tone, sfx, music, burst, burstAt, css, shuffle, danishVoices, label, setVoice, getVoice: () => voice });
   window.Spil = Spil;
